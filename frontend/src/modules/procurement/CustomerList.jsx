@@ -138,12 +138,12 @@ const CustomerList = () => {
             <div className="space-y-1">
               <label className="text-xs font-medium text-gray-600">Customer Type <span className="text-red-400">*</span></label>
                 <select required name="customerType" value={formData.customerType} onChange={handleInputChange} className="w-full bg-white/50 border border-[var(--color-glass-border)] rounded-md px-3 py-2 text-gray-900 text-sm focus:outline-none focus:border-[var(--color-primary)] transition-colors">
-                  <option value="Dealer" className="bg-[#1a1525] text-gray-900">Dealer</option>
-                  <option value="Party order" className="bg-[#1a1525] text-gray-900">Party order</option>
-                  <option value="Vechicle sales" className="bg-[#1a1525] text-gray-900">Vechicle sales</option>
-                  <option value="Coimbatore" className="bg-[#1a1525] text-gray-900">Coimbatore</option>
-                  <option value="Madurai" className="bg-[#1a1525] text-gray-900">Madurai</option>
-                  <option value="Kerala" className="bg-[#1a1525] text-gray-900">Kerala</option>
+                  <option value="Dealer" className="bg-white text-gray-900">Dealer</option>
+                  <option value="Party order" className="bg-white text-gray-900">Party order</option>
+                  <option value="Vechicle sales" className="bg-white text-gray-900">Vechicle sales</option>
+                  <option value="Coimbatore" className="bg-white text-gray-900">Coimbatore</option>
+                  <option value="Madurai" className="bg-white text-gray-900">Madurai</option>
+                  <option value="Kerala" className="bg-white text-gray-900">Kerala</option>
                 </select>
             </div>
             <div className="space-y-1">

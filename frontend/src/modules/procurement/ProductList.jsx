@@ -125,7 +125,7 @@ const ProductList = () => {
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-1">
               <label className="text-xs font-medium text-gray-600">Item Type <span className="text-red-400">*</span></label>
-              <select required name="itemType" value={formData.itemType} onChange={handleInputChange} className="w-full bg-[#1a1525] border border-[var(--color-glass-border)] rounded-md px-3 py-2 text-gray-900 text-sm focus:outline-none focus:border-[var(--color-primary)] transition-colors appearance-none">
+              <select required name="itemType" value={formData.itemType} onChange={handleInputChange} className="w-full bg-white/50 border border-[var(--color-glass-border)] rounded-md px-3 py-2 text-gray-900 text-sm focus:outline-none focus:border-[var(--color-primary)] transition-colors appearance-none">
                 <option value="Raw Material">Raw Material</option>
                 <option value="Finished Goods">Finished Goods</option>
               </select>
@@ -139,7 +139,7 @@ const ProductList = () => {
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-1">
               <label className="text-xs font-medium text-gray-600">Unit of Measure <span className="text-red-400">*</span></label>
-              <select required name="unitOfMeasure" value={formData.unitOfMeasure} onChange={handleInputChange} className="w-full bg-[#1a1525] border border-[var(--color-glass-border)] rounded-md px-3 py-2 text-gray-900 text-sm focus:outline-none focus:border-[var(--color-primary)] transition-colors appearance-none">
+              <select required name="unitOfMeasure" value={formData.unitOfMeasure} onChange={handleInputChange} className="w-full bg-white/50 border border-[var(--color-glass-border)] rounded-md px-3 py-2 text-gray-900 text-sm focus:outline-none focus:border-[var(--color-primary)] transition-colors appearance-none">
                 <option value="Kg">Kg</option>
                 <option value="Ltr">Ltr</option>
                 <option value="Pcs">Pcs</option>
