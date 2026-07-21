@@ -24,16 +24,16 @@ const InventoryDashboard = () => {
   return (
     <div>
       <div className="flex justify-between items-center mb-6">
-        <h1 className="text-2xl font-semibold text-white">Inventory Levels</h1>
+        <h1 className="text-2xl font-semibold text-gray-900">Inventory Levels</h1>
       </div>
 
       <div className="glass-panel overflow-hidden">
         {loading ? (
-          <div className="p-8 text-center text-gray-400">Loading inventory...</div>
+          <div className="p-8 text-center text-gray-600">Loading inventory...</div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full text-left text-sm text-gray-300">
-              <thead className="bg-[rgba(255,255,255,0.02)] border-b border-[var(--color-glass-border)] text-gray-400">
+            <table className="w-full text-left text-sm text-gray-700">
+              <thead className="bg-[rgba(255,255,255,0.02)] border-b border-[var(--color-glass-border)] text-gray-600">
                 <tr>
                   <th className="px-6 py-4 font-medium">Branch</th>
                   <th className="px-6 py-4 font-medium">Item Code</th>
@@ -46,7 +46,7 @@ const InventoryDashboard = () => {
               <tbody className="divide-y divide-[var(--color-glass-border)]">
                 {inventory.map((item) => (
                   <tr key={item._id} className="hover:bg-[rgba(255,255,255,0.02)] transition-colors">
-                    <td className="px-6 py-4 font-medium text-white">{item.branch?.branchName}</td>
+                    <td className="px-6 py-4 font-medium text-gray-900">{item.branch?.branchName}</td>
                     <td className="px-6 py-4 font-mono text-xs">{item.rawMaterial?.itemCode}</td>
                     <td className="px-6 py-4">{item.rawMaterial?.name}</td>
                     <td className="px-6 py-4">{item.rawMaterial?.category}</td>
@@ -60,7 +60,7 @@ const InventoryDashboard = () => {
                 ))}
                 {inventory.length === 0 && (
                   <tr>
-                    <td colSpan="6" className="px-6 py-8 text-center text-gray-400">
+                    <td colSpan="6" className="px-6 py-8 text-center text-gray-600">
                       No inventory records found for this branch.
                     </td>
                   </tr>

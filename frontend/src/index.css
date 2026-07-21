@@ -5,19 +5,25 @@
   --color-primary-hover: #AD1457;
   --color-primary-soft: rgba(216, 27, 96, 0.15);
   
-  --color-secondary: #0A0A0A;
-  --color-dark-charcoal: #1A1A1A;
+  --color-secondary: #f8f9fa;
+  --color-dark-charcoal: #111111;
   --color-soft-pink: #FCE4EC;
-  --color-light-gray: #F5F5F5;
-  --color-glass: rgba(255, 255, 255, 0.05);
-  --color-glass-border: rgba(255, 255, 255, 0.1);
+  --color-light-gray: #e9ecef;
+  
+  /* Light Glassmorphism */
+  --color-glass: rgba(255, 255, 255, 0.6);
+  --color-glass-border: rgba(255, 255, 255, 0.8);
+  --color-glass-shadow: rgba(0, 0, 0, 0.05);
 
   --font-sans: 'Poppins', sans-serif;
 }
 
 body {
   background-color: var(--color-secondary);
-  color: white;
+  background-image: radial-gradient(at 0% 0%, rgba(216, 27, 96, 0.1) 0px, transparent 50%),
+                    radial-gradient(at 100% 100%, rgba(216, 27, 96, 0.1) 0px, transparent 50%);
+  background-attachment: fixed;
+  color: var(--color-dark-charcoal);
   font-family: 'Poppins', sans-serif;
   margin: 0;
   padding: 0;
@@ -26,26 +32,29 @@ body {
 /* Glassmorphism utilities */
 .glass-panel {
   background: var(--color-glass);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
   border: 1px solid var(--color-glass-border);
   border-radius: 1rem;
-  box-shadow: 0 4px 30px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 8px 32px var(--color-glass-shadow);
+  color: var(--color-dark-charcoal);
 }
 
 .glass-input {
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  color: white;
+  background: rgba(255, 255, 255, 0.8);
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  color: var(--color-dark-charcoal);
   border-radius: 0.5rem;
   padding: 0.5rem 1rem;
   transition: all 0.3s ease;
+  box-shadow: inset 0 2px 4px rgba(0,0,0,0.02);
 }
 
 .glass-input:focus {
   outline: none;
   border-color: var(--color-primary);
-  background: rgba(255, 255, 255, 0.1);
+  background: #ffffff;
+  box-shadow: 0 0 0 3px var(--color-primary-soft);
 }
 
 .glass-button {
@@ -64,3 +73,14 @@ body {
   transform: translateY(-2px);
   box-shadow: 0 6px 20px rgba(216, 27, 96, 0.4);
 }
+
+/* Table Header Styles */
+thead {
+  background-color: var(--color-primary) !important;
+  color: white !important;
+}
+
+thead th {
+  color: white !important;
+}
+

@@ -3,7 +3,11 @@ const mongoose = require('mongoose');
 const customerSchema = new mongoose.Schema({
     customerCode: { type: String, required: true, unique: true },
     name: { type: String, required: true },
-    customerType: { type: String, enum: ['Wholesale', 'Retail', 'Distributor'], default: 'Wholesale' },
+    customerType: { 
+        type: String, 
+        enum: ['Dealer', 'Party order', 'Vechicle sales', 'Coimbatore', 'Madurai', 'Kerala'], 
+        required: true 
+    },
     contactPerson: { type: String },
     email: { type: String },
     phone: { type: String },

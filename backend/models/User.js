@@ -13,7 +13,7 @@ const userSchema = new mongoose.Schema({
     assignedBranches: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Branch' }],
     department: { type: String },
     designation: { type: String },
-    status: { type: String, enum: ['Active', 'Inactive', 'Suspended'], default: 'Active' },
+    status: { type: String, enum: ['Pending', 'Active', 'Inactive', 'Suspended'], default: 'Pending' },
     lastLogin: { type: Date },
     createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
     updatedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' }

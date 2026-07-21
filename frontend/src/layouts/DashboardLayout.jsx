@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Outlet, Navigate, useNavigate, Link, useLocation } from 'react-router-dom';
-import { LogOut, LayoutDashboard, Building2, Users, Menu, X } from 'lucide-react';
+import { LogOut, LayoutDashboard, Building2, Users, Menu, X, ChevronDown } from 'lucide-react';
 import api from '../services/api';
 
 const DashboardLayout = () => {
@@ -32,72 +32,105 @@ const DashboardLayout = () => {
       <Link 
         to={to} 
         onClick={() => setIsSidebarOpen(false)}
-        className={`flex items-center gap-3 px-3 py-2 rounded-lg transition-colors ${isActive ? 'bg-[var(--color-primary-soft)] text-white' : 'text-gray-400 hover:bg-[var(--color-glass)] hover:text-white'}`}
+        className={`flex items-center gap-3 px-3 py-2 rounded-lg transition-colors ${isActive ? 'bg-white/20 text-white font-medium' : 'text-pink-100 hover:bg-white/10 hover:text-white'}`}
       >
         <Icon size={18} /> {children}
       </Link>
     );
   };
 
+  const NavGroup = ({ title, children, defaultOpen = true }) => {
+    const [isOpen, setIsOpen] = useState(defaultOpen);
+
+    return (
+      <div className="mb-2 mt-2">
+        <button 
+          onClick={() => setIsOpen(!isOpen)}
+          className="w-full flex items-center justify-between px-3 py-2 text-xs font-semibold text-pink-200 uppercase tracking-wider hover:text-white transition-colors group rounded-lg hover:bg-white/5"
+        >
+          <span>{title}</span>
+          <ChevronDown 
+            size={14} 
+            className={`transition-transform duration-200 ${isOpen ? 'rotate-180 text-white' : 'text-pink-300 group-hover:text-white'}`} 
+          />
+        </button>
+        
+        <div className={`overflow-hidden transition-all duration-300 ease-in-out ${isOpen ? 'max-h-96 opacity-100 mt-1' : 'max-h-0 opacity-0'}`}>
+          <div className="space-y-1">
+            {children}
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   return (
-    <div className="flex h-screen bg-[var(--color-secondary)] overflow-hidden text-sm">
+    <div className="flex h-screen bg-[var(--color-primary)]/15 overflow-hidden text-sm">
       {/* Mobile Overlay */}
       {isSidebarOpen && (
         <div 
-          className="fixed inset-0 bg-black/60 backdrop-blur-sm z-40 lg:hidden"
+          className="fixed inset-0 bg-white/60 backdrop-blur-sm z-40 lg:hidden"
           onClick={() => setIsSidebarOpen(false)}
         />
       )}
 
       {/* Sidebar */}
-      <div className={`fixed inset-y-0 left-0 z-50 w-64 glass-panel border-y-0 border-l-0 rounded-none flex flex-col transform transition-transform duration-300 ease-in-out lg:relative lg:translate-x-0 ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}>
-        <div className="p-6 border-b border-[var(--color-glass-border)] flex justify-between items-center">
-          <div>
-            <h2 className="text-xl font-bold text-white tracking-wider">SARAVANASS</h2>
-            <p className="text-xs text-[var(--color-primary)] mt-1">ERP SYSTEM</p>
+      <div className={`fixed inset-y-0 left-0 z-50 w-64 bg-[var(--color-primary)] border-y-0 border-l-0 border-r border-pink-400 rounded-none flex flex-col transform transition-transform duration-300 ease-in-out lg:relative lg:translate-x-0 ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}>
+        <div className="p-6 border-b border-[var(--color-glass-border)] flex justify-between items-start">
+          <div className="flex flex-col gap-3">
+            <img src="/logo.avif" alt="Logo" className="w-48 h-20 rounded-xl shadow-sm object-cover object-center" />
+            <div>
+              <h2 className="text-xl font-bold text-white tracking-wider">SARAVANASS</h2>
+              <p className="text-xs text-pink-200 mt-1">ERP SYSTEM</p>
+            </div>
           </div>
           <button 
-            className="lg:hidden text-gray-400 hover:text-white"
+            className="lg:hidden text-white hover:text-pink-100"
             onClick={() => setIsSidebarOpen(false)}
           >
             <X size={20} />
           </button>
         </div>
         
-        <nav className="flex-1 p-4 space-y-2 overflow-y-auto">
-          <div className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2 mt-2 px-3">Dashboard</div>
-          <NavItem to="/dashboard" icon={LayoutDashboard}>Overview</NavItem>
+        <nav className="flex-1 p-4 overflow-y-auto">
+          <NavGroup title="Dashboard">
+            <NavItem to="/dashboard" icon={LayoutDashboard}>Overview</NavItem>
+          </NavGroup>
 
-          <div className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2 mt-6 px-3">Master Hub</div>
-          <NavItem to="/vendors" icon={Building2}>Vendors</NavItem>
-          <NavItem to="/customers" icon={Users}>Customers</NavItem>
-          <NavItem to="/products" icon={LayoutDashboard}>Products</NavItem>
+          <NavGroup title="Master Hub">
+            <NavItem to="/vendors" icon={Building2}>Vendors</NavItem>
+            <NavItem to="/customers" icon={Users}>Customers</NavItem>
+            <NavItem to="/products" icon={LayoutDashboard}>Products</NavItem>
+          </NavGroup>
 
-          <div className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2 mt-6 px-3">Procurement</div>
-          <NavItem to="/purchase-orders" icon={LayoutDashboard}>Purchase Orders</NavItem>
-          <NavItem to="/grn" icon={LayoutDashboard}>Goods Receiving</NavItem>
+          <NavGroup title="Procurement">
+            <NavItem to="/purchase-orders" icon={LayoutDashboard}>Purchase Orders</NavItem>
+            <NavItem to="/grn" icon={LayoutDashboard}>Goods Receiving</NavItem>
+          </NavGroup>
 
-          <div className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2 mt-6 px-3">Inventory</div>
-          <NavItem to="/inventory" icon={LayoutDashboard}>Stock Levels</NavItem>
+          <NavGroup title="Inventory">
+            <NavItem to="/inventory" icon={LayoutDashboard}>Stock Levels</NavItem>
+          </NavGroup>
 
-          <div className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2 mt-6 px-3">Admin</div>
-          <NavItem to="/branches" icon={Building2}>Branches</NavItem>
-          <NavItem to="/users" icon={Users}>Users</NavItem>
+          <NavGroup title="Admin">
+            <NavItem to="/branches" icon={Building2}>Branches</NavItem>
+            <NavItem to="/users" icon={Users}>Users</NavItem>
+          </NavGroup>
         </nav>
 
         <div className="p-4 border-t border-[var(--color-glass-border)]">
           <div className="flex items-center gap-3 mb-4">
-            <div className="w-10 h-10 min-w-[40px] rounded-full bg-[var(--color-primary)] flex items-center justify-center font-bold text-lg">
+            <div className="w-10 h-10 min-w-[40px] rounded-full bg-white text-[var(--color-primary)] flex items-center justify-center font-bold text-lg">
               {user.name?.charAt(0) || 'U'}
             </div>
             <div className="overflow-hidden">
               <div className="font-medium text-white truncate">{user.name || 'User'}</div>
-              <div className="text-xs text-[var(--color-primary)] font-semibold truncate">{user.role || 'Role'}</div>
+              <div className="text-xs text-pink-200 font-semibold truncate">{user.role || 'Role'}</div>
             </div>
           </div>
           <button 
             onClick={handleLogout}
-            className="flex items-center gap-2 text-sm text-red-400 hover:text-red-300 w-full px-2 py-2 rounded transition-colors hover:bg-[rgba(255,0,0,0.1)]"
+            className="flex items-center gap-2 text-sm text-white hover:text-pink-200 w-full px-2 py-2 rounded transition-colors hover:bg-white/10"
           >
             <LogOut size={16} /> Logout
           </button>
@@ -110,19 +143,19 @@ const DashboardLayout = () => {
         <header className="h-16 glass-panel border-x-0 border-t-0 rounded-none flex items-center justify-between px-4 lg:px-8 z-10 w-full">
           <div className="flex items-center gap-3">
             <button 
-              className="lg:hidden text-gray-300 hover:text-white p-1 rounded-md hover:bg-[var(--color-glass)]"
+              className="lg:hidden text-gray-700 hover:text-gray-900 p-1 rounded-md hover:bg-[var(--color-glass)]"
               onClick={() => setIsSidebarOpen(true)}
             >
               <Menu size={20} />
             </button>
-            <div className="text-lg font-medium text-gray-200 hidden sm:block">
+            <div className="text-lg font-medium text-gray-800 hidden sm:block">
               {/* Breadcrumbs or Page Title could go here */}
             </div>
           </div>
           
           <div className="flex items-center gap-2 sm:gap-4">
-            <span className="text-xs sm:text-sm text-gray-400 hidden sm:inline">Current Branch:</span>
-            <div className="px-2 sm:px-3 py-1 bg-[var(--color-glass)] border border-[var(--color-glass-border)] rounded-md text-xs sm:text-sm text-white truncate max-w-[120px] sm:max-w-xs">
+            <span className="text-xs sm:text-sm text-gray-600 hidden sm:inline">Current Branch:</span>
+            <div className="px-2 sm:px-3 py-1 bg-[var(--color-glass)] border border-[var(--color-glass-border)] rounded-md text-xs sm:text-sm text-gray-900 truncate max-w-[120px] sm:max-w-xs">
               Main Branch
             </div>
           </div>
