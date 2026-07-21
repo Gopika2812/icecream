@@ -1,7 +1,9 @@
 import axios from 'axios';
 
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://icecream-b4lp.onrender.com/api/v1';
+
 const api = axios.create({
-  baseURL: 'http://localhost:5001/api/v1',
+  baseURL: API_BASE_URL,
   withCredentials: true // For sending cookies
 });
 
@@ -22,7 +24,7 @@ api.interceptors.response.use(
     if (error.response?.status === 401 && !originalRequest._retry && originalRequest.url !== '/auth/login') {
       originalRequest._retry = true;
       try {
-        const { data } = await axios.post('http://localhost:5001/api/v1/auth/refresh', {}, { withCredentials: true });
+        const { data } = await axios.post(`${API_BASE_URL}/auth/refresh`, {}, { withCredentials: true });
         localStorage.setItem('accessToken', data.accessToken);
         api.defaults.headers.common['Authorization'] = `Bearer ${data.accessToken}`;
         return api(originalRequest);

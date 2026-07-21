@@ -19,7 +19,10 @@ const app = express();
 app.use(express.json());
 app.use(cookieParser());
 app.use(cors({
-    origin: ['http://localhost:5173', 'http://localhost:3000'],
+    origin: function (origin, callback) {
+        // Allow all origins for seamless frontend deployment testing
+        callback(null, true);
+    },
     credentials: true
 }));
 app.use(helmet());
