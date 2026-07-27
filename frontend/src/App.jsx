@@ -9,7 +9,7 @@ import VendorList from './modules/procurement/VendorList';
 import CustomerList from './modules/procurement/CustomerList';
 import ProductList from './modules/procurement/ProductList';
 import PurchaseOrderList from './modules/procurement/PurchaseOrderList';
-import GRNList from './modules/procurement/GRNList';
+import QCList from './modules/procurement/QCList';
 import InventoryDashboard from './modules/inventory/InventoryDashboard';
 
 const queryClient = new QueryClient();
@@ -30,7 +30,7 @@ function App() {
             <Route path="customers" element={<CustomerList />} />
             <Route path="products" element={<ProductList />} />
             <Route path="purchase-orders" element={<PurchaseOrderList />} />
-            <Route path="grn" element={<GRNList />} />
+            <Route path="qc" element={<QCList />} />
             <Route path="inventory" element={<InventoryDashboard />} />
 
             {/* Admin */}

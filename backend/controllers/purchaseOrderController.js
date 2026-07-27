@@ -5,7 +5,7 @@ exports.getPurchaseOrders = async (req, res) => {
         const pos = await PurchaseOrder.find()
             .populate('vendor', 'name vendorCode')
             .populate('branch', 'branchName branchCode')
-            .populate('items.rawMaterial', 'name itemCode unitOfMeasure');
+            .populate('items.product', 'name itemCode unitOfMeasure');
         res.json({ success: true, data: pos });
     } catch (error) {
         res.status(500).json({ success: false, message: error.message });
@@ -17,7 +17,7 @@ exports.getPurchaseOrder = async (req, res) => {
         const po = await PurchaseOrder.findById(req.params.id)
             .populate('vendor', 'name vendorCode')
             .populate('branch', 'branchName branchCode')
-            .populate('items.rawMaterial', 'name itemCode unitOfMeasure');
+            .populate('items.product', 'name itemCode unitOfMeasure');
         if (!po) return res.status(404).json({ success: false, message: 'PO not found' });
         res.json({ success: true, data: po });
     } catch (error) {

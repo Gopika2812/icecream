@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import api from '../../services/api';
-import { Plus } from 'lucide-react';
+import { Plus, Search, Filter } from 'lucide-react';
 import Modal from '../../components/Modal';
 
 const ProductList = () => {
@@ -8,6 +8,16 @@ const ProductList = () => {
   const [loading, setLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
   
+  // Search state per column
+  const [searchFilters, setSearchFilters] = useState({
+    itemCode: '',
+    name: '',
+    itemType: '',
+    category: '',
+    unitOfMeasure: '',
+    wholesalePrice: ''
+  });
+
   // Form State
   const [formData, setFormData] = useState({
     itemCode: '', name: '', itemType: 'Raw Material', category: '', unitOfMeasure: 'Kg', mrp: 0, wholesalePrice: 0, minimumStockLevel: 0
@@ -33,6 +43,13 @@ const ProductList = () => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
   };
 
+  const handleFilterChange = (column, value) => {
+    setSearchFilters(prev => ({
+      ...prev,
+      [column]: value
+    }));
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setSubmitting(true);
@@ -49,13 +66,25 @@ const ProductList = () => {
     }
   };
 
+  // Filtered products list
+  const filteredProducts = products.filter((item) => {
+    const itemCodeMatch = (item.itemCode || '').toLowerCase().includes(searchFilters.itemCode.toLowerCase());
+    const nameMatch = (item.name || '').toLowerCase().includes(searchFilters.name.toLowerCase());
+    const typeMatch = searchFilters.itemType === '' || item.itemType === searchFilters.itemType;
+    const categoryMatch = (item.category || '').toLowerCase().includes(searchFilters.category.toLowerCase());
+    const uomMatch = (item.unitOfMeasure || '').toLowerCase().includes(searchFilters.unitOfMeasure.toLowerCase());
+    const priceMatch = searchFilters.wholesalePrice === '' || (item.wholesalePrice || '').toString().includes(searchFilters.wholesalePrice);
+    
+    return itemCodeMatch && nameMatch && typeMatch && categoryMatch && uomMatch && priceMatch;
+  });
+
   return (
     <div>
       <div className="flex justify-between items-center mb-6">
-        <h1 className="text-2xl font-semibold text-gray-900">Products & Materials</h1>
+        <h1 className="text-2xl font-semibold text-gray-900 font-display">Products & Materials</h1>
         <button 
           onClick={() => setIsModalOpen(true)}
-          className="flex items-center gap-2 bg-[var(--color-primary)] hover:bg-[var(--color-primary-soft)] text-white px-4 py-2 rounded-lg transition-colors shadow-[0_0_15px_rgba(216,27,96,0.3)]"
+          className="flex items-center gap-2 bg-[var(--color-primary)] hover:bg-[var(--color-primary-soft)] text-white px-4 py-2 rounded-lg transition-colors shadow-[0_0_15px_rgba(216,27,96,0.3)] font-medium"
         >
           <Plus size={18} /> Add Item
         </button>
@@ -67,39 +96,102 @@ const ProductList = () => {
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-left text-sm text-gray-700">
-              <thead className="bg-[rgba(255,255,255,0.02)] border-b border-[var(--color-glass-border)] text-gray-600">
+              <thead className="bg-[rgba(255,255,255,0.02)] border-b border-[var(--color-glass-border)] text-gray-600 font-semibold">
+                {/* Column Headers */}
                 <tr>
-                  <th className="px-6 py-4 font-medium">Item Code</th>
-                  <th className="px-6 py-4 font-medium">Name</th>
-                  <th className="px-6 py-4 font-medium">Type</th>
-                  <th className="px-6 py-4 font-medium">Category</th>
-                  <th className="px-6 py-4 font-medium">UoM</th>
-                  <th className="px-6 py-4 font-medium">Wholesale Price</th>
-                  <th className="px-6 py-4 font-medium text-right">Actions</th>
+                  <th className="px-6 py-4">Item Code</th>
+                  <th className="px-6 py-4">Name</th>
+                  <th className="px-6 py-4">Type</th>
+                  <th className="px-6 py-4">Category</th>
+                  <th className="px-6 py-4">UoM</th>
+                  <th className="px-6 py-4">Wholesale Price</th>
+                  <th className="px-6 py-4 text-right">Actions</th>
+                </tr>
+                {/* Search / Filter Row */}
+                <tr className="bg-white/5 border-b border-[var(--color-glass-border)]">
+                  <th className="px-4 py-2">
+                    <div className="relative">
+                      <input 
+                        type="text" 
+                        placeholder="Search code..."
+                        value={searchFilters.itemCode}
+                        onChange={(e) => handleFilterChange('itemCode', e.target.value)}
+                        className="w-full bg-white/20 border border-[var(--color-glass-border)] rounded-md pl-2 pr-2 py-1 text-xs text-gray-900 focus:outline-none focus:border-[var(--color-primary)] font-normal"
+                      />
+                    </div>
+                  </th>
+                  <th className="px-4 py-2">
+                    <input 
+                      type="text" 
+                      placeholder="Search name..."
+                      value={searchFilters.name}
+                      onChange={(e) => handleFilterChange('name', e.target.value)}
+                      className="w-full bg-white/20 border border-[var(--color-glass-border)] rounded-md px-2 py-1 text-xs text-gray-900 focus:outline-none focus:border-[var(--color-primary)] font-normal"
+                    />
+                  </th>
+                  <th className="px-4 py-2">
+                    <select
+                      value={searchFilters.itemType}
+                      onChange={(e) => handleFilterChange('itemType', e.target.value)}
+                      className="w-full bg-white/20 border border-[var(--color-glass-border)] rounded-md px-1 py-1 text-xs text-gray-700 focus:outline-none focus:border-[var(--color-primary)] font-normal"
+                    >
+                      <option value="">All Types</option>
+                      <option value="Raw Material">Raw Material</option>
+                      <option value="Finished Goods">Finished Goods</option>
+                    </select>
+                  </th>
+                  <th className="px-4 py-2">
+                    <input 
+                      type="text" 
+                      placeholder="Search category..."
+                      value={searchFilters.category}
+                      onChange={(e) => handleFilterChange('category', e.target.value)}
+                      className="w-full bg-white/20 border border-[var(--color-glass-border)] rounded-md px-2 py-1 text-xs text-gray-900 focus:outline-none focus:border-[var(--color-primary)] font-normal"
+                    />
+                  </th>
+                  <th className="px-4 py-2">
+                    <input 
+                      type="text" 
+                      placeholder="Search UoM..."
+                      value={searchFilters.unitOfMeasure}
+                      onChange={(e) => handleFilterChange('unitOfMeasure', e.target.value)}
+                      className="w-full bg-white/20 border border-[var(--color-glass-border)] rounded-md px-2 py-1 text-xs text-gray-900 focus:outline-none focus:border-[var(--color-primary)] font-normal"
+                    />
+                  </th>
+                  <th className="px-4 py-2">
+                    <input 
+                      type="text" 
+                      placeholder="Search price..."
+                      value={searchFilters.wholesalePrice}
+                      onChange={(e) => handleFilterChange('wholesalePrice', e.target.value)}
+                      className="w-full bg-white/20 border border-[var(--color-glass-border)] rounded-md px-2 py-1 text-xs text-gray-900 focus:outline-none focus:border-[var(--color-primary)] font-normal text-right"
+                    />
+                  </th>
+                  <th className="px-4 py-2 text-right"></th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-[var(--color-glass-border)]">
-                {products.map((item) => (
+                {filteredProducts.map((item) => (
                   <tr key={item._id} className="hover:bg-[rgba(255,255,255,0.02)] transition-colors">
-                    <td className="px-6 py-4 font-mono text-xs">{item.itemCode}</td>
+                    <td className="px-6 py-4 font-mono text-xs font-semibold">{item.itemCode}</td>
                     <td className="px-6 py-4 font-medium text-gray-900">{item.name}</td>
                     <td className="px-6 py-4">
-                      <span className={`px-2 py-1 rounded-full text-xs ${item.itemType === 'Raw Material' ? 'bg-orange-500/10 text-orange-400' : 'bg-blue-500/10 text-blue-400'}`}>
+                      <span className={`px-2 py-1 rounded-full text-xs font-semibold ${item.itemType === 'Raw Material' ? 'bg-orange-500/10 text-orange-400' : 'bg-blue-500/10 text-blue-400'}`}>
                         {item.itemType}
                       </span>
                     </td>
-                    <td className="px-6 py-4">{item.category}</td>
+                    <td className="px-6 py-4 font-medium">{item.category}</td>
                     <td className="px-6 py-4">{item.unitOfMeasure}</td>
-                    <td className="px-6 py-4">₹{item.wholesalePrice}</td>
+                    <td className="px-6 py-4 font-bold text-gray-900">₹{item.wholesalePrice}</td>
                     <td className="px-6 py-4 text-right">
-                      <button className="text-[var(--color-primary)] hover:text-gray-900 transition-colors text-xs font-medium">Edit</button>
+                      <button className="text-[var(--color-primary)] hover:text-gray-900 transition-colors text-xs font-semibold">Edit</button>
                     </td>
                   </tr>
                 ))}
-                {products.length === 0 && (
+                {filteredProducts.length === 0 && (
                   <tr>
                     <td colSpan="7" className="px-6 py-8 text-center text-gray-600">
-                      No items found. Add one to get started.
+                      No items matching the filters.
                     </td>
                   </tr>
                 )}

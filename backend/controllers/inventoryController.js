@@ -12,7 +12,7 @@ exports.getInventory = async (req, res) => {
         
         const inventory = await Inventory.find(query)
             .populate('branch', 'branchName branchCode')
-            .populate('rawMaterial', 'name itemCode category unitOfMeasure minimumStockLevel');
+            .populate('product', 'name itemCode category unitOfMeasure minimumStockLevel');
             
         res.json({ success: true, data: inventory });
     } catch (error) {
@@ -23,16 +23,19 @@ exports.getInventory = async (req, res) => {
 // @desc    Get inventory transactions
 // @route   GET /api/v1/inventory/transactions
 // @access  Private
+// @desc    Get inventory transactions
+// @route   GET /api/v1/inventory/transactions
+// @access  Private
 exports.getInventoryTransactions = async (req, res) => {
     try {
-        const { branchId, rawMaterialId } = req.query;
+        const { branchId, productId } = req.query;
         let query = {};
         if (branchId) query.branch = branchId;
-        if (rawMaterialId) query.rawMaterial = rawMaterialId;
+        if (productId) query.product = productId;
 
         const transactions = await InventoryTransaction.find(query)
             .populate('branch', 'branchName')
-            .populate('rawMaterial', 'name itemCode')
+            .populate('product', 'name itemCode')
             .populate('performedBy', 'name')
             .sort({ createdAt: -1 })
             .limit(100);

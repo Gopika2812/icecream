@@ -37,6 +37,7 @@ app.use('/api/v1/customers', require('./routes/customerRoutes'));
 app.use('/api/v1/products', require('./routes/productRoutes'));
 app.use('/api/v1/purchase-orders', require('./routes/purchaseOrderRoutes'));
 app.use('/api/v1/grn', require('./routes/grnRoutes'));
+app.use('/api/v1/qc', require('./routes/qualityControlRoutes'));
 app.use('/api/v1/inventory', require('./routes/inventoryRoutes'));
 
 // Error handling middleware

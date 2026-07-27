@@ -8,7 +8,7 @@ exports.getGRNs = async (req, res) => {
         const grns = await GRN.find()
             .populate('poReference', 'poNumber')
             .populate('branch', 'branchName branchCode')
-            .populate('items.rawMaterial', 'name itemCode unitOfMeasure');
+            .populate('items.product', 'name itemCode unitOfMeasure');
         res.json({ success: true, data: grns });
     } catch (error) {
         res.status(500).json({ success: false, message: error.message });
@@ -24,7 +24,7 @@ exports.getGRN = async (req, res) => {
                 populate: { path: 'vendor', select: 'name' }
             })
             .populate('branch', 'branchName branchCode')
-            .populate('items.rawMaterial', 'name itemCode unitOfMeasure');
+            .populate('items.product', 'name itemCode unitOfMeasure');
         if (!grn) return res.status(404).json({ success: false, message: 'GRN not found' });
         res.json({ success: true, data: grn });
     } catch (error) {
@@ -52,30 +52,8 @@ exports.createGRN = async (req, res) => {
             createdBy: req.user._id
         });
 
-        // 3. Update Inventory and Create Transactions
-        for (const item of items) {
-            if (item.acceptedQty > 0) {
-                // Update Inventory
-                const inventory = await Inventory.findOneAndUpdate(
-                    { branch, rawMaterial: item.rawMaterial },
-                    { $inc: { quantity: item.acceptedQty }, $set: { lastUpdated: Date.now() } },
-                    { new: true, upsert: true }
-                );
-
-                // Create Transaction Log
-                await InventoryTransaction.create({
-                    branch,
-                    rawMaterial: item.rawMaterial,
-                    transactionType: 'IN',
-                    quantity: item.acceptedQty,
-                    referenceType: 'GRN',
-                    referenceId: grn._id,
-                    remarks: `GRN created. Rejected Qty: ${item.rejectedQty}`,
-                    performedBy: req.user._id
-                });
-            }
-        }
-
+        // 3. (Deferred to QC Step) Inventory and transaction logs will be created when QC is run.
+        
         // 4. Update PO Status
         po.status = 'Completed'; // Simplified logic, ideally check if all items received fully
         await po.save();

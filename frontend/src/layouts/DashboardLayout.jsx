@@ -105,7 +105,7 @@ const DashboardLayout = () => {
 
           <NavGroup title="Procurement">
             <NavItem to="/purchase-orders" icon={LayoutDashboard}>Purchase Orders</NavItem>
-            <NavItem to="/grn" icon={LayoutDashboard}>Goods Receiving</NavItem>
+            <NavItem to="/qc" icon={LayoutDashboard}>Quality Control</NavItem>
           </NavGroup>
 
           <NavGroup title="Inventory">
