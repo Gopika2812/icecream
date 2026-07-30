@@ -10,7 +10,9 @@ import CustomerList from './modules/procurement/CustomerList';
 import ProductList from './modules/procurement/ProductList';
 import PurchaseOrderList from './modules/procurement/PurchaseOrderList';
 import QCList from './modules/procurement/QCList';
-import InventoryDashboard from './modules/inventory/InventoryDashboard';
+import RawMaterialStock from './modules/inventory/RawMaterialStock';
+import ProductionList from './modules/production/ProductionList';
+import FinishedGoodsStock from './modules/inventory/FinishedGoodsStock';
 
 const queryClient = new QueryClient();
 
@@ -25,13 +27,20 @@ function App() {
             <Route index element={<Navigate to="/dashboard" replace />} />
             <Route path="dashboard" element={<AdminDashboard />} />
             
-            {/* Master Hub & Procurement & Inventory */}
+            {/* Master Hub */}
             <Route path="vendors" element={<VendorList />} />
             <Route path="customers" element={<CustomerList />} />
             <Route path="products" element={<ProductList />} />
+            
+            {/* Procurement & Production */}
             <Route path="purchase-orders" element={<PurchaseOrderList />} />
             <Route path="qc" element={<QCList />} />
-            <Route path="inventory" element={<InventoryDashboard />} />
+            <Route path="raw-material-stock" element={<RawMaterialStock />} />
+            <Route path="production" element={<ProductionList />} />
+
+            {/* Inventory */}
+            <Route path="finished-goods-stock" element={<FinishedGoodsStock />} />
+            <Route path="inventory" element={<Navigate to="/finished-goods-stock" replace />} />
 
             {/* Admin */}
             <Route path="branches" element={<BranchesList />} />

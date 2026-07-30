@@ -8,7 +8,15 @@ const Product = require('../models/Product');
 exports.getQualityControls = async (req, res) => {
     try {
         const qcs = await QualityControl.find()
-            .populate('grnReference', 'grnNumber poReference')
+            .populate({
+                path: 'grnReference',
+                populate: {
+                    path: 'poReference',
+                    populate: {
+                        path: 'vendor'
+                    }
+                }
+            })
             .populate('branch', 'branchName branchCode')
             .populate('items.product', 'name itemCode unitOfMeasure itemType');
         res.json({ success: true, data: qcs });
@@ -20,7 +28,15 @@ exports.getQualityControls = async (req, res) => {
 exports.getQualityControl = async (req, res) => {
     try {
         const qc = await QualityControl.findById(req.params.id)
-            .populate('grnReference', 'grnNumber poReference')
+            .populate({
+                path: 'grnReference',
+                populate: {
+                    path: 'poReference',
+                    populate: {
+                        path: 'vendor'
+                    }
+                }
+            })
             .populate('branch', 'branchName branchCode')
             .populate('items.product', 'name itemCode unitOfMeasure itemType');
         if (!qc) return res.status(404).json({ success: false, message: 'QC report not found' });

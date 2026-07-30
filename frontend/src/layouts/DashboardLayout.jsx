@@ -1,12 +1,18 @@
 import React, { useState } from 'react';
 import { Outlet, Navigate, useNavigate, Link, useLocation } from 'react-router-dom';
-import { LogOut, LayoutDashboard, Building2, Users, Menu, X, ChevronDown } from 'lucide-react';
+import { 
+  LogOut, LayoutDashboard, Building2, Users, Menu, X, ChevronDown, 
+  Package, ShoppingCart, ShieldCheck, GitBranch, ChevronLeft, ChevronRight, PanelLeft, ArrowLeftRight, Factory, ThermometerSnowflake 
+} from 'lucide-react';
 import api from '../services/api';
 
 const DashboardLayout = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  // Sidebar default state: OPEN / EXPANDED by default for maximum comfort
+  const [isCollapsed, setIsCollapsed] = useState(false);
+  const [isMobileOpen, setIsMobileOpen] = useState(false);
+
   const token = localStorage.getItem('accessToken');
   const user = JSON.parse(localStorage.getItem('user') || '{}');
 
@@ -26,15 +32,21 @@ const DashboardLayout = () => {
     }
   };
 
-  const NavItem = ({ to, icon: Icon, children }) => {
+  const NavItem = ({ to, icon: Icon, title }) => {
     const isActive = location.pathname.startsWith(to);
     return (
       <Link 
         to={to} 
-        onClick={() => setIsSidebarOpen(false)}
-        className={`flex items-center gap-3 px-3 py-2 rounded-lg transition-colors ${isActive ? 'bg-white/20 text-white font-medium' : 'text-pink-100 hover:bg-white/10 hover:text-white'}`}
+        onClick={() => setIsMobileOpen(false)}
+        title={isCollapsed ? title : ''}
+        className={`flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all ${
+          isActive 
+            ? 'bg-white/20 text-white font-semibold shadow-sm' 
+            : 'text-pink-100 hover:bg-white/10 hover:text-white'
+        } ${isCollapsed ? 'justify-center' : ''}`}
       >
-        <Icon size={18} /> {children}
+        <Icon size={20} className="shrink-0" />
+        {!isCollapsed && <span className="truncate">{title}</span>}
       </Link>
     );
   };
@@ -42,11 +54,19 @@ const DashboardLayout = () => {
   const NavGroup = ({ title, children, defaultOpen = true }) => {
     const [isOpen, setIsOpen] = useState(defaultOpen);
 
+    if (isCollapsed) {
+      return (
+        <div className="py-2 border-b border-pink-400/20 last:border-b-0 space-y-1">
+          {children}
+        </div>
+      );
+    }
+
     return (
       <div className="mb-2 mt-2">
         <button 
           onClick={() => setIsOpen(!isOpen)}
-          className="w-full flex items-center justify-between px-3 py-2 text-xs font-semibold text-pink-200 uppercase tracking-wider hover:text-white transition-colors group rounded-lg hover:bg-white/5"
+          className="w-full flex items-center justify-between px-3 py-1.5 text-[11px] font-bold text-pink-200 uppercase tracking-wider hover:text-white transition-colors group rounded-lg hover:bg-white/5"
         >
           <span>{title}</span>
           <ChevronDown 
@@ -67,104 +87,156 @@ const DashboardLayout = () => {
   return (
     <div className="flex h-screen bg-[var(--color-primary)]/15 overflow-hidden text-sm">
       {/* Mobile Overlay */}
-      {isSidebarOpen && (
+      {isMobileOpen && (
         <div 
-          className="fixed inset-0 bg-white/60 backdrop-blur-sm z-40 lg:hidden"
-          onClick={() => setIsSidebarOpen(false)}
+          className="fixed inset-0 bg-black/50 backdrop-blur-sm z-40 lg:hidden"
+          onClick={() => setIsMobileOpen(false)}
         />
       )}
 
       {/* Sidebar */}
-      <div className={`fixed inset-y-0 left-0 z-50 w-64 bg-[var(--color-primary)] border-y-0 border-l-0 border-r border-pink-400 rounded-none flex flex-col transform transition-transform duration-300 ease-in-out lg:relative lg:translate-x-0 ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}>
-        <div className="p-6 border-b border-[var(--color-glass-border)] flex justify-between items-start">
-          <div className="flex flex-col gap-3">
-            <img src="/logo.avif" alt="Logo" className="w-48 h-20 rounded-xl shadow-sm object-cover object-center" />
-            <div>
-              <h2 className="text-xl font-bold text-white tracking-wider">SARAVANASS</h2>
-              <p className="text-xs text-pink-200 mt-1">ERP SYSTEM</p>
+      <aside className={`fixed inset-y-0 left-0 z-30 bg-[var(--color-primary)] border-r border-pink-400/30 flex flex-col transition-all duration-300 ease-in-out lg:relative ${
+        isCollapsed ? 'w-20' : 'w-64'
+      } ${isMobileOpen ? 'translate-x-0 w-64' : '-translate-x-full lg:translate-x-0'}`}>
+        
+        {/* Sidebar Header */}
+        <div className={`p-4 border-b border-pink-400/30 flex items-center ${isCollapsed ? 'justify-center' : 'justify-between'}`}>
+          {!isCollapsed ? (
+            <div className="flex items-center gap-3">
+              <img src="/logo.avif" alt="Logo" className="w-12 h-12 rounded-xl shadow-sm object-cover" />
+              <div>
+                <h2 className="text-base font-extrabold text-white tracking-wider">SARAVANASS</h2>
+                <p className="text-[10px] font-semibold text-pink-200 tracking-wide">ERP SYSTEM</p>
+              </div>
             </div>
-          </div>
+          ) : (
+            <div className="flex flex-col items-center gap-1">
+              <img src="/logo.avif" alt="Logo" className="w-10 h-10 rounded-xl shadow-sm object-cover" />
+            </div>
+          )}
+
+          {/* Toggle button inside sidebar header on desktop */}
           <button 
-            className="lg:hidden text-white hover:text-pink-100"
-            onClick={() => setIsSidebarOpen(false)}
+            onClick={() => setIsCollapsed(!isCollapsed)}
+            className="hidden lg:flex p-1.5 rounded-lg text-pink-100 hover:text-white hover:bg-white/10 transition-colors"
+            title={isCollapsed ? "Expand Sidebar" : "Collapse Sidebar"}
+          >
+            {isCollapsed ? <ChevronRight size={18} /> : <ChevronLeft size={18} />}
+          </button>
+
+          {/* Mobile close button */}
+          <button 
+            className="lg:hidden text-white hover:text-pink-100 p-1"
+            onClick={() => setIsMobileOpen(false)}
           >
             <X size={20} />
           </button>
         </div>
         
-        <nav className="flex-1 p-4 overflow-y-auto">
+        {/* Navigation Menu */}
+        <nav className="flex-1 p-3 overflow-y-auto custom-scrollbar space-y-1">
           <NavGroup title="Dashboard">
-            <NavItem to="/dashboard" icon={LayoutDashboard}>Overview</NavItem>
+            <NavItem to="/dashboard" icon={LayoutDashboard} title="Overview" />
           </NavGroup>
 
           <NavGroup title="Master Hub">
-            <NavItem to="/vendors" icon={Building2}>Vendors</NavItem>
-            <NavItem to="/customers" icon={Users}>Customers</NavItem>
-            <NavItem to="/products" icon={LayoutDashboard}>Products</NavItem>
+            <NavItem to="/vendors" icon={Building2} title="Vendors" />
+            <NavItem to="/customers" icon={Users} title="Customers" />
+            <NavItem to="/products" icon={Package} title="Products" />
           </NavGroup>
 
-          <NavGroup title="Procurement">
-            <NavItem to="/purchase-orders" icon={LayoutDashboard}>Purchase Orders</NavItem>
-            <NavItem to="/qc" icon={LayoutDashboard}>Quality Control</NavItem>
+          <NavGroup title="Procurement & Production">
+            <NavItem to="/purchase-orders" icon={ShoppingCart} title="Purchase Orders" />
+            <NavItem to="/qc" icon={ShieldCheck} title="Quality Control" />
+            <NavItem to="/raw-material-stock" icon={ArrowLeftRight} title="Raw Material Stock" />
+            <NavItem to="/production" icon={Factory} title="Production & Assembly" />
           </NavGroup>
 
           <NavGroup title="Inventory">
-            <NavItem to="/inventory" icon={LayoutDashboard}>Stock Levels</NavItem>
+            <NavItem to="/finished-goods-stock" icon={ThermometerSnowflake} title="Finished Goods Stock" />
           </NavGroup>
 
           <NavGroup title="Admin">
-            <NavItem to="/branches" icon={Building2}>Branches</NavItem>
-            <NavItem to="/users" icon={Users}>Users</NavItem>
+            <NavItem to="/branches" icon={GitBranch} title="Branches" />
+            <NavItem to="/users" icon={Users} title="Users" />
           </NavGroup>
         </nav>
 
-        <div className="p-4 border-t border-[var(--color-glass-border)]">
-          <div className="flex items-center gap-3 mb-4">
-            <div className="w-10 h-10 min-w-[40px] rounded-full bg-white text-[var(--color-primary)] flex items-center justify-center font-bold text-lg">
-              {user.name?.charAt(0) || 'U'}
+        {/* User Profile & Logout Footer */}
+        <div className="p-3 border-t border-pink-400/30">
+          {!isCollapsed ? (
+            <div>
+              <div className="flex items-center gap-3 mb-3 p-2 rounded-xl bg-white/10">
+                <div className="w-9 h-9 min-w-[36px] rounded-full bg-white text-[var(--color-primary)] flex items-center justify-center font-bold text-base shadow-sm">
+                  {user.name?.charAt(0) || 'U'}
+                </div>
+                <div className="overflow-hidden">
+                  <div className="font-semibold text-white truncate text-xs">{user.name || 'System Admin'}</div>
+                  <div className="text-[10px] text-pink-200 font-medium truncate">{user.role || 'Super Admin'}</div>
+                </div>
+              </div>
+              <button 
+                onClick={handleLogout}
+                className="flex items-center gap-2 text-xs font-semibold text-white hover:text-pink-200 w-full px-3 py-2 rounded-lg transition-colors hover:bg-white/10"
+              >
+                <LogOut size={16} /> Logout
+              </button>
             </div>
-            <div className="overflow-hidden">
-              <div className="font-medium text-white truncate">{user.name || 'User'}</div>
-              <div className="text-xs text-pink-200 font-semibold truncate">{user.role || 'Role'}</div>
+          ) : (
+            <div className="flex flex-col items-center gap-2">
+              <div 
+                className="w-10 h-10 rounded-full bg-white text-[var(--color-primary)] flex items-center justify-center font-bold text-base shadow-sm cursor-pointer"
+                title={`${user.name || 'User'} (${user.role || 'Role'})`}
+              >
+                {user.name?.charAt(0) || 'U'}
+              </div>
+              <button 
+                onClick={handleLogout}
+                title="Logout"
+                className="p-2 rounded-lg text-white hover:bg-white/10 transition-colors"
+              >
+                <LogOut size={18} />
+              </button>
             </div>
-          </div>
-          <button 
-            onClick={handleLogout}
-            className="flex items-center gap-2 text-sm text-white hover:text-pink-200 w-full px-2 py-2 rounded transition-colors hover:bg-white/10"
-          >
-            <LogOut size={16} /> Logout
-          </button>
+          )}
         </div>
-      </div>
+      </aside>
 
-      {/* Main Content */}
+      {/* Main Content Area */}
       <div className="flex-1 flex flex-col relative overflow-hidden w-full">
-        {/* Header */}
-        <header className="h-16 glass-panel border-x-0 border-t-0 rounded-none flex items-center justify-between px-4 lg:px-8 z-10 w-full">
+        {/* Header Bar */}
+        <header className="h-16 glass-panel border-x-0 border-t-0 rounded-none flex items-center justify-between px-4 lg:px-6 z-10 w-full">
           <div className="flex items-center gap-3">
+            {/* Mobile Hamburger Menu Toggle */}
             <button 
-              className="lg:hidden text-gray-700 hover:text-gray-900 p-1 rounded-md hover:bg-[var(--color-glass)]"
-              onClick={() => setIsSidebarOpen(true)}
+              className="lg:hidden text-gray-700 hover:text-gray-900 p-2 rounded-lg hover:bg-gray-100 transition-colors"
+              onClick={() => setIsMobileOpen(true)}
             >
               <Menu size={20} />
             </button>
-            <div className="text-lg font-medium text-gray-800 hidden sm:block">
-              {/* Breadcrumbs or Page Title could go here */}
-            </div>
+
+            {/* Desktop Collapse / Expand Sidebar Toggle Button */}
+            <button 
+              onClick={() => setIsCollapsed(!isCollapsed)}
+              className="hidden lg:flex items-center gap-2 px-3 py-1.5 rounded-lg bg-[var(--color-primary)]/10 text-[var(--color-primary)] hover:bg-[var(--color-primary)] hover:text-white transition-all text-xs font-bold shadow-sm"
+              title={isCollapsed ? "Expand Sidebar Menu" : "Collapse Sidebar Menu"}
+            >
+              <PanelLeft size={16} />
+              <span>{isCollapsed ? "Expand Sidebar" : "Collapse Sidebar"}</span>
+            </button>
           </div>
           
           <div className="flex items-center gap-2 sm:gap-4">
-            <span className="text-xs sm:text-sm text-gray-600 hidden sm:inline">Current Branch:</span>
-            <div className="px-2 sm:px-3 py-1 bg-[var(--color-glass)] border border-[var(--color-glass-border)] rounded-md text-xs sm:text-sm text-gray-900 truncate max-w-[120px] sm:max-w-xs">
+            <span className="text-xs sm:text-sm text-gray-600 hidden sm:inline font-medium">Current Branch:</span>
+            <div className="px-3 py-1 bg-white/80 border border-[var(--color-glass-border)] rounded-lg text-xs sm:text-sm font-semibold text-gray-900 shadow-sm truncate max-w-[140px] sm:max-w-xs">
               Main Branch
             </div>
           </div>
         </header>
 
-        {/* Page Content */}
+        {/* Page Content View */}
         <main className="flex-1 overflow-y-auto p-4 lg:p-8 relative z-0">
-           {/* Background subtle elements */}
-           <div className="fixed top-20 right-20 w-[300px] h-[300px] lg:w-[500px] lg:h-[500px] bg-[var(--color-primary)] rounded-full blur-[100px] lg:blur-[150px] opacity-[0.05] pointer-events-none"></div>
+          <div className="fixed top-20 right-20 w-[300px] h-[300px] lg:w-[500px] lg:h-[500px] bg-[var(--color-primary)] rounded-full blur-[100px] lg:blur-[150px] opacity-[0.05] pointer-events-none"></div>
           <Outlet />
         </main>
       </div>

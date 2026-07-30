@@ -8,6 +8,7 @@ const productSchema = new mongoose.Schema({
     unitOfMeasure: { type: String, required: true }, // e.g., Ltr, Kg, Pcs, Box
     mrp: { type: Number, default: 0 },
     wholesalePrice: { type: Number, default: 0 },
+    piecesPerBox: { type: Number, default: 12 }, // Box configuration e.g. 1 Box = 12 Pcs
     minimumStockLevel: { type: Number, default: 0 },
     status: { type: String, enum: ['Active', 'Inactive'], default: 'Active' },
     createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },

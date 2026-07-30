@@ -14,6 +14,7 @@ const vendorSchema = new mongoose.Schema({
         pinCode: { type: String, required: true }
     },
     gstinNumber: { type: String, required: true },
+    openingBalance: { type: Number, default: 0 },
     status: { type: String, enum: ['Active', 'Inactive', 'Blacklisted'], default: 'Active' },
     createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
     updatedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' }
