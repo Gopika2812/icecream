@@ -65,7 +65,8 @@ exports.createProductionBatch = async (req, res) => {
         const countToday = await Production.countDocuments();
         const dateStr = new Date().toISOString().split('T')[0].replace(/-/g, '');
         const productionNumber = `PRD-${dateStr}-${(countToday + 1).toString().padStart(3, '0')}`;
-        const batchNumber = `BATCH-FG-${dateStr}-${Math.floor(100 + Math.random() * 900)}`;
+        const totalBatches = await Production.countDocuments();
+        const batchNumber = req.body.batchNumber || `BATCH-${totalBatches + 1}`;
 
         // Verify Finished Good Product
         const fgProductObj = await Product.findById(finishedGoodProduct);
@@ -123,19 +124,26 @@ exports.createProductionBatch = async (req, res) => {
         const expDate = new Date(expiryDate);
 
         // Stock into Factory Store Room
-        await Inventory.create({
-            branch: targetBranch,
-            product: finishedGoodProduct,
-            inventoryType: 'Store Room',
-            batchNumber,
-            purchasePrice: fgSellingPrice,
-            mrp: fgMrp,
-            manufacturingDate: mfgDate,
-            expiryDate: expDate,
-            temperature: fgTemp,
-            quantity: totalPieces,
-            lastUpdated: Date.now()
-        });
+        await Inventory.findOneAndUpdate(
+            {
+                branch: targetBranch,
+                product: finishedGoodProduct,
+                inventoryType: 'Store Room',
+                batchNumber
+            },
+            {
+                $inc: { quantity: totalPieces },
+                $set: {
+                    purchasePrice: fgSellingPrice,
+                    mrp: fgMrp,
+                    manufacturingDate: mfgDate,
+                    expiryDate: expDate,
+                    temperature: fgTemp,
+                    lastUpdated: Date.now()
+                }
+            },
+            { new: true, upsert: true }
+        );
 
         // Log Store Room Inward Transaction
         await InventoryTransaction.create({
@@ -272,19 +280,26 @@ exports.performFinishedGoodsQC = async (req, res) => {
 
         // 2. Transfer Passed Stock -> Cold Room Inventory (INWARD Sales Inventory)
         if (pPcs > 0) {
-            await Inventory.create({
-                branch: prod.branch,
-                product: prod.finishedGoodProduct._id,
-                inventoryType: 'Cold Room',
-                batchNumber: prod.batchNumber,
-                purchasePrice: prod.sellingPrice,
-                mrp: prod.mrp,
-                manufacturingDate: prod.manufacturingDate,
-                expiryDate: prod.expiryDate,
-                temperature: prod.temperature,
-                quantity: pPcs,
-                lastUpdated: Date.now()
-            });
+            await Inventory.findOneAndUpdate(
+                {
+                    branch: prod.branch,
+                    product: prod.finishedGoodProduct._id,
+                    inventoryType: 'Cold Room',
+                    batchNumber: prod.batchNumber
+                },
+                {
+                    $inc: { quantity: pPcs },
+                    $set: {
+                        purchasePrice: prod.sellingPrice,
+                        mrp: prod.mrp,
+                        manufacturingDate: prod.manufacturingDate,
+                        expiryDate: prod.expiryDate,
+                        temperature: prod.temperature,
+                        lastUpdated: Date.now()
+                    }
+                },
+                { new: true, upsert: true }
+            );
 
             await InventoryTransaction.create({
                 branch: prod.branch,
@@ -305,19 +320,26 @@ exports.performFinishedGoodsQC = async (req, res) => {
 
         // 3. Transfer Damaged Stock -> Rejected Stock Inventory
         if (dPcs > 0) {
-            await Inventory.create({
-                branch: prod.branch,
-                product: prod.finishedGoodProduct._id,
-                inventoryType: 'Rejected Stock',
-                batchNumber: prod.batchNumber,
-                purchasePrice: prod.sellingPrice,
-                mrp: prod.mrp,
-                manufacturingDate: prod.manufacturingDate,
-                expiryDate: prod.expiryDate,
-                temperature: prod.temperature,
-                quantity: dPcs,
-                lastUpdated: Date.now()
-            });
+            await Inventory.findOneAndUpdate(
+                {
+                    branch: prod.branch,
+                    product: prod.finishedGoodProduct._id,
+                    inventoryType: 'Rejected Stock',
+                    batchNumber: prod.batchNumber
+                },
+                {
+                    $inc: { quantity: dPcs },
+                    $set: {
+                        purchasePrice: prod.sellingPrice,
+                        mrp: prod.mrp,
+                        manufacturingDate: prod.manufacturingDate,
+                        expiryDate: prod.expiryDate,
+                        temperature: prod.temperature,
+                        lastUpdated: Date.now()
+                    }
+                },
+                { new: true, upsert: true }
+            );
 
             await InventoryTransaction.create({
                 branch: prod.branch,

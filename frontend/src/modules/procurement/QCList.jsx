@@ -793,7 +793,7 @@ const QCList = () => {
 
       {/* Unified Navigation Tabs */}
       <div className="flex gap-2 mb-6 border-b border-[var(--color-glass-border)] pb-px">
-        {['QC Check', 'Store Room', 'Return to Vendor', 'Vendor Payment'].map((tab) => (
+        {['QC Check', 'Store Room', 'Return to Vendor'].map((tab) => (
           <button
             key={tab}
             onClick={() => setActiveTab(tab)}

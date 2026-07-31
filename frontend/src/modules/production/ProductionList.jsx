@@ -111,6 +111,26 @@ const ProductionList = () => {
     setFormData({ ...formData, rawMaterialsUsed: updated });
   };
 
+  // Open New Batch Modal with auto-incremented batch code
+  const handleOpenNewBatchModal = () => {
+    const nextBatchNum = `BATCH-${productions.length + 1}`;
+    setWizardStep(1);
+    setFormData({
+      batchNumber: nextBatchNum,
+      finishedGoodProduct: '',
+      quantityBoxes: '',
+      piecesPerBox: 12,
+      rawMaterialsUsed: [{ product: '', quantityUsed: '', batchNumber: 'STORE-RM' }],
+      temperature: -18,
+      sellingPrice: '',
+      mrp: '',
+      manufacturingDate: new Date().toISOString().split('T')[0],
+      expiryDate: new Date(Date.now() + 180 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+      remarks: ''
+    });
+    setIsNewBatchModalOpen(true);
+  };
+
   // Submit Production Batch to Factory Store Room
   const handleSubmitBatch = async (e) => {
     e.preventDefault();
@@ -122,6 +142,7 @@ const ProductionList = () => {
       setSubmitting(true);
       const response = await api.post('/production', {
         ...formData,
+        batchNumber: formData.batchNumber || `BATCH-${productions.length + 1}`,
         quantityBoxes: parseFloat(formData.quantityBoxes),
         piecesPerBox: parseInt(formData.piecesPerBox) || 12,
         sellingPrice: parseFloat(formData.sellingPrice) || 0,
@@ -132,18 +153,6 @@ const ProductionList = () => {
       alert(response.data.message || 'Production Batch Created & Stored in Factory Store Room!');
       setIsNewBatchModalOpen(false);
       setWizardStep(1);
-      setFormData({
-        finishedGoodProduct: '',
-        quantityBoxes: '',
-        piecesPerBox: 12,
-        rawMaterialsUsed: [{ product: '', quantityUsed: '', batchNumber: 'STORE-RM' }],
-        temperature: -18,
-        sellingPrice: '',
-        mrp: '',
-        manufacturingDate: new Date().toISOString().split('T')[0],
-        expiryDate: new Date(Date.now() + 180 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-        remarks: ''
-      });
       fetchInitialData();
     } catch (error) {
       console.error('Failed to create production batch', error);
@@ -213,93 +222,157 @@ const ProductionList = () => {
 
   const customInputStyle = "w-full bg-white border border-pink-200/80 rounded-xl px-4 py-2.5 text-xs font-semibold text-gray-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-pink-500/20 focus:border-[var(--color-primary)] hover:border-pink-300 transition-all";
 
-  // Print Batch Sticker Window
+  // Print Batch & Individual Box Stickers Window
   const handlePrintBatchSticker = (prod) => {
     const printWindow = window.open('', '_blank');
     if (!printWindow) return alert('Please allow popups to print batch labels.');
+
+    const passedPcs = prod.passedPieces !== undefined ? prod.passedPieces : (prod.totalPieces || 0);
+    const pPerBox = prod.piecesPerBox || 12;
+
+    const fullBoxesCount = Math.floor(passedPcs / pPerBox);
+    const loosePcsCount = passedPcs % pPerBox;
+    const totalBoxesCount = fullBoxesCount + (loosePcsCount > 0 ? 1 : 0);
+
+    const boxCards = [];
+    for (let i = 1; i <= fullBoxesCount; i++) {
+      boxCards.push({
+        boxIndex: i,
+        boxLabel: `Box ${i} of ${totalBoxesCount}`,
+        pcsText: `${pPerBox} Pcs (Full Box)`,
+        isPartial: false
+      });
+    }
+    if (loosePcsCount > 0) {
+      boxCards.push({
+        boxIndex: totalBoxesCount,
+        boxLabel: `Box ${totalBoxesCount} of ${totalBoxesCount}`,
+        pcsText: `${loosePcsCount} Loose Pcs (Partial Box)`,
+        isPartial: true
+      });
+    }
 
     const htmlContent = `
       <!DOCTYPE html>
       <html>
         <head>
-          <title>Batch Sticker - ${prod.batchNumber}</title>
+          <title>Batch & Box Stickers - ${prod.batchNumber}</title>
           <style>
             * { box-sizing: border-box; }
-            body { font-family: 'Segoe UI', Tahoma, Arial, sans-serif; padding: 20px; background: #fff; }
+            body { font-family: 'Segoe UI', Tahoma, Arial, sans-serif; padding: 20px; background: #f8fafc; color: #111; }
+            .header-banner {
+              text-align: center;
+              margin-bottom: 20px;
+              padding: 10px;
+              background: #fff;
+              border: 1px solid #e2e8f0;
+              border-radius: 8px;
+            }
+            .header-banner h2 { margin: 0; color: #d81b60; font-size: 18px; }
+            .header-banner p { margin: 4px 0 0; font-size: 12px; color: #64748b; }
+            
+            .sticker-grid {
+              display: grid;
+              grid-template-columns: repeat(2, 1fr);
+              gap: 16px;
+            }
+            
             .sticker-card {
-              width: 380px;
               border: 2px solid #d81b60;
               border-radius: 12px;
-              padding: 16px;
-              margin: 0 auto;
+              padding: 14px;
               background: #fff;
-              box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+              box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+              page-break-inside: avoid;
             }
+            .sticker-card.partial-card {
+              border-color: #d97706;
+            }
+            
             .brand-header {
               background: #d81b60;
               color: white;
-              padding: 8px 12px;
-              border-radius: 8px;
+              padding: 6px 10px;
+              border-radius: 6px;
               text-align: center;
               font-weight: 800;
-              font-size: 14px;
+              font-size: 12px;
               text-transform: uppercase;
-              letter-spacing: 1px;
+              letter-spacing: 0.5px;
             }
-            .prod-title { font-size: 16px; font-weight: 800; color: #111; margin-top: 10px; }
-            .meta-row { display: flex; justify-content: space-between; font-size: 11px; margin-top: 4px; color: #444; }
-            .qr-box { text-align: center; margin: 12px 0; padding: 10px; background: #f8fafc; border: 1px dashed #cbd5e1; border-radius: 8px; }
-            .qr-box svg { width: 120px; height: 120px; }
-            .batch-badge { background: #1e1b4b; color: white; padding: 4px 8px; border-radius: 4px; font-family: monospace; font-weight: 700; font-size: 12px; }
-            .footer-note { text-align: center; font-size: 9px; color: #64748b; margin-top: 8px; }
+            .brand-header.partial-header {
+              background: #d97706;
+            }
+            
+            .prod-title { font-size: 15px; font-weight: 800; color: #111; margin-top: 8px; }
+            .meta-row { display: flex; justify-content: space-between; align-items: center; font-size: 11px; margin-top: 4px; color: #444; }
+            
+            .qr-box { text-align: center; margin: 10px 0; padding: 8px; background: #f8fafc; border: 1px dashed #cbd5e1; border-radius: 8px; }
+            .qr-box svg { width: 100px; height: 100px; }
+            
+            .batch-badge { background: #1e1b4b; color: white; padding: 3px 6px; border-radius: 4px; font-family: monospace; font-weight: 700; font-size: 11px; }
+            .box-badge { background: #d81b60; color: white; padding: 3px 6px; border-radius: 4px; font-family: monospace; font-weight: 700; font-size: 11px; }
+            .box-badge.partial { background: #d97706; }
+            
+            .footer-note { text-align: center; font-size: 9px; color: #64748b; margin-top: 6px; }
+            
             @media print {
-              body { padding: 0; }
+              body { padding: 0; background: #fff; }
+              .header-banner { display: none; }
+              .sticker-grid { grid-template-columns: repeat(2, 1fr); gap: 12px; }
               .sticker-card { border-color: #000; box-shadow: none; }
             }
           </style>
         </head>
         <body>
-          <div class="sticker-card">
-            <div class="brand-header">SRI SARAVANAA ERP • QUALITY PASSED</div>
-            <div class="prod-title">${prod.finishedGoodProduct?.name}</div>
-            <div class="meta-row">
-              <span>Item Code: <strong>${prod.finishedGoodProduct?.itemCode}</strong></span>
-              <span class="batch-badge">${prod.batchNumber}</span>
-            </div>
+          <div class="header-banner">
+            <h2>SRI SARAVANAA ERP — BATCH & BOX STICKERS</h2>
+            <p>Batch: <strong>${prod.batchNumber}</strong> | Item: <strong>${prod.finishedGoodProduct?.name}</strong> | Total Stickers: <strong>${totalBoxesCount} Box Labels (${passedPcs} Passed Pcs)</strong></p>
+          </div>
 
-            <div class="qr-box">
-              <div style="font-family: monospace; font-size: 10px; color: #334155; margin-bottom: 6px;">[ QR CODE SCANNABLE BATCH LABEL ]</div>
-              <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
-                <rect width="100" height="100" fill="#ffffff"/>
-                <rect x="10" y="10" width="30" height="30" fill="#000000"/>
-                <rect x="15" y="15" width="20" height="20" fill="#ffffff"/>
-                <rect x="20" y="20" width="10" height="10" fill="#000000"/>
-                <rect x="60" y="10" width="30" height="30" fill="#000000"/>
-                <rect x="65" y="15" width="20" height="20" fill="#ffffff"/>
-                <rect x="70" y="20" width="10" height="10" fill="#000000"/>
-                <rect x="10" y="60" width="30" height="30" fill="#000000"/>
-                <rect x="15" y="65" width="20" height="20" fill="#ffffff"/>
-                <rect x="20" y="70" width="10" height="10" fill="#000000"/>
-                <rect x="50" y="50" width="10" height="10" fill="#000000"/>
-                <rect x="70" y="50" width="20" height="10" fill="#000000"/>
-                <rect x="50" y="70" width="10" height="20" fill="#000000"/>
-                <rect x="70" y="70" width="20" height="20" fill="#000000"/>
-              </svg>
-              <div style="font-size: 9px; font-weight: bold; color: #047857; margin-top: 4px;">STORAGE TEMP: ${prod.temperature} °C</div>
-            </div>
+          <div class="sticker-grid">
+            ${boxCards.map(box => {
+              const qrText = `SRI SARAVANAA ERP\nItem: ${prod.finishedGoodProduct?.name || ''} (${prod.finishedGoodProduct?.itemCode || ''})\nBatch: ${prod.batchNumber}\nBox: ${box.boxLabel} (${box.pcsText})\nStorage Temp: ${prod.temperature} °C\nMfg Date: ${new Date(prod.manufacturingDate).toLocaleDateString()}\nExp Date: ${new Date(prod.expiryDate).toLocaleDateString()}\nSelling Price: ₹${prod.sellingPrice?.toFixed(2)}`;
+              const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(qrText)}`;
 
-            <div class="meta-row">
-              <span>Passed Qty: <strong>${prod.passedPieces || prod.totalPieces} Pcs (${prod.passedBoxes || prod.quantityBoxes} Boxes)</strong></span>
-              <span>Selling Price: <strong>₹${prod.sellingPrice?.toFixed(2)}</strong></span>
-            </div>
-            <div class="meta-row" style="margin-top: 6px;">
-              <span>Mfg Date: <strong>${new Date(prod.manufacturingDate).toLocaleDateString()}</strong></span>
-              <span>Exp Date: <strong style="color: #be123c;">${new Date(prod.expiryDate).toLocaleDateString()}</strong></span>
-            </div>
+              return `
+              <div class="sticker-card ${box.isPartial ? 'partial-card' : ''}">
+                <div class="brand-header ${box.isPartial ? 'partial-header' : ''}">
+                  SRI SARAVANAA ERP • ${box.isPartial ? 'PARTIAL BOX STICKER' : 'BOX STICKER'}
+                </div>
+                <div class="prod-title">${prod.finishedGoodProduct?.name}</div>
+                
+                <div class="meta-row">
+                  <span>Item Code: <strong>${prod.finishedGoodProduct?.itemCode}</strong></span>
+                  <span class="batch-badge">${prod.batchNumber}</span>
+                </div>
 
-            <div class="footer-note">
-              Sri Saravanaa Ice Cream & Dairy Products • Quality Certified Batch
-            </div>
+                <div class="meta-row" style="margin-top: 6px;">
+                  <span class="box-badge ${box.isPartial ? 'partial' : ''}">${box.boxLabel}</span>
+                  <strong style="color: ${box.isPartial ? '#b45309' : '#047857'}; font-size: 12px;">${box.pcsText}</strong>
+                </div>
+
+                <div class="qr-box">
+                  <div style="font-family: monospace; font-size: 9px; color: #334155; margin-bottom: 4px;">[ SCANNABLE BOX QR ]</div>
+                  <img src="${qrUrl}" alt="Box QR Code" style="width: 110px; height: 110px; margin: 0 auto; display: block; border: 1px solid #e2e8f0; border-radius: 4px; padding: 4px; background: #fff;" />
+                  <div style="font-size: 9px; font-weight: bold; color: #047857; margin-top: 4px;">TEMP: ${prod.temperature} °C</div>
+                </div>
+
+                <div class="meta-row">
+                  <span>Price: <strong>₹${prod.sellingPrice?.toFixed(2)}</strong></span>
+                  <span>Mfg: <strong>${new Date(prod.manufacturingDate).toLocaleDateString()}</strong></span>
+                </div>
+                <div class="meta-row" style="margin-top: 4px;">
+                  <span>Exp: <strong style="color: #be123c;">${new Date(prod.expiryDate).toLocaleDateString()}</strong></span>
+                  <span style="font-size: 10px; color: #64748b;">QC Certified</span>
+                </div>
+
+                <div class="footer-note">
+                  Sri Saravanaa Ice Cream & Dairy Products
+                </div>
+              </div>
+            `;
+            }).join('')}
           </div>
 
           <script>
@@ -328,7 +401,7 @@ const ProductionList = () => {
         </div>
 
         <button
-          onClick={() => { setWizardStep(1); setIsNewBatchModalOpen(true); }}
+          onClick={handleOpenNewBatchModal}
           className="flex items-center gap-2 bg-white border-2 border-[var(--color-primary)] text-[var(--color-primary)] hover:bg-pink-50 px-5 py-2.5 rounded-xl text-xs font-extrabold transition-all shadow-md"
         >
           <Plus size={18} /> Start New Production Batch
@@ -549,7 +622,19 @@ const ProductionList = () => {
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-3 gap-4">
+                <div className="space-y-1">
+                  <label className="text-xs font-bold text-gray-600 uppercase tracking-wider block mb-1">Batch Code / Number *</label>
+                  <input
+                    type="text"
+                    required
+                    value={formData.batchNumber}
+                    onChange={(e) => setFormData({ ...formData, batchNumber: e.target.value })}
+                    placeholder="e.g. BATCH-1"
+                    className={`${customInputStyle} font-mono font-bold text-indigo-700`}
+                  />
+                </div>
+
                 <div className="space-y-1">
                   <label className="text-xs font-bold text-gray-600 uppercase tracking-wider block mb-1">Target Output Quantity (Boxes) *</label>
                   <input
@@ -564,7 +649,7 @@ const ProductionList = () => {
                 </div>
 
                 <div className="space-y-1">
-                  <label className="text-xs font-bold text-gray-600 uppercase tracking-wider block mb-1">Packaging Config (Pieces per Box)</label>
+                  <label className="text-xs font-bold text-gray-600 uppercase tracking-wider block mb-1">Packaging Config (Pcs / Box)</label>
                   <input
                     type="number"
                     min="1"
@@ -838,6 +923,7 @@ const ProductionList = () => {
                     <input
                       type="number"
                       min="0"
+                      step="any"
                       max={selectedProductionForQc.totalPieces}
                       required
                       value={qcForm.damagedPieces}
@@ -866,6 +952,7 @@ const ProductionList = () => {
                     <input
                       type="number"
                       min="0"
+                      step="any"
                       max={selectedProductionForQc.quantityBoxes}
                       value={qcForm.damagedBoxes}
                       onChange={(e) => {

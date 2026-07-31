@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Outlet, Navigate, useNavigate, Link, useLocation } from 'react-router-dom';
 import { 
   LogOut, LayoutDashboard, Building2, Users, Menu, X, ChevronDown, 
-  Package, ShoppingCart, ShieldCheck, GitBranch, ChevronLeft, ChevronRight, PanelLeft, ArrowLeftRight, Factory, ThermometerSnowflake 
+  Package, ShoppingCart, ShieldCheck, GitBranch, ChevronLeft, ChevronRight, PanelLeft, ArrowLeftRight, Factory, ThermometerSnowflake, FileText, Truck, BookOpen 
 } from 'lucide-react';
 import api from '../services/api';
 
@@ -139,21 +139,25 @@ const DashboardLayout = () => {
             <NavItem to="/dashboard" icon={LayoutDashboard} title="Overview" />
           </NavGroup>
 
-          <NavGroup title="Master Hub">
-            <NavItem to="/vendors" icon={Building2} title="Vendors" />
-            <NavItem to="/customers" icon={Users} title="Customers" />
-            <NavItem to="/products" icon={Package} title="Products" />
-          </NavGroup>
-
           <NavGroup title="Procurement & Production">
             <NavItem to="/purchase-orders" icon={ShoppingCart} title="Purchase Orders" />
             <NavItem to="/qc" icon={ShieldCheck} title="Quality Control" />
+            <NavItem to="/vendor-ledgers" icon={Building2} title="Vendor Ledgers & Payments" />
             <NavItem to="/raw-material-stock" icon={ArrowLeftRight} title="Raw Material Stock" />
             <NavItem to="/production" icon={Factory} title="Production & Assembly" />
           </NavGroup>
 
-          <NavGroup title="Inventory">
+          <NavGroup title="Inventory & Sales">
             <NavItem to="/finished-goods-stock" icon={ThermometerSnowflake} title="Finished Goods Stock" />
+            <NavItem to="/sales-invoices" icon={FileText} title="Sales Orders & Invoicing" />
+            <NavItem to="/auto-sales-ledger" icon={Truck} title="Auto Sales Stock & Expenses" />
+            <NavItem to="/customer-ledgers" icon={BookOpen} title="Customer Ledgers" />
+          </NavGroup>
+
+          <NavGroup title="Master Hub">
+            <NavItem to="/vendors" icon={Building2} title="Vendors" />
+            <NavItem to="/customers" icon={Users} title="Customers" />
+            <NavItem to="/products" icon={Package} title="Products" />
           </NavGroup>
 
           <NavGroup title="Admin">
@@ -235,7 +239,7 @@ const DashboardLayout = () => {
         </header>
 
         {/* Page Content View */}
-        <main className="flex-1 overflow-y-auto p-4 lg:p-8 relative z-0">
+        <main className="flex-1 overflow-y-auto custom-scrollbar p-4 lg:p-8 relative z-0">
           <div className="fixed top-20 right-20 w-[300px] h-[300px] lg:w-[500px] lg:h-[500px] bg-[var(--color-primary)] rounded-full blur-[100px] lg:blur-[150px] opacity-[0.05] pointer-events-none"></div>
           <Outlet />
         </main>

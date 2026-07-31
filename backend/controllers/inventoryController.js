@@ -12,7 +12,7 @@ exports.getInventory = async (req, res) => {
         
         const inventory = await Inventory.find(query)
             .populate('branch', 'branchName branchCode')
-            .populate('product', 'name itemCode category unitOfMeasure minimumStockLevel mrp purchasePrice');
+            .populate('product', 'name itemCode category unitOfMeasure minimumStockLevel mrp wholesalePrice purchasePrice itemType piecesPerBox');
             
         res.json({ success: true, data: inventory });
     } catch (error) {
@@ -32,7 +32,7 @@ exports.getInventoryTransactions = async (req, res) => {
 
         const transactions = await InventoryTransaction.find(query)
             .populate('branch', 'branchName')
-            .populate('product', 'name itemCode category unitOfMeasure')
+            .populate('product', 'name itemCode category unitOfMeasure itemType piecesPerBox')
             .populate('performedBy', 'name')
             .sort({ createdAt: -1 })
             .limit(200);

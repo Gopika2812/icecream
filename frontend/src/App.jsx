@@ -10,9 +10,13 @@ import CustomerList from './modules/procurement/CustomerList';
 import ProductList from './modules/procurement/ProductList';
 import PurchaseOrderList from './modules/procurement/PurchaseOrderList';
 import QCList from './modules/procurement/QCList';
+import VendorLedgers from './modules/procurement/VendorLedgers';
 import RawMaterialStock from './modules/inventory/RawMaterialStock';
 import ProductionList from './modules/production/ProductionList';
 import FinishedGoodsStock from './modules/inventory/FinishedGoodsStock';
+import SalesInvoice from './modules/inventory/SalesInvoice';
+import AutoSalesLedger from './modules/inventory/AutoSalesLedger';
+import CustomerLedgers from './modules/inventory/CustomerLedgers';
 
 const queryClient = new QueryClient();
 
@@ -35,11 +39,15 @@ function App() {
             {/* Procurement & Production */}
             <Route path="purchase-orders" element={<PurchaseOrderList />} />
             <Route path="qc" element={<QCList />} />
+            <Route path="vendor-ledgers" element={<VendorLedgers />} />
             <Route path="raw-material-stock" element={<RawMaterialStock />} />
             <Route path="production" element={<ProductionList />} />
 
-            {/* Inventory */}
+            {/* Inventory & Sales */}
             <Route path="finished-goods-stock" element={<FinishedGoodsStock />} />
+            <Route path="sales-invoices" element={<SalesInvoice />} />
+            <Route path="auto-sales-ledger" element={<AutoSalesLedger />} />
+            <Route path="customer-ledgers" element={<CustomerLedgers />} />
             <Route path="inventory" element={<Navigate to="/finished-goods-stock" replace />} />
 
             {/* Admin */}

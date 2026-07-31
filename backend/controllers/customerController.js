@@ -2,7 +2,7 @@ const Customer = require('../models/Customer');
 
 exports.getCustomers = async (req, res) => {
     try {
-        const customers = await Customer.find();
+        const customers = await Customer.find().populate('salesOwner', 'name username employeeId designation');
         res.json({ success: true, data: customers });
     } catch (error) {
         res.status(500).json({ success: false, message: error.message });
@@ -11,7 +11,7 @@ exports.getCustomers = async (req, res) => {
 
 exports.getCustomer = async (req, res) => {
     try {
-        const customer = await Customer.findById(req.params.id);
+        const customer = await Customer.findById(req.params.id).populate('salesOwner', 'name username employeeId designation');
         if (!customer) return res.status(404).json({ success: false, message: 'Customer not found' });
         res.json({ success: true, data: customer });
     } catch (error) {

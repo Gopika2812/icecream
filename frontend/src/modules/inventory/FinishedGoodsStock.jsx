@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import api from '../../services/api';
 import { 
   ThermometerSnowflake, ShoppingBag, ShieldAlert, ArrowUpRight, ArrowDownLeft, 
-  Search, Filter, Plus, Printer, Loader2, QrCode, Building2, Users, Calendar, Box, X, History 
+  Search, Filter, Plus, Printer, Loader2, QrCode, Building2, Users, Calendar, Box, X, History, ChevronDown, ChevronRight 
 } from 'lucide-react';
 import Modal from '../../components/Modal';
 import SearchableSelect from '../../components/SearchableSelect';
@@ -14,9 +14,13 @@ const FinishedGoodsStock = () => {
   const [loading, setLoading] = useState(true);
 
   // Search & Filter
-  const [activeTab, setActiveTab] = useState('Stock Balance'); // 'Stock Balance' | 'Movement Ledger'
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedLocation, setSelectedLocation] = useState('Cold Room');
+
+  // Date Range Filters & Expanded Product State for Movement Ledger
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
+  const [expandedProductId, setExpandedProductId] = useState(null);
 
   // Modals
   const [selectedBatchForSale, setSelectedBatchForSale] = useState(null);
@@ -79,21 +83,85 @@ const FinishedGoodsStock = () => {
     return matchName || matchCode || matchBatch;
   });
 
-  // Filtered Movement Ledger for Finished Goods
-  const fgTransactions = transactions.filter(tx => tx.product?.itemType === 'Finished Goods');
-  const filteredLedger = fgTransactions.filter(tx => {
-    if (!searchTerm.trim()) return true;
-    const q = searchTerm.toLowerCase();
-    const matchName = (tx.product?.name || '').toLowerCase().includes(q);
-    const matchCode = (tx.product?.itemCode || '').toLowerCase().includes(q);
-    const matchBatch = (tx.batchNumber || '').toLowerCase().includes(q);
-    const matchRef = (tx.remarks || '').toLowerCase().includes(q);
-    return matchName || matchCode || matchBatch || matchRef;
-  });
+  // Group transactions by product for Single-Row Product Ledger Summary
+  const productLedgerSummary = React.useMemo(() => {
+    const fgTxs = transactions.filter(tx => tx.product && tx.product.itemType === 'Finished Goods');
+    const productMap = {};
+
+    fgTxs.forEach(tx => {
+      const pId = tx.product._id;
+      if (!productMap[pId]) {
+        productMap[pId] = {
+          product: tx.product,
+          allTxs: []
+        };
+      }
+      productMap[pId].allTxs.push(tx);
+    });
+
+    inventory.forEach(inv => {
+      if (inv.product && inv.product.itemType === 'Finished Goods') {
+        const pId = inv.product._id;
+        if (!productMap[pId]) {
+          productMap[pId] = {
+            product: inv.product,
+            allTxs: []
+          };
+        }
+      }
+    });
+
+    const startTs = startDate ? new Date(startDate).setHours(0, 0, 0, 0) : 0;
+    const endTs = endDate ? new Date(endDate).setHours(23, 59, 59, 999) : Infinity;
+
+    const summaryList = Object.values(productMap).map(({ product, allTxs }) => {
+      let openingQty = 0;
+      let inwardQty = 0;
+      let outwardQty = 0;
+      const periodTxs = [];
+
+      allTxs.forEach(tx => {
+        const txTime = new Date(tx.createdAt).getTime();
+        const qty = parseFloat(tx.quantity) || 0;
+
+        if (startDate && txTime < startTs) {
+          if (tx.transactionType === 'IN') openingQty += qty;
+          else if (tx.transactionType === 'OUT') openingQty -= qty;
+        } else if (txTime >= startTs && txTime <= endTs) {
+          if (tx.transactionType === 'IN') inwardQty += qty;
+          else if (tx.transactionType === 'OUT') outwardQty += qty;
+          periodTxs.push(tx);
+        }
+      });
+
+      const closingQty = startDate
+        ? Math.max(0, openingQty + inwardQty - outwardQty)
+        : Math.max(0, inwardQty - outwardQty);
+
+      return {
+        product,
+        openingQty: Math.max(0, openingQty),
+        inwardQty,
+        outwardQty,
+        closingQty,
+        periodTxs: periodTxs.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+      };
+    });
+
+    return summaryList.filter(item => {
+      if (!searchTerm.trim()) return true;
+      const q = searchTerm.toLowerCase();
+      return (
+        (item.product?.name || '').toLowerCase().includes(q) ||
+        (item.product?.itemCode || '').toLowerCase().includes(q)
+      );
+    });
+  }, [transactions, inventory, startDate, endDate, searchTerm]);
 
   // Top Summary Totals
   const coldRoomItems = inventory.filter(i => i.product?.itemType === 'Finished Goods' && i.inventoryType === 'Cold Room');
   const totalColdRoomPieces = coldRoomItems.reduce((sum, i) => sum + i.quantity, 0);
+  const fgTransactions = transactions.filter(tx => tx.product?.itemType === 'Finished Goods');
   const totalSalesCount = fgTransactions.filter(tx => tx.transactionType === 'OUT' && tx.referenceType === 'MANUAL').length;
   const totalDamagedPieces = inventory.filter(i => i.product?.itemType === 'Finished Goods' && i.inventoryType === 'Rejected Stock').reduce((sum, i) => sum + i.quantity, 0);
 
@@ -242,61 +310,108 @@ const FinishedGoodsStock = () => {
         </div>
       </div>
 
-      {/* Views & Filters Toolbar */}
-      <div className="flex flex-col sm:flex-row justify-between items-center gap-4 mb-6 bg-white/40 p-4 rounded-2xl border border-[var(--color-glass-border)] shadow-sm">
-        {/* Navigation Tabs */}
-        <div className="flex gap-2 w-full sm:w-auto">
-          <button
-            onClick={() => setActiveTab('Stock Balance')}
-            className={`px-4 py-2 rounded-xl text-xs font-extrabold transition-all border ${
-              activeTab === 'Stock Balance'
-                ? 'bg-white text-[var(--color-primary)] border-pink-400 shadow-md ring-2 ring-pink-500/20'
-                : 'bg-white/80 text-gray-700 border-transparent hover:bg-gray-100'
-            }`}
-          >
-            Cold Room Stock Balances
-          </button>
-          <button
-            onClick={() => setActiveTab('Movement Ledger')}
-            className={`px-4 py-2 rounded-xl text-xs font-extrabold transition-all border ${
-              activeTab === 'Movement Ledger'
-                ? 'bg-white text-[var(--color-primary)] border-pink-400 shadow-md ring-2 ring-pink-500/20'
-                : 'bg-white/80 text-gray-700 border-transparent hover:bg-gray-100'
-            }`}
-          >
-            Inward & Outward Finished Goods Ledger
-          </button>
-        </div>
+      {/* Filters Toolbar */}
+      <div className="bg-white/40 p-4 rounded-2xl border border-[var(--color-glass-border)] shadow-sm mb-6 space-y-3">
+        <div className="flex flex-col lg:flex-row justify-between items-center gap-4">
+          
+          {/* Date Period Filtration */}
+          <div className="flex flex-wrap items-center gap-3 w-full lg:w-auto">
+            <span className="text-xs font-bold text-gray-700 flex items-center gap-1.5">
+              <Calendar size={16} className="text-[var(--color-primary)]" /> Filter Date Period:
+            </span>
+            
+            <div className="flex items-center gap-1.5">
+              <span className="text-[11px] text-gray-500 font-semibold">From:</span>
+              <input
+                type="date"
+                value={startDate}
+                onChange={(e) => setStartDate(e.target.value)}
+                className="bg-white border border-pink-200 rounded-lg px-2.5 py-1.5 text-xs font-semibold text-gray-800 shadow-sm focus:outline-none focus:ring-1 focus:ring-pink-500"
+              />
+            </div>
 
-        {/* Filters */}
-        <div className="flex flex-wrap items-center gap-3 w-full sm:w-auto justify-end">
-          <div className="relative w-full sm:w-64">
-            <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-            <input
-              type="text"
-              placeholder="Search product, batch, ref..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-9 pr-4 py-1.5 bg-white border border-[var(--color-glass-border)] rounded-xl text-xs text-gray-900 focus:outline-none focus:border-[var(--color-primary)]"
-            />
+            <div className="flex items-center gap-1.5">
+              <span className="text-[11px] text-gray-500 font-semibold">To:</span>
+              <input
+                type="date"
+                value={endDate}
+                onChange={(e) => setEndDate(e.target.value)}
+                className="bg-white border border-pink-200 rounded-lg px-2.5 py-1.5 text-xs font-semibold text-gray-800 shadow-sm focus:outline-none focus:ring-1 focus:ring-pink-500"
+              />
+            </div>
+            
+            {/* Quick Date Presets */}
+            <div className="flex items-center gap-1.5">
+              <button
+                type="button"
+                onClick={() => {
+                  const today = new Date().toISOString().split('T')[0];
+                  setStartDate(today);
+                  setEndDate(today);
+                }}
+                className="px-2.5 py-1 rounded-lg bg-pink-50 text-[var(--color-primary)] border border-pink-200 text-xs font-bold hover:bg-pink-100 transition-colors"
+              >
+                Today
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  const d = new Date();
+                  const firstDay = new Date(d.getFullYear(), d.getMonth(), 1).toISOString().split('T')[0];
+                  const today = d.toISOString().split('T')[0];
+                  setStartDate(firstDay);
+                  setEndDate(today);
+                }}
+                className="px-2.5 py-1 rounded-lg bg-pink-50 text-[var(--color-primary)] border border-pink-200 text-xs font-bold hover:bg-pink-100 transition-colors"
+              >
+                This Month
+              </button>
+              {(startDate || endDate) && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setStartDate('');
+                    setEndDate('');
+                  }}
+                  className="px-2.5 py-1 rounded-lg bg-gray-100 text-gray-600 text-xs font-bold hover:bg-gray-200 transition-colors flex items-center gap-1"
+                >
+                  <X size={12} /> Clear Filter
+                </button>
+              )}
+            </div>
           </div>
 
-          <div className="flex items-center gap-2">
-            <Filter size={14} className="text-gray-500" />
-            <select
-              value={selectedLocation}
-              onChange={(e) => setSelectedLocation(e.target.value)}
-              className="bg-white border border-pink-200/80 rounded-xl px-4 py-1.5 text-xs font-bold text-gray-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-pink-500/20 focus:border-[var(--color-primary)] hover:border-pink-300 transition-all appearance-none bg-[url('data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22292.4%22%20height%3D%22292.4%22%3E%3Cpath%20fill%3D%22%23d81b60%22%20d%3D%22M287%2069.4a17.6%2017.6%200%200%200-13-5.4H18.4c-5%200-9.3%201.8-12.9%205.4A17.6%2017.6%200%200%200%200%2082.2c0%205%201.8%209.3%205.4%2012.9l128%20127.9c3.6%203.6%207.8%205.4%2012.8%205.4s9.2-1.8%2012.8-5.4L287%2095c3.5-3.5%205.4-7.8%205.4-12.8%200-5-1.9-9.2-5.5-12.8z%22%2F%3E%3C%2Fsvg%3E')] bg-[length:10px_10px] bg-[right_12px_center] bg-no-repeat pr-8 cursor-pointer"
-            >
-              <option value="Cold Room">Cold Room Storage</option>
-              <option value="Rejected Stock">Damaged / Rejected Stock</option>
-              <option value="ALL">All Storage Locations</option>
-            </select>
+          {/* Search & Location Filters */}
+          <div className="flex flex-wrap items-center gap-3 w-full lg:w-auto justify-end">
+            <div className="relative w-full sm:w-64">
+              <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+              <input
+                type="text"
+                placeholder="Search product name, code..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="w-full pl-9 pr-4 py-1.5 bg-white border border-[var(--color-glass-border)] rounded-xl text-xs text-gray-900 focus:outline-none focus:border-[var(--color-primary)]"
+              />
+            </div>
+
+            <div className="flex items-center gap-2">
+              <Filter size={14} className="text-gray-500" />
+              <select
+                value={selectedLocation}
+                onChange={(e) => setSelectedLocation(e.target.value)}
+                className="bg-white border border-pink-200/80 rounded-xl px-4 py-1.5 text-xs font-bold text-gray-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-pink-500/20 focus:border-[var(--color-primary)] hover:border-pink-300 transition-all appearance-none bg-[url('data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22292.4%22%20height%3D%22292.4%22%3E%3Cpath%20fill%3D%22%23d81b60%22%20d%3D%22M287%2069.4a17.6%2017.6%200%200%200-13-5.4H18.4c-5%200-9.3%201.8-12.9%205.4A17.6%2017.6%200%200%200%200%2082.2c0%205%201.8%209.3%205.4%2012.9l128%20127.9c3.6%203.6%207.8%205.4%2012.8%205.4s9.2-1.8%2012.8-5.4L287%2095c3.5-3.5%205.4-7.8%205.4-12.8%200-5-1.9-9.2-5.5-12.8z%22%2F%3E%3C%2Fsvg%3E')] bg-[length:10px_10px] bg-[right_12px_center] bg-no-repeat pr-8 cursor-pointer"
+              >
+                <option value="Cold Room">Cold Room Storage</option>
+                <option value="Rejected Stock">Damaged / Rejected Stock</option>
+                <option value="ALL">All Storage Locations</option>
+              </select>
+            </div>
           </div>
+
         </div>
       </div>
 
-      {/* Main Content Area */}
+      {/* Main Content Area: Single Row Product Inward & Outward Ledger */}
       <div className="glass-panel overflow-hidden">
         {loading ? (
           <div className="p-12 text-center text-gray-600 flex justify-center items-center gap-2">
@@ -304,147 +419,193 @@ const FinishedGoodsStock = () => {
             Loading Finished Goods Inventory...
           </div>
         ) : (
-          <div>
-            {/* VIEW 1: COLD ROOM STOCK BALANCES */}
-            {activeTab === 'Stock Balance' && (
-              <div className="overflow-x-auto">
-                <table className="w-full text-left text-sm text-gray-700">
-                  <thead className="bg-gray-50/80 border-b border-[var(--color-glass-border)] text-gray-600 font-semibold text-xs uppercase tracking-wider">
-                    <tr>
-                      <th className="px-6 py-4">Finished Good Item</th>
-                      <th className="px-6 py-4 text-center">Batch Code</th>
-                      <th className="px-6 py-4 text-center">Cold Temp Log</th>
-                      <th className="px-6 py-4 text-right">Available Stock</th>
-                      <th className="px-6 py-4 text-right">Selling Price</th>
-                      <th className="px-6 py-4 text-center">Expiry Date</th>
-                      <th className="px-6 py-4 text-center">Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-[var(--color-glass-border)]">
-                    {filteredFgStock.map((item) => {
-                      const pPerBox = item.product?.piecesPerBox || 12;
-                      const boxCount = Math.floor(item.quantity / pPerBox);
-                      const extraPcs = item.quantity % pPerBox;
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-sm text-gray-700">
+              <thead className="bg-gray-50/80 border-b border-[var(--color-glass-border)] text-gray-600 font-semibold text-xs uppercase tracking-wider">
+                <tr>
+                  <th className="px-6 py-4">Finished Good Item</th>
+                  <th className="px-6 py-4 text-right text-gray-700">Opening Stock</th>
+                  <th className="px-6 py-4 text-right text-emerald-700">Period Inward (+)</th>
+                  <th className="px-6 py-4 text-right text-rose-700">Period Outward (-)</th>
+                  <th className="px-6 py-4 text-right text-indigo-700">Closing Stock</th>
+                  <th className="px-6 py-4 text-center">Actions & History</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-[var(--color-glass-border)]">
+                {productLedgerSummary.map((item) => {
+                  const pPerBox = item.product?.piecesPerBox || 12;
+                  const isExpanded = expandedProductId === item.product?._id;
 
-                      return (
-                        <tr key={item._id} className="hover:bg-white/40 transition-colors">
-                          <td className="px-6 py-4 font-bold text-gray-900">
-                            {item.product?.name}
-                            <span className="block font-mono text-[10px] text-gray-400 font-normal">Code: {item.product?.itemCode}</span>
-                          </td>
-                          <td className="px-6 py-4 text-center">
-                            <span className="px-2.5 py-1 rounded bg-indigo-50 text-indigo-700 border border-indigo-200 font-mono text-xs font-bold">
-                              {item.batchNumber}
-                            </span>
-                          </td>
-                          <td className="px-6 py-4 text-center font-mono text-xs font-bold text-blue-600">
-                            {item.temperature !== undefined ? `${item.temperature} °C` : '-18 °C'}
-                          </td>
-                          <td className="px-6 py-4 text-right font-mono font-extrabold text-emerald-700 text-base">
-                            {boxCount} Boxes <span className="text-xs text-gray-500 font-normal">({item.quantity} Pcs)</span>
-                          </td>
-                          <td className="px-6 py-4 text-right font-mono font-bold text-gray-900">
-                            ₹{(item.purchasePrice || 0).toFixed(2)}
-                          </td>
-                          <td className="px-6 py-4 text-center text-xs font-bold text-rose-600">
-                            {item.expiryDate ? new Date(item.expiryDate).toLocaleDateString() : 'N/A'}
-                          </td>
-                          <td className="px-6 py-4 text-center">
-                            <div className="flex items-center justify-center gap-2">
-                              <button
-                                onClick={() => {
-                                  setSelectedBatchForSale(item);
-                                  setSaleForm({ customerId: '', invoiceNumber: '', boxesToSell: 1, sellingPrice: item.purchasePrice || '' });
-                                  setIsSaleModalOpen(true);
-                                }}
-                                className="px-3 py-1 text-xs font-bold rounded-lg bg-emerald-600 text-white hover:bg-emerald-700 transition-all shadow-sm flex items-center gap-1"
-                              >
-                                <ShoppingBag size={12} /> Dispatch Sale
-                              </button>
+                  const openBoxes = Math.floor(item.openingQty / pPerBox);
+                  const openLoose = item.openingQty % pPerBox;
 
-                              <button
-                                onClick={() => {
-                                  setSelectedBatchForDamage(item);
-                                  setDamageForm({ damagedQuantity: 1, reason: '' });
-                                  setIsDamageModalOpen(true);
-                                }}
-                                className="px-3 py-1 text-xs font-bold rounded-lg bg-rose-600 text-white hover:bg-rose-700 transition-all shadow-sm flex items-center gap-1"
-                              >
-                                <ShieldAlert size={12} /> Log Damage
-                              </button>
+                  const closeBoxes = Math.floor(item.closingQty / pPerBox);
+                  const closeLoose = item.closingQty % pPerBox;
+
+                  const inBoxes = Math.floor(item.inwardQty / pPerBox);
+                  const inLoose = item.inwardQty % pPerBox;
+
+                  const outBoxes = Math.floor(item.outwardQty / pPerBox);
+                  const outLoose = item.outwardQty % pPerBox;
+
+                  return (
+                    <React.Fragment key={item.product?._id}>
+                      {/* Single Summary Row for Product */}
+                      <tr 
+                        onClick={() => setExpandedProductId(isExpanded ? null : item.product?._id)}
+                        className={`cursor-pointer transition-colors ${
+                          isExpanded ? 'bg-pink-50/80 border-l-4 border-l-[var(--color-primary)]' : 'hover:bg-white/60'
+                        }`}
+                      >
+                        <td className="px-6 py-4 font-bold text-gray-900">
+                          <div className="flex items-center gap-2.5">
+                            {isExpanded ? <ChevronDown size={18} className="text-[var(--color-primary)] shrink-0" /> : <ChevronRight size={18} className="text-gray-400 shrink-0" />}
+                            <div>
+                              <span className="text-sm">{item.product?.name}</span>
+                              <span className="block font-mono text-[10px] text-gray-400 font-normal">Code: {item.product?.itemCode}</span>
                             </div>
-                          </td>
-                        </tr>
+                          </div>
+                        </td>
+
+                        <td className="px-6 py-4 text-right font-mono font-bold text-gray-700">
+                          <div>{openBoxes} Boxes {openLoose > 0 ? `+ ${openLoose} Pcs` : ''}</div>
+                          <div className="text-[10px] text-gray-400 font-normal">({item.openingQty} Pcs)</div>
+                        </td>
+
+                        <td className="px-6 py-4 text-right font-mono font-extrabold text-emerald-600">
+                          <div>+ {inBoxes} Boxes {inLoose > 0 ? `+ ${inLoose} Pcs` : ''}</div>
+                          <div className="text-[10px] text-emerald-600/80 font-normal">(+ {item.inwardQty} Pcs)</div>
+                        </td>
+
+                        <td className="px-6 py-4 text-right font-mono font-extrabold text-rose-600">
+                          <div>- {outBoxes} Boxes {outLoose > 0 ? `+ ${outLoose} Pcs` : ''}</div>
+                          <div className="text-[10px] text-rose-600/80 font-normal">(- {item.outwardQty} Pcs)</div>
+                        </td>
+
+                        <td className="px-6 py-4 text-right font-mono font-extrabold text-indigo-700 text-base">
+                          <div>{closeBoxes} Boxes {closeLoose > 0 ? `+ ${closeLoose} Pcs` : ''}</div>
+                          <div className="text-[10px] text-indigo-500 font-normal">({item.closingQty} Pcs)</div>
+                        </td>
+
+                        <td className="px-6 py-4 text-center">
+                          <div className="flex items-center justify-center gap-2">
+
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                const coldRoomBatch = inventory.find(i => i.product?._id === item.product?._id && i.inventoryType === 'Cold Room' && i.quantity > 0) || { product: item.product, batchNumber: 'COLD-ROOM', quantity: item.closingQty };
+                                setSelectedBatchForDamage(coldRoomBatch);
+                                setDamageForm({ damagedQuantity: 1, reason: '' });
+                                setIsDamageModalOpen(true);
+                              }}
+                              className="px-2.5 py-1.5 text-xs font-bold rounded-lg bg-rose-600 text-white hover:bg-rose-700 transition-all shadow-sm inline-flex items-center gap-1"
+                              title="Log Damaged Stock"
+                            >
+                              <ShieldAlert size={13} /> Damage
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setExpandedProductId(isExpanded ? null : item.product?._id);
+                              }}
+                              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all border inline-flex items-center gap-1.5 ${
+                                isExpanded
+                                  ? 'bg-[var(--color-primary)] text-white border-transparent shadow-sm'
+                                  : 'bg-white text-gray-700 border-gray-300 hover:bg-pink-50 hover:text-[var(--color-primary)]'
+                              }`}
+                            >
+                              {isExpanded ? 'Hide' : `History (${item.periodTxs.length})`}
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+
+                          {/* Expanded Detailed Transactions Sub-table */}
+                          {isExpanded && (
+                            <tr>
+                              <td colSpan="6" className="p-0 bg-pink-50/40">
+                                <div className="p-4 sm:p-6 border-b-2 border-pink-200 shadow-inner">
+                                  <div className="flex justify-between items-center mb-3">
+                                    <h4 className="text-xs font-extrabold text-gray-800 uppercase tracking-wider flex items-center gap-2">
+                                      <History size={16} className="text-[var(--color-primary)]" />
+                                      Inward & Outward Transactions History — <span className="text-[var(--color-primary)]">{item.product?.name}</span>
+                                    </h4>
+                                    <span className="text-xs font-bold text-gray-500">
+                                      Showing {item.periodTxs.length} movement transactions for selected period
+                                    </span>
+                                  </div>
+
+                                  <div className="bg-white rounded-xl border border-pink-200 overflow-hidden shadow-sm">
+                                    <table className="w-full text-left text-xs text-gray-700">
+                                      <thead className="bg-gray-100/80 text-gray-600 font-bold uppercase tracking-wider border-b border-gray-200">
+                                        <tr>
+                                          <th className="px-4 py-3">Date & Time</th>
+                                          <th className="px-4 py-3 text-center">Transaction Type</th>
+                                          <th className="px-4 py-3 text-center">Batch Code</th>
+                                          <th className="px-4 py-3 text-right text-emerald-700">Inward (+ Pcs)</th>
+                                          <th className="px-4 py-3 text-right text-rose-700">Outward (- Pcs)</th>
+                                          <th className="px-4 py-3">Reference / Customer Remarks</th>
+                                        </tr>
+                                      </thead>
+                                      <tbody className="divide-y divide-gray-100 font-medium">
+                                        {item.periodTxs.map((tx) => (
+                                          <tr key={tx._id} className="hover:bg-pink-50/30 transition-colors">
+                                            <td className="px-4 py-2.5 whitespace-nowrap text-gray-600 font-mono">
+                                              {new Date(tx.createdAt).toLocaleString()}
+                                            </td>
+                                            <td className="px-4 py-2.5 text-center">
+                                              {tx.transactionType === 'IN' ? (
+                                                <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-emerald-100 text-emerald-800 border border-emerald-300">
+                                                  🟢 PRODUCTION INWARD
+                                                </span>
+                                              ) : (
+                                                <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-rose-100 text-rose-800 border border-rose-300">
+                                                  🔴 SALES / DAMAGE OUTWARD
+                                                </span>
+                                              )}
+                                            </td>
+                                            <td className="px-4 py-2.5 text-center font-mono font-bold text-gray-800">
+                                              <span className="px-2 py-0.5 bg-gray-100 rounded border border-gray-300">
+                                                {tx.batchNumber}
+                                              </span>
+                                            </td>
+                                            <td className="px-4 py-2.5 text-right font-mono font-extrabold text-emerald-600">
+                                              {tx.transactionType === 'IN' ? `+ ${tx.quantity} Pcs` : '-'}
+                                            </td>
+                                            <td className="px-4 py-2.5 text-right font-mono font-extrabold text-rose-600">
+                                              {tx.transactionType === 'OUT' ? `- ${tx.quantity} Pcs` : '-'}
+                                            </td>
+                                            <td className="px-4 py-2.5 text-gray-700">
+                                              {tx.remarks}
+                                            </td>
+                                          </tr>
+                                        ))}
+
+                                        {item.periodTxs.length === 0 && (
+                                          <tr>
+                                            <td colSpan="6" className="px-4 py-6 text-center text-gray-500 italic">
+                                              No inward/outward transactions logged for this item during the selected date period.
+                                            </td>
+                                          </tr>
+                                        )}
+                                      </tbody>
+                                    </table>
+                                  </div>
+                                </div>
+                              </td>
+                            </tr>
+                          )}
+                        </React.Fragment>
                       );
                     })}
-                    {filteredFgStock.length === 0 && (
-                      <tr>
-                        <td colSpan="7" className="px-6 py-10 text-center text-gray-500">
-                          No finished goods items found in selected inventory location.
-                        </td>
-                      </tr>
-                    )}
-                  </tbody>
-                </table>
-              </div>
-            )}
 
-            {/* VIEW 2: INWARD & OUTWARD FINISHED GOODS LEDGER */}
-            {activeTab === 'Movement Ledger' && (
-              <div className="overflow-x-auto">
-                <table className="w-full text-left text-sm text-gray-700">
-                  <thead className="bg-gray-50/80 border-b border-[var(--color-glass-border)] text-gray-600 font-semibold text-xs uppercase tracking-wider">
-                    <tr>
-                      <th className="px-6 py-4">Date & Time</th>
-                      <th className="px-6 py-4 text-center">Type</th>
-                      <th className="px-6 py-4">Finished Good Item</th>
-                      <th className="px-6 py-4 text-center">Batch Code</th>
-                      <th className="px-6 py-4 text-right text-emerald-700">Inward (+ Pcs)</th>
-                      <th className="px-6 py-4 text-right text-rose-700">Outward (- Pcs)</th>
-                      <th className="px-6 py-4">Reference & Customer Details</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-[var(--color-glass-border)]">
-                    {filteredLedger.map((tx) => (
-                      <tr key={tx._id} className="hover:bg-white/40 transition-colors">
-                        <td className="px-6 py-4 text-xs font-medium text-gray-600 whitespace-nowrap">
-                          {new Date(tx.createdAt).toLocaleString()}
-                        </td>
-                        <td className="px-6 py-4 text-center">
-                          {tx.transactionType === 'IN' ? (
-                            <span className="px-2.5 py-1 rounded-full text-[11px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
-                              🟢 PRODUCTION INWARD
-                            </span>
-                          ) : (
-                            <span className="px-2.5 py-1 rounded-full text-[11px] font-bold bg-rose-50 text-rose-700 border border-rose-200">
-                              🔴 SALES / DAMAGE OUTWARD
-                            </span>
-                          )}
-                        </td>
-                        <td className="px-6 py-4 font-bold text-gray-900">
-                          {tx.product?.name}
-                          <span className="block font-mono text-[10px] text-gray-400 font-normal">Code: {tx.product?.itemCode}</span>
-                        </td>
-                        <td className="px-6 py-4 text-center font-mono text-xs">
-                          <span className="px-2 py-0.5 rounded bg-gray-100 text-gray-700 border border-gray-200 font-semibold">
-                            {tx.batchNumber}
-                          </span>
-                        </td>
-                        <td className="px-6 py-4 text-right font-mono font-bold text-emerald-600">
-                          {tx.transactionType === 'IN' ? `+ ${tx.quantity} Pcs` : '-'}
-                        </td>
-                        <td className="px-6 py-4 text-right font-mono font-bold text-rose-600">
-                          {tx.transactionType === 'OUT' ? `- ${tx.quantity} Pcs` : '-'}
-                        </td>
-                        <td className="px-6 py-4 text-xs text-gray-700">
-                          {tx.remarks}
-                        </td>
-                      </tr>
-                    ))}
-                    {filteredLedger.length === 0 && (
+                    {productLedgerSummary.length === 0 && (
                       <tr>
-                        <td colSpan="7" className="px-6 py-10 text-center text-gray-500">
-                          No finished goods movement ledger transactions logged.
+                        <td colSpan="6" className="px-6 py-10 text-center text-gray-500">
+                          No finished goods records found matching your filters.
                         </td>
                       </tr>
                     )}
@@ -452,8 +613,6 @@ const FinishedGoodsStock = () => {
                 </table>
               </div>
             )}
-          </div>
-        )}
       </div>
 
       {/* --- POPUP MODAL: DISPATCH CUSTOMER SALE --- */}

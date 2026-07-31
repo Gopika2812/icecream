@@ -40,6 +40,10 @@ app.use('/api/v1/grn', require('./routes/grnRoutes'));
 app.use('/api/v1/qc', require('./routes/qualityControlRoutes'));
 app.use('/api/v1/inventory', require('./routes/inventoryRoutes'));
 app.use('/api/v1/production', require('./routes/productionRoutes'));
+app.use('/api/v1/sales-orders', require('./routes/salesOrderRoutes'));
+app.use('/api/v1/auto-sales', require('./routes/autoSalesRoutes'));
+app.use('/api/v1/customer-ledger', require('./routes/customerLedgerRoutes'));
+app.use('/api/v1/vendor-ledger', require('./routes/vendorLedgerRoutes'));
 
 // Error handling middleware
 app.use(notFound);

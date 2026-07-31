@@ -16,7 +16,7 @@ const inventoryTransactionSchema = new mongoose.Schema({
     expiryDate: { type: Date },
     transactionType: { type: String, enum: ['IN', 'OUT', 'ADJUSTMENT'], required: true },
     quantity: { type: Number, required: true },
-    referenceType: { type: String, enum: ['GRN', 'QC', 'MANUAL', 'PRODUCTION'], required: true },
+    referenceType: { type: String, enum: ['GRN', 'QC', 'MANUAL', 'PRODUCTION', 'PRODUCTION_QC', 'DAMAGE'], required: true },
     referenceId: { type: mongoose.Schema.Types.ObjectId },
     remarks: { type: String },
     performedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true }
