@@ -1,0 +1,20 @@
+services:
+  - type: web
+    name: saravanas-backend
+    env: node
+    rootDir: backend
+    buildCommand: npm install
+    startCommand: node server.js
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: MONGODB_URI
+        value: mongodb+srv://gopikap2812_db_user:4SyjUP7qMMarkgqu@saravanas.qg7d9tq.mongodb.net/sri_saravanass_erp
+      - key: JWT_SECRET
+        value: super_secret_jwt_key_for_erp_2026
+      - key: JWT_REFRESH_SECRET
+        value: super_secret_refresh_key_for_erp_2026
+      - key: JWT_EXPIRES_IN
+        value: 1d
+      - key: JWT_REFRESH_EXPIRES_IN
+        value: 7d
