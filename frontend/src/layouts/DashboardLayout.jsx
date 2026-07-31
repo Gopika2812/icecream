@@ -85,19 +85,19 @@ const DashboardLayout = () => {
   };
 
   return (
-    <div className="flex h-screen bg-[var(--color-primary)]/15 overflow-hidden text-sm">
-      {/* Mobile Overlay */}
+    <div className="flex h-screen bg-[var(--color-primary)]/15 overflow-hidden text-sm relative">
+      {/* Mobile Overlay (Behind Sidebar) */}
       {isMobileOpen && (
         <div 
-          className="fixed inset-0 bg-black/50 backdrop-blur-sm z-40 lg:hidden"
+          className="fixed inset-0 bg-black/60 backdrop-blur-xs z-40 lg:hidden cursor-pointer"
           onClick={() => setIsMobileOpen(false)}
         />
       )}
 
-      {/* Sidebar */}
-      <aside className={`fixed inset-y-0 left-0 z-30 bg-[var(--color-primary)] border-r border-pink-400/30 flex flex-col transition-all duration-300 ease-in-out lg:relative ${
-        isCollapsed ? 'w-20' : 'w-64'
-      } ${isMobileOpen ? 'translate-x-0 w-64' : '-translate-x-full lg:translate-x-0'}`}>
+      {/* Sidebar (Above Overlay on Mobile) */}
+      <aside className={`fixed inset-y-0 left-0 z-50 bg-[var(--color-primary)] border-r border-pink-400/30 flex flex-col transition-all duration-300 ease-in-out lg:relative ${
+        isCollapsed ? 'lg:w-20 w-64' : 'w-64'
+      } ${isMobileOpen ? 'translate-x-0 shadow-2xl' : '-translate-x-full lg:translate-x-0'}`}>
         
         {/* Sidebar Header */}
         <div className={`p-4 border-b border-pink-400/30 flex items-center ${isCollapsed ? 'justify-center' : 'justify-between'}`}>
