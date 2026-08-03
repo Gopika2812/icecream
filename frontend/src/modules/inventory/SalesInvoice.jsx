@@ -5,6 +5,7 @@ import {
   RotateCcw, Printer, Loader2, ArrowRight, Truck, Store, PartyPopper, MapPin, X, Wrench, Gift, User
 } from 'lucide-react';
 import Modal from '../../components/Modal';
+import SearchableSelect from '../../components/SearchableSelect';
 
 const SalesInvoice = () => {
   const [salesOrders, setSalesOrders] = useState([]);
@@ -223,6 +224,221 @@ const SalesInvoice = () => {
 
   // Auto Sales Return State
   const [returnMode, setReturnMode] = useState('daily_auto'); // 'daily_auto' | 'cold_room'
+
+  // Print Official Sales GST Tax Invoice PDF
+  const handlePrintInvoice = (invoice) => {
+    if (!invoice) return;
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) return alert('Please allow popups in your browser to print the Tax Invoice.');
+
+    const companyName = "SRI SARAVANASS ICE CREAM & DAIRY PRODUCTS";
+    const companyAddress = "Head Office & Factory: 66, Nataraja Theatre Road, Sattur, Virudhunagar - 626203, Tamil Nadu";
+    const companyContact = "Phone: +91 99420 27197 | Email: accounts@saravanass.com | GSTIN: 33AAAFS1234A1Z1";
+
+    const customerObj = invoice.customer || {};
+    const salesOwnerObj = invoice.salesOwner || {};
+    const items = invoice.items || [];
+
+    const subTotal = invoice.subTotal || items.reduce((sum, i) => sum + (i.totalPrice || 0), 0);
+    const isTaxable = (invoice.taxRate || 18) > 0;
+    const sgst = isTaxable ? subTotal * 0.09 : 0;
+    const cgst = isTaxable ? subTotal * 0.09 : 0;
+    const grandTotal = invoice.grandTotal || (subTotal + sgst + cgst);
+
+    const htmlContent = `
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <title>GST Tax Invoice - ${invoice.invoiceNumber}</title>
+          <style>
+            * { box-sizing: border-box; margin: 0; padding: 0; }
+            body { font-family: 'Segoe UI', Arial, sans-serif; color: #1e293b; padding: 25px; background: #fff; line-height: 1.4; }
+            
+            /* Letterhead Header */
+            .header-table { width: 100%; border-collapse: collapse; margin-bottom: 15px; border-bottom: 3px double #d81b60; padding-bottom: 12px; }
+            .header-logo { width: 68px; height: 68px; object-fit: cover; border-radius: 12px; }
+            .company-title { font-size: 19px; font-weight: 900; color: #881337; text-transform: uppercase; letter-spacing: 0.5px; }
+            .company-sub { font-size: 11px; color: #475569; font-weight: 600; margin-top: 2px; }
+            .company-contact { font-size: 10px; color: #64748b; margin-top: 4px; font-family: monospace; }
+            
+            /* Document Title Bar */
+            .doc-title-bar { background: linear-gradient(135deg, #881337 0%, #ad1457 100%); color: white; padding: 8px 14px; border-radius: 6px; margin-bottom: 16px; display: flex; justify-content: space-between; align-items: center; }
+            .doc-title { font-size: 13px; font-weight: 800; text-transform: uppercase; letter-spacing: 1px; }
+            .doc-date { font-size: 11px; opacity: 0.95; font-family: monospace; }
+
+            /* Info Box Grid */
+            .info-grid { display: flex; justify-content: space-between; gap: 15px; margin-bottom: 16px; }
+            .info-box { flex: 1; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; padding: 12px; font-size: 11px; }
+            .info-box h4 { font-size: 10px; font-weight: 800; text-transform: uppercase; color: #881337; border-bottom: 1px solid #cbd5e1; padding-bottom: 4px; margin-bottom: 6px; letter-spacing: 0.5px; }
+            .info-box p { margin: 2px 0; color: #334155; }
+            .info-box strong { color: #0f172a; }
+
+            /* Items Table */
+            .table-container { border: 1px solid #cbd5e1; border-radius: 6px; overflow: hidden; margin-bottom: 16px; }
+            .po-table { width: 100%; border-collapse: collapse; font-size: 11px; }
+            .po-table th { background: #f1f5f9; text-align: left; padding: 8px 10px; border-bottom: 2px solid #cbd5e1; font-weight: 800; color: #334155; text-transform: uppercase; font-size: 9px; letter-spacing: 0.5px; }
+            .po-table td { padding: 8px 10px; border-bottom: 1px solid #e2e8f0; vertical-align: middle; }
+            .text-right { text-align: right; }
+            .text-center { text-align: center; }
+            .font-mono { font-family: monospace; }
+
+            /* Summary Section */
+            .summary-section { display: flex; justify-content: space-between; gap: 20px; margin-bottom: 20px; }
+            .terms-box { flex: 1; font-size: 9.5px; color: #64748b; background: #fafafa; border: 1px solid #f1f5f9; padding: 10px; border-radius: 6px; }
+            .totals-box { width: 240px; font-size: 11px; }
+            .totals-row { display: flex; justify-content: space-between; padding: 3px 0; }
+            .totals-grand { display: flex; justify-between: space-between; border-top: 2px solid #881337; padding-top: 6px; margin-top: 4px; font-weight: 900; font-size: 13px; color: #881337; }
+
+            /* Signatures */
+            .footer-section { margin-top: 30px; }
+            .sig-grid { display: flex; justify-content: space-between; margin-top: 40px; padding-top: 8px; }
+            .sig-box { text-align: center; width: 170px; border-top: 1px dashed #94a3b8; padding-top: 4px; font-size: 9.5px; font-weight: 700; color: #475569; }
+            .disclaimer { margin-top: 20px; text-align: center; font-size: 8.5px; color: #94a3b8; border-top: 1px solid #e2e8f0; padding-top: 6px; }
+
+            @media print {
+              body { padding: 10px; }
+              @page { size: auto; margin: 8mm; }
+            }
+          </style>
+        </head>
+        <body>
+          
+          <!-- LETTERHEAD HEADER -->
+          <table class="header-table">
+            <tr>
+              <td style="width: 76px; vertical-align: top;">
+                <img src="/logo.avif" alt="Logo" class="header-logo" />
+              </td>
+              <td style="vertical-align: top; padding-left: 10px;">
+                <div class="company-title">${companyName}</div>
+                <div class="company-sub">${companyAddress}</div>
+                <div class="company-contact">${companyContact}</div>
+              </td>
+            </tr>
+          </table>
+
+          <!-- DOCUMENT TITLE BAR -->
+          <div class="doc-title-bar">
+            <span class="doc-title">TAX INVOICE — ${invoice.invoiceType || 'SALES'} (${invoice.invoiceNumber})</span>
+            <span class="doc-date">Date: ${new Date(invoice.createdAt).toLocaleDateString('en-IN')}</span>
+          </div>
+
+          <!-- INFO BOXES -->
+          <div class="info-grid">
+            <div class="info-box">
+              <h4>Billed Customer / Outlet Details</h4>
+              <p><strong>Customer Name:</strong> ${invoice.guestName || customerObj.name || 'Walk-in Customer'}</p>
+              <p><strong>Customer Code:</strong> ${customerObj.customerCode || 'N/A'}</p>
+              <p><strong>GSTIN Number:</strong> ${customerObj.gstinNumber || 'URD (Unregistered)'}</p>
+              <p><strong>Billing Address:</strong> ${customerObj.billingAddress?.city || 'Tamil Nadu'}</p>
+              <p><strong>Phone:</strong> ${customerObj.phone || 'N/A'}</p>
+            </div>
+
+            <div class="info-box">
+              <h4>Invoice & Sales Dispatch Info</h4>
+              <p><strong>Invoice Number:</strong> ${invoice.invoiceNumber}</p>
+              <p><strong>Invoice Type:</strong> ${invoice.invoiceType}</p>
+              <p><strong>Sales Representative:</strong> ${salesOwnerObj.name || 'In-House Direct'}</p>
+              <p><strong>Sales Designation:</strong> ${salesOwnerObj.designation || 'Sales Executive'}</p>
+              <p><strong>Payment Status:</strong> <strong style="color: #047857;">${invoice.paymentStatus}</strong></p>
+            </div>
+          </div>
+
+          <!-- ITEMS TABLE -->
+          <div class="table-container">
+            <table class="po-table">
+              <thead>
+                <tr>
+                  <th style="width: 5%;">#</th>
+                  <th>Product Description</th>
+                  <th style="width: 14%;">Batch No</th>
+                  <th class="text-right" style="width: 12%;">Boxes</th>
+                  <th class="text-right" style="width: 12%;">Qty (Pcs)</th>
+                  <th class="text-right" style="width: 15%;">Rate (₹/Pc)</th>
+                  <th class="text-right" style="width: 18%;">Total Amount (₹)</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${items.map((item, idx) => {
+                  const prod = item.product || {};
+                  return `
+                    <tr>
+                      <td class="text-center font-mono">${idx + 1}</td>
+                      <td><strong>${prod.name || 'Ice Cream Finished Good'}</strong></td>
+                      <td class="font-mono">${item.batchNumber || 'COLD-ROOM'}</td>
+                      <td class="text-right font-mono">${item.quantityBoxes || 0}</td>
+                      <td class="text-right font-mono" style="font-weight: 700;">${item.quantityPcs}</td>
+                      <td class="text-right font-mono">₹${(item.unitPrice || 0).toFixed(2)}</td>
+                      <td class="text-right font-mono" style="font-weight: 800; color: #0f172a;">₹${(item.totalPrice || 0).toFixed(2)}</td>
+                    </tr>
+                  `;
+                }).join('')}
+              </tbody>
+            </table>
+          </div>
+
+          <!-- SUMMARY SECTION -->
+          <div class="summary-section">
+            <div class="terms-box">
+              <strong style="color: #334155; display: block; margin-bottom: 3px;">Terms & Conditions:</strong>
+              1. Goods once sold will not be taken back unless damaged prior to delivery.<br />
+              2. Keep ice cream products stored at -18°C or below.<br />
+              3. Subject to Sattur jurisdiction only.
+            </div>
+
+            <div class="totals-box">
+              <div class="totals-row">
+                <span>Subtotal Amount:</span>
+                <span class="font-mono">₹${subTotal.toFixed(2)}</span>
+              </div>
+              ${isTaxable ? `
+                <div class="totals-row">
+                  <span>SGST (9%):</span>
+                  <span class="font-mono">₹${sgst.toFixed(2)}</span>
+                </div>
+                <div class="totals-row">
+                  <span>CGST (9%):</span>
+                  <span class="font-mono">₹${cgst.toFixed(2)}</span>
+                </div>
+              ` : `
+                <div class="totals-row">
+                  <span>Tax (Exempted):</span>
+                  <span class="font-mono">₹0.00</span>
+                </div>
+              `}
+              <div class="totals-grand">
+                <span>Grand Total:</span>
+                <span class="font-mono">₹${grandTotal.toFixed(2)}</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- FOOTER & SIGNATURES -->
+          <div class="footer-section">
+            <div class="sig-grid">
+              <div class="sig-box">Customer Signature</div>
+              <div class="sig-box">Sales Representative</div>
+              <div class="sig-box">For SRI SARAVANASS<br /><strong style="font-size: 8.5px;">Authorized Signatory</strong></div>
+            </div>
+            <div class="disclaimer">
+              This Tax Invoice is computer-generated by Sri Saravanaa ERP System.
+            </div>
+          </div>
+
+          <script>
+            window.onload = function() {
+              setTimeout(function() {
+                window.print();
+              }, 300);
+            }
+          </script>
+        </body>
+      </html>
+    `;
+
+    printWindow.document.write(htmlContent);
+    printWindow.document.close();
+  };
 
   // Auto Sales Stock Return Handler
   const handleOpenAutoReturn = (order, mode = 'daily_auto') => {
@@ -520,7 +736,7 @@ const SalesInvoice = () => {
             </div>
 
             {/* STEP 2 & 3: CUSTOMER / GUEST SELECTION & AUTO-SELECTED SALES OWNER */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 p-4 bg-gray-50/70 rounded-2xl border border-gray-200">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 p-4 bg-gray-50/70 rounded-2xl border border-gray-200 relative z-20">
               
               {/* If Guest -> Manual Guest / Receiver Name Entry */}
               {invoiceType === 'Guest' ? (
@@ -554,19 +770,13 @@ const SalesInvoice = () => {
                       );
                     })()}
                   </label>
-                  <select
-                    required
+                  <SearchableSelect
+                    options={filteredCustomers.map(c => ({ value: c._id, label: c.name, code: c.customerCode }))}
                     value={selectedCustomerId}
-                    onChange={(e) => handleCustomerChange(e.target.value)}
-                    className="w-full bg-white border border-pink-200 rounded-xl px-3.5 py-2.5 text-xs font-bold text-gray-900 focus:outline-none focus:ring-2 focus:ring-pink-500/20"
-                  >
-                    <option value="">-- Choose Customer ({invoiceType}) --</option>
-                    {filteredCustomers.map(c => (
-                      <option key={c._id} value={c._id}>
-                        {c.name} ({c.customerCode})
-                      </option>
-                    ))}
-                  </select>
+                    onChange={(val) => handleCustomerChange(val)}
+                    placeholder={`Choose Customer (${invoiceType})...`}
+                    required
+                  />
                 </div>
               )}
 
@@ -576,18 +786,12 @@ const SalesInvoice = () => {
                   <span>3. Sales Owner (Salesperson / Employee)</span>
                   {selectedSalesOwnerId && <span className="text-[10px] text-emerald-600 font-extrabold">✓ Auto Selected</span>}
                 </label>
-                <select
+                <SearchableSelect
+                  options={users.map(u => ({ value: u._id, label: u.name, sublabel: u.designation || u.username }))}
                   value={selectedSalesOwnerId}
-                  onChange={(e) => setSelectedSalesOwnerId(e.target.value)}
-                  className="w-full bg-white border border-pink-200 rounded-xl px-3.5 py-2.5 text-xs font-bold text-gray-900 focus:outline-none focus:ring-2 focus:ring-pink-500/20"
-                >
-                  <option value="">-- Select Sales Owner --</option>
-                  {users.map(u => (
-                    <option key={u._id} value={u._id}>
-                      {u.name} ({u.designation || u.username})
-                    </option>
-                  ))}
-                </select>
+                  onChange={(val) => setSelectedSalesOwnerId(val)}
+                  placeholder="Select Sales Owner..."
+                />
               </div>
             </div>
 
@@ -608,23 +812,22 @@ const SalesInvoice = () => {
 
               <div className="space-y-3">
                 {lineItems.map((item, idx) => (
-                  <div key={idx} className="grid grid-cols-12 gap-2 items-center p-3 bg-white border border-pink-200 rounded-xl shadow-sm">
+                  <div key={idx} className="grid grid-cols-12 gap-2 items-center p-3 bg-white border border-pink-200 rounded-xl shadow-sm relative" style={{ zIndex: 100 - idx }}>
                     {/* Item & Batch Picker */}
                     <div className="col-span-12 sm:col-span-5 space-y-1">
                       <label className="text-[10px] text-gray-400 font-bold uppercase">Product & Cold Room Batch</label>
-                      <select
-                        required
+                      <SearchableSelect
+                        options={inventory.map(inv => ({
+                          value: inv.product?._id,
+                          label: inv.product?.name,
+                          code: `Batch: ${inv.batchNumber}`,
+                          sublabel: `Available: ${inv.quantity} Pcs`
+                        }))}
                         value={item.productId}
-                        onChange={(e) => handleLineItemChange(idx, 'productId', e.target.value)}
-                        className="w-full bg-gray-50 border border-gray-300 rounded-lg px-2.5 py-1.5 text-xs font-bold text-gray-900"
-                      >
-                        <option value="">-- Select Finished Good --</option>
-                        {inventory.map(inv => (
-                          <option key={inv._id} value={inv.product?._id}>
-                            {inv.product?.name} | Batch: {inv.batchNumber} (Available: {inv.quantity} Pcs)
-                          </option>
-                        ))}
-                      </select>
+                        onChange={(val) => handleLineItemChange(idx, 'productId', val)}
+                        placeholder="Select Finished Good..."
+                        required
+                      />
                     </div>
 
                     {/* Quantity Boxes */}
@@ -823,95 +1026,114 @@ const SalesInvoice = () => {
       {selectedInvoiceForPrint && (
         <Modal isOpen={!!selectedInvoiceForPrint} onClose={() => setSelectedInvoiceForPrint(null)} title="Print GST Tax Invoice">
           <div className="p-4 bg-white rounded-2xl border border-gray-200 text-gray-800 space-y-4" id="printable-invoice">
-            {/* Header */}
-            <div className="flex justify-between items-start border-b border-gray-200 pb-3">
-              <div>
-                <h3 className="text-lg font-black text-[var(--color-primary)] font-display">SRI SARAVANASS ICE CREAMS</h3>
-                <p className="text-[11px] text-gray-500">Factory & Cold Storage Depot, Main Road</p>
-                <p className="text-[11px] text-gray-500">GSTIN: 33AAAAA1234A1Z0 | State Code: 33</p>
+            {/* Professional Header Banner with Logo */}
+            <div className="p-4 bg-gradient-to-r from-rose-900 via-pink-900 to-purple-950 text-white rounded-2xl shadow-md space-y-3">
+              <div className="flex justify-between items-start">
+                <div className="flex items-center gap-3">
+                  <img src="/logo.avif" alt="Company Logo" className="w-12 h-12 rounded-xl object-cover border-2 border-pink-300/40 shadow-sm" />
+                  <div>
+                    <h2 className="text-base font-black tracking-wider text-white">SRI SARAVANASS ICE CREAM & DAIRY</h2>
+                    <p className="text-[11px] text-pink-200 font-medium">Head Office: 66, Nataraja Theatre Road, Sattur, Virudhunagar - 626203</p>
+                    <p className="text-[10px] text-pink-300/80 font-mono mt-0.5">GSTIN: 33AAAFS1234A1Z1 | Phone: +91 99420 27197</p>
+                  </div>
+                </div>
+
+                <button
+                  onClick={() => handlePrintInvoice(selectedInvoiceForPrint)}
+                  className="flex items-center gap-1.5 bg-white hover:bg-pink-50 text-pink-900 px-3.5 py-2 rounded-xl font-bold text-xs shadow-md transition-all border border-pink-200 cursor-pointer"
+                >
+                  <Printer size={14} className="text-pink-700" /> Print Tax Invoice
+                </button>
               </div>
 
-              <div className="text-right">
-                <span className="px-2.5 py-0.5 rounded bg-pink-100 text-[var(--color-primary)] font-mono text-xs font-extrabold">
-                  {selectedInvoiceForPrint.invoiceType} INVOICE
-                </span>
-                <h4 className="font-mono font-bold text-gray-900 text-sm mt-1">{selectedInvoiceForPrint.invoiceNumber}</h4>
-                <p className="text-[10px] text-gray-400">{new Date(selectedInvoiceForPrint.createdAt).toLocaleDateString()}</p>
+              <div className="pt-2 border-t border-pink-500/30 flex justify-between items-center text-xs font-mono">
+                <div>
+                  <span className="text-pink-300 font-semibold">Category Type:</span> <strong className="text-white text-sm ml-1">{selectedInvoiceForPrint.invoiceType} INVOICE</strong>
+                </div>
+                <div>
+                  <span className="text-pink-300 font-semibold">Invoice #:</span> <strong className="text-white ml-1">{selectedInvoiceForPrint.invoiceNumber}</strong>
+                </div>
               </div>
             </div>
 
             {/* Customer & Salesperson Info */}
-            <div className="grid grid-cols-2 gap-4 text-xs bg-pink-50/50 p-3 rounded-xl border border-pink-100">
+            <div className="grid grid-cols-2 gap-4 text-xs bg-gray-50 p-3 rounded-xl border border-gray-200">
               <div>
-                <span className="text-[10px] text-gray-400 font-bold uppercase tracking-wider block">Billed To Customer</span>
-                <strong className="text-gray-900 block font-bold">{selectedInvoiceForPrint.customer?.name}</strong>
-                <span className="block text-[11px] text-gray-600">GSTIN: {selectedInvoiceForPrint.customer?.gstinNumber || 'N/A'}</span>
-                <span className="block text-[11px] text-gray-600">{selectedInvoiceForPrint.customer?.billingAddress?.city || 'Tamil Nadu'}</span>
+                <span className="text-[10px] text-pink-900 font-extrabold uppercase tracking-wider block border-b border-gray-200 pb-1 mb-1">Billed To Customer / Outlet</span>
+                <strong className="text-gray-900 block font-bold text-sm">{selectedInvoiceForPrint.guestName || selectedInvoiceForPrint.customer?.name || 'Walk-in Customer'}</strong>
+                <span className="block text-[11px] text-gray-600">GSTIN: {selectedInvoiceForPrint.customer?.gstinNumber || 'URD (Unregistered)'}</span>
+                <span className="block text-[11px] text-gray-600">Location: {selectedInvoiceForPrint.customer?.billingAddress?.city || 'Tamil Nadu'}</span>
               </div>
 
               <div>
-                <span className="text-[10px] text-gray-400 font-bold uppercase tracking-wider block">Salesperson / Representative</span>
-                <strong className="text-gray-900 block font-bold">{selectedInvoiceForPrint.salesOwner?.name || 'In-House Direct'}</strong>
-                <span className="block text-[11px] text-gray-600">{selectedInvoiceForPrint.salesOwner?.designation || 'Sales Incharge'}</span>
+                <span className="text-[10px] text-pink-900 font-extrabold uppercase tracking-wider block border-b border-gray-200 pb-1 mb-1">Salesperson / Representative</span>
+                <strong className="text-gray-900 block font-bold text-sm">{selectedInvoiceForPrint.salesOwner?.name || 'In-House Direct'}</strong>
+                <span className="block text-[11px] text-gray-600">{selectedInvoiceForPrint.salesOwner?.designation || 'Sales Executive'}</span>
+                <span className="block text-[11px] text-emerald-700 font-bold">Payment: {selectedInvoiceForPrint.paymentStatus}</span>
               </div>
             </div>
 
             {/* Line Items Table */}
             <div className="overflow-hidden border border-gray-200 rounded-xl">
               <table className="w-full text-left text-xs">
-                <thead className="bg-gray-100 text-gray-700 font-bold uppercase">
+                <thead className="bg-gray-100 text-gray-700 font-extrabold uppercase text-[10px]">
                   <tr>
-                    <th className="p-2.5">Item Description</th>
-                    <th className="p-2.5 text-center">Batch</th>
+                    <th className="p-2.5">Finished Good Description</th>
+                    <th className="p-2.5 text-center">Batch No</th>
+                    <th className="p-2.5 text-right">Boxes</th>
                     <th className="p-2.5 text-right">Qty (Pcs)</th>
-                    <th className="p-2.5 text-right">Rate</th>
-                    <th className="p-2.5 text-right">Total</th>
+                    <th className="p-2.5 text-right">Rate (₹/Pc)</th>
+                    <th className="p-2.5 text-right">Total Amount (₹)</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100">
                   {selectedInvoiceForPrint.items?.map((item, idx) => (
-                    <tr key={idx}>
-                      <td className="p-2.5 font-bold text-gray-900">{item.product?.name || 'Ice Cream Item'}</td>
-                      <td className="p-2.5 text-center font-mono text-[11px]">{item.batchNumber}</td>
-                      <td className="p-2.5 text-right font-mono font-bold">{item.quantityPcs}</td>
-                      <td className="p-2.5 text-right font-mono">₹{item.unitPrice?.toFixed(2)}</td>
-                      <td className="p-2.5 text-right font-mono font-bold">₹{item.totalPrice?.toFixed(2)}</td>
+                    <tr key={idx} className="hover:bg-gray-50/50">
+                      <td className="p-2.5 font-bold text-gray-900">{item.product?.name || 'Ice Cream Finished Good'}</td>
+                      <td className="p-2.5 text-center font-mono text-[11px] text-gray-600">{item.batchNumber || 'COLD-ROOM'}</td>
+                      <td className="p-2.5 text-right font-mono text-gray-700">{item.quantityBoxes || 0}</td>
+                      <td className="p-2.5 text-right font-mono font-bold text-gray-900">{item.quantityPcs}</td>
+                      <td className="p-2.5 text-right font-mono text-gray-700">₹{(item.unitPrice || 0).toFixed(2)}</td>
+                      <td className="p-2.5 text-right font-mono font-extrabold text-pink-950 bg-pink-50/30">₹{(item.totalPrice || 0).toFixed(2)}</td>
                     </tr>
                   ))}
                 </tbody>
               </table>
             </div>
 
-            {/* Invoice Total */}
-            <div className="flex justify-between items-center text-xs pt-2">
-              <div className="text-gray-500 italic">
-                Payment Status: <span className="font-bold text-emerald-700 uppercase">{selectedInvoiceForPrint.paymentStatus}</span>
+            {/* Invoice Total Summary */}
+            <div className="flex justify-between items-center text-xs pt-2 border-t border-gray-100">
+              <div className="text-gray-500 text-[11px] italic">
+                Status: <span className="font-extrabold text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200 uppercase">{selectedInvoiceForPrint.paymentStatus}</span>
               </div>
 
               <div className="text-right space-y-1">
-                <div>Subtotal: <span className="font-mono font-bold">₹{selectedInvoiceForPrint.subTotal?.toFixed(2)}</span></div>
-                <div>GST (18%): <span className="font-mono font-bold">₹{selectedInvoiceForPrint.taxAmount?.toFixed(2)}</span></div>
-                <div className="text-base font-black text-[var(--color-primary)] font-mono">
+                <div className="text-xs text-gray-600">Subtotal: <span className="font-mono font-bold text-gray-900">₹{(selectedInvoiceForPrint.subTotal || selectedInvoiceForPrint.grandTotal || 0).toFixed(2)}</span></div>
+                <div className="text-xs text-gray-600">GST (18%): <span className="font-mono font-bold text-gray-900">₹{(selectedInvoiceForPrint.taxAmount || 0).toFixed(2)}</span></div>
+                <div className="text-base font-black text-pink-950 font-mono">
                   Grand Total: ₹{selectedInvoiceForPrint.grandTotal?.toFixed(2)}
                 </div>
               </div>
             </div>
 
-            <div className="pt-4 flex justify-end gap-3 border-t border-gray-200">
-              <button
-                type="button"
-                onClick={() => setSelectedInvoiceForPrint(null)}
-                className="px-4 py-2 text-xs font-bold text-gray-600 hover:bg-gray-100 rounded-lg"
-              >
-                Close
-              </button>
-              <button
-                type="button"
-                onClick={() => window.print()}
-                className="bg-[var(--color-primary)] hover:bg-pink-700 text-white px-6 py-2 rounded-xl text-xs font-bold shadow-md flex items-center gap-1.5"
-              >
-                <Printer size={14} /> Print Tax Invoice
-              </button>
+            <div className="pt-3 flex justify-between items-center border-t border-gray-200">
+              <span className="text-[11px] text-gray-400 italic">Sri Saravanaa ERP System • Sales & Distribution</span>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => setSelectedInvoiceForPrint(null)}
+                  className="px-4 py-2 text-xs font-bold text-gray-600 hover:bg-gray-100 rounded-xl"
+                >
+                  Close
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handlePrintInvoice(selectedInvoiceForPrint)}
+                  className="bg-[var(--color-primary)] hover:bg-pink-700 text-white px-6 py-2 rounded-xl text-xs font-bold shadow-md flex items-center gap-1.5"
+                >
+                  <Printer size={14} /> Print Tax Invoice PDF
+                </button>
+              </div>
             </div>
           </div>
         </Modal>

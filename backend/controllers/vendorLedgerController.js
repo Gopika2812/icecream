@@ -1,7 +1,9 @@
 const Vendor = require('../models/Vendor');
 const PurchaseOrder = require('../models/PurchaseOrder');
+const GRN = require('../models/GRN');
 const QualityControl = require('../models/QualityControl');
 const VendorPayment = require('../models/VendorPayment');
+const Product = require('../models/Product');
 
 // @desc    Get Vendor Financial Ledger Statement with Running Balance
 // @route   GET /api/v1/vendor-ledger/:vendorId
@@ -30,9 +32,26 @@ exports.getVendorLedger = async (req, res) => {
         const purchaseOrders = await PurchaseOrder.find(poQuery).sort({ createdAt: 1 });
 
         // 2. Fetch QC / Quality Checks for Vendor (Approved / Rejected)
-        const qcQuery = { vendor: vendorId };
-        if (startDate || endDate) qcQuery.createdAt = dateFilter;
-        const qcEntries = await QualityControl.find(qcQuery).sort({ createdAt: 1 });
+        const allQCs = await QualityControl.find()
+            .populate({
+                path: 'grnReference',
+                populate: {
+                    path: 'poReference'
+                }
+            })
+            .populate('items.product', 'name itemCode unitOfMeasure');
+
+        const qcEntries = allQCs.filter(qc => {
+            const poVendorId = qc.grnReference?.poReference?.vendor?._id?.toString() || qc.grnReference?.poReference?.vendor?.toString();
+            if (!poVendorId || poVendorId !== vendorId.toString()) return false;
+
+            if (startDate || endDate) {
+                const qcDate = qc.checkedDate || qc.createdAt;
+                if (startDate && new Date(qcDate) < dateFilter.$gte) return false;
+                if (endDate && new Date(qcDate) > dateFilter.$lte) return false;
+            }
+            return true;
+        });
 
         // 3. Fetch Vendor Payments Paid
         const payQuery = { vendor: vendorId };
@@ -49,7 +68,7 @@ exports.getVendorLedger = async (req, res) => {
                 voucherNo: po.poNumber,
                 type: 'Purchase Order',
                 particulars: `Purchase Inward Bill (${po.items?.length || 0} Raw Materials)`,
-                credit: po.grandTotal || 0, // Purchases increase payable amount to vendor
+                credit: po.totalAmount || po.grandTotal || 0, // Purchases increase payable amount to vendor
                 debit: 0,
                 status: po.status,
                 rawDoc: po
@@ -57,16 +76,36 @@ exports.getVendorLedger = async (req, res) => {
         });
 
         // QC Checks & Vendor Returns
-        qcEntries.forEach(qc => {
-            if (qc.qcStatus === 'Rejected' || qc.rejectedQuantity > 0) {
-                const returnVal = (qc.rejectedQuantity || 0) * (qc.unitPrice || 10);
+        qcEntries.forEach((qc, idx) => {
+            const poObj = qc.grnReference?.poReference;
+            let totalReturnQty = 0;
+            let totalReturnValue = 0;
+            const itemDetails = [];
+
+            (qc.items || []).forEach(item => {
+                if (item.damagedQty > 0) {
+                    totalReturnQty += item.damagedQty;
+                    let unitPrice = item.purchasePrice || 0;
+                    if (!unitPrice && poObj?.items) {
+                        const prodId = item.product?._id?.toString() || item.product?.toString();
+                        const poItem = poObj.items.find(pi => (pi.product?._id || pi.product)?.toString() === prodId);
+                        if (poItem) unitPrice = poItem.unitPrice || 0;
+                    }
+                    const returnVal = item.damagedQty * unitPrice;
+                    totalReturnValue += returnVal;
+                    itemDetails.push(`${item.product?.name || 'Item'}: ${item.damagedQty} units @ ₹${unitPrice.toFixed(2)}`);
+                }
+            });
+
+            if (totalReturnQty > 0 || totalReturnValue > 0) {
+                const voucherNo = qc.qcNumber ? qc.qcNumber.replace(/^QC-/, 'R-') : `R-${String(idx + 1).padStart(3, '0')}/26-27`;
                 ledgerTransactions.push({
-                    date: qc.qcDate || qc.createdAt,
-                    voucherNo: `VRET-${qc._id.toString().substring(18)}`,
+                    date: qc.checkedDate || qc.createdAt,
+                    voucherNo,
                     type: 'Vendor Return',
-                    particulars: `Purchase Return / Rejected Material (${qc.rejectedQuantity} Units)`,
+                    particulars: `Purchase Return / Rejected Material (${totalReturnQty} Units${itemDetails.length ? `: ${itemDetails.join(', ')}` : ''})`,
                     credit: 0,
-                    debit: returnVal, // Returns reduce payable amount
+                    debit: totalReturnValue, // Returns reduce payable amount
                     status: 'Returned',
                     rawDoc: qc
                 });
@@ -146,12 +185,18 @@ exports.getAllVendorSummaries = async (req, res) => {
 
         const poQuery = startDate || endDate ? { createdAt: dateFilter } : {};
         const payQuery = startDate || endDate ? { paymentDate: dateFilter } : {};
-        const qcQuery = startDate || endDate ? { createdAt: dateFilter } : {};
 
         const [purchaseOrders, payments, qcEntries] = await Promise.all([
             PurchaseOrder.find(poQuery).lean(),
             VendorPayment.find(payQuery).lean(),
-            QualityControl.find(qcQuery).lean()
+            QualityControl.find()
+                .populate({
+                    path: 'grnReference',
+                    populate: {
+                        path: 'poReference'
+                    }
+                })
+                .lean()
         ]);
 
         const summariesMap = {};
@@ -168,7 +213,7 @@ exports.getAllVendorSummaries = async (req, res) => {
         purchaseOrders.forEach(po => {
             const vId = po.vendor?.toString();
             if (vId && summariesMap[vId]) {
-                summariesMap[vId].totalCredit += (po.grandTotal || 0);
+                summariesMap[vId].totalCredit += (po.totalAmount || po.grandTotal || 0);
             }
         });
 
@@ -180,10 +225,24 @@ exports.getAllVendorSummaries = async (req, res) => {
         });
 
         qcEntries.forEach(qc => {
-            const vId = qc.vendor?.toString();
-            if (vId && summariesMap[vId] && (qc.qcStatus === 'Rejected' || qc.rejectedQuantity > 0)) {
-                const returnVal = (qc.rejectedQuantity || 0) * (qc.unitPrice || 10);
-                summariesMap[vId].totalDebit += returnVal;
+            const qcDate = qc.checkedDate || qc.createdAt;
+            if (startDate && new Date(qcDate) < dateFilter.$gte) return;
+            if (endDate && new Date(qcDate) > dateFilter.$lte) return;
+
+            const poObj = qc.grnReference?.poReference;
+            const vId = poObj?.vendor?.toString();
+            if (vId && summariesMap[vId]) {
+                (qc.items || []).forEach(item => {
+                    if (item.damagedQty > 0) {
+                        let unitPrice = item.purchasePrice || 0;
+                        if (!unitPrice && poObj?.items) {
+                            const prodId = item.product?.toString();
+                            const poItem = poObj.items.find(pi => pi.product?.toString() === prodId);
+                            if (poItem) unitPrice = poItem.unitPrice || 0;
+                        }
+                        summariesMap[vId].totalDebit += (item.damagedQty * unitPrice);
+                    }
+                });
             }
         });
 

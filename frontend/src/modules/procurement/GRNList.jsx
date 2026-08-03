@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, ArrowLeft, Loader2, FileText, CheckCircle2, ShieldCheck, AlertCircle } from 'lucide-react';
+import { Plus, ArrowLeft, Loader2, FileText, CheckCircle2, ShieldCheck, AlertCircle, Calendar } from 'lucide-react';
 import api from '../../services/api';
 
 const GRNList = () => {
@@ -8,6 +8,10 @@ const GRNList = () => {
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
+
+  // Date Filter State
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
 
   // Form State
   const [selectedPO, setSelectedPO] = useState('');
@@ -18,12 +22,18 @@ const GRNList = () => {
   useEffect(() => {
     fetchGRNs();
     fetchInitialData();
-  }, []);
+  }, [startDate, endDate]);
 
   const fetchGRNs = async () => {
     try {
       setLoading(true);
-      const response = await api.get('/grn');
+      let url = '/grn';
+      const params = [];
+      if (startDate) params.push(`startDate=${startDate}`);
+      if (endDate) params.push(`endDate=${endDate}`);
+      if (params.length) url += `?${params.join('&')}`;
+
+      const response = await api.get(url);
       setGrns(response.data.data);
     } catch (error) {
       console.error('Failed to fetch GRNs', error);
@@ -281,15 +291,47 @@ const GRNList = () => {
   }
 
   return (
-    <div>
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-2xl font-semibold text-gray-900 font-display">Goods Receiving & Quality Control</h1>
-        <button 
-          onClick={() => setIsCreating(true)}
-          className="flex items-center gap-2 bg-[var(--color-primary)] hover:bg-[var(--color-primary-soft)] text-white px-4 py-2 rounded-lg transition-colors shadow-[0_0_15px_rgba(216,27,96,0.3)] font-medium"
-        >
-          <Plus size={18} /> Create GRN
-        </button>
+    <div className="space-y-6">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-semibold text-gray-900 font-display">Goods Receiving & Quality Control</h1>
+          <p className="text-xs text-gray-500 mt-0.5">Goods receipt notes, stock entry & gate pass logs</p>
+        </div>
+
+        <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 bg-white p-2 rounded-xl border border-gray-200 shadow-sm text-xs">
+            <Calendar size={14} className="text-gray-400" />
+            <span className="font-bold text-gray-700 font-mono uppercase text-[11px]">Period:</span>
+            <input
+              type="date"
+              value={startDate}
+              onChange={(e) => setStartDate(e.target.value)}
+              className="bg-gray-50 border border-gray-300 rounded px-2 py-1 font-mono font-bold text-gray-900 text-xs"
+            />
+            <span className="text-gray-400">to</span>
+            <input
+              type="date"
+              value={endDate}
+              onChange={(e) => setEndDate(e.target.value)}
+              className="bg-gray-50 border border-gray-300 rounded px-2 py-1 font-mono font-bold text-gray-900 text-xs"
+            />
+            {(startDate || endDate) && (
+              <button
+                onClick={() => { setStartDate(''); setEndDate(''); }}
+                className="text-pink-600 font-bold hover:underline text-[11px] ml-1"
+              >
+                Clear
+              </button>
+            )}
+          </div>
+
+          <button 
+            onClick={() => setIsCreating(true)}
+            className="flex items-center gap-2 bg-[var(--color-primary)] hover:bg-[var(--color-primary-soft)] text-white px-4 py-2 rounded-xl transition-colors shadow-[0_0_15px_rgba(216,27,96,0.3)] font-medium text-xs"
+          >
+            <Plus size={16} /> Create GRN
+          </button>
+        </div>
       </div>
 
       <div className="glass-panel overflow-hidden">

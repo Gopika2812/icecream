@@ -5,6 +5,7 @@ import {
   ArrowUpRight, ArrowDownLeft, Wallet, Filter, DollarSign, Printer, X 
 } from 'lucide-react';
 import api from '../../services/api';
+import SearchableSelect from '../../components/SearchableSelect';
 
 const QCList = () => {
   const [activeTab, setActiveTab] = useState('QC Check');
@@ -17,6 +18,10 @@ const QCList = () => {
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
+
+  // Main Dashboard Date Filter State
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
 
   // Vendor Ledger Modal & Date Filter State
   const [selectedLedgerVendorId, setSelectedLedgerVendorId] = useState(null);
@@ -32,13 +37,19 @@ const QCList = () => {
 
   useEffect(() => {
     fetchInitialData();
-  }, [activeTab]);
+  }, [activeTab, startDate, endDate]);
 
   const fetchInitialData = async () => {
     try {
       setLoading(true);
+      let qcUrl = '/qc';
+      const params = [];
+      if (startDate) params.push(`startDate=${startDate}`);
+      if (endDate) params.push(`endDate=${endDate}`);
+      if (params.length) qcUrl += `?${params.join('&')}`;
+
       const [qcRes, pendingRes, invRes, vendorRes] = await Promise.all([
-        api.get('/qc'),
+        api.get(qcUrl),
         api.get('/qc/pending-pos'),
         api.get('/inventory'),
         api.get('/vendors')
@@ -187,9 +198,23 @@ const QCList = () => {
     }
   };
 
-  // Filter local data for tabs
-  const storeRoomStock = inventory.filter(i => i.inventoryType === 'Store Room');
-  const rejectedStock = inventory.filter(i => i.inventoryType === 'Rejected Stock');
+  // Helper to filter items by main date range
+  const matchesMainDateRange = (dateStr) => {
+    if (!dateStr) return true;
+    const t = new Date(dateStr).getTime();
+    if (startDate && t < new Date(startDate).setHours(0,0,0,0)) return false;
+    if (endDate && t > new Date(endDate).setHours(23,59,59,999)) return false;
+    return true;
+  };
+
+  // Filter local data for tabs (Sort newest stocked-in items first at top)
+  const storeRoomStock = inventory
+    .filter(i => i.inventoryType === 'Store Room' && matchesMainDateRange(i.lastUpdated || i.createdAt))
+    .sort((a, b) => new Date(b.lastUpdated || b.updatedAt || b.createdAt || 0) - new Date(a.lastUpdated || a.updatedAt || a.createdAt || 0));
+
+  const rejectedStock = inventory
+    .filter(i => i.inventoryType === 'Rejected Stock' && matchesMainDateRange(i.lastUpdated || i.createdAt))
+    .sort((a, b) => new Date(b.lastUpdated || b.updatedAt || b.createdAt || 0) - new Date(a.lastUpdated || a.updatedAt || a.createdAt || 0));
 
   // Helper to match vendor for an inventory item
   const getVendorForItem = (item) => {
@@ -591,7 +616,7 @@ const QCList = () => {
 
   if (isCreating) {
     return (
-      <div className="max-w-5xl mx-auto">
+      <div className="w-full">
         <div className="flex items-center gap-4 mb-6">
           <button 
             type="button"
@@ -604,31 +629,32 @@ const QCList = () => {
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-6">
-          <div className="glass-panel p-6 grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="glass-panel p-6 grid grid-cols-1 md:grid-cols-2 gap-6 relative z-20">
             <div>
-              <label className="block text-xs font-semibold text-gray-600 mb-2">Select Pending Purchase Order *</label>
-              <select 
-                value={selectedPO} 
-                onChange={(e) => handlePOChange(e.target.value)}
+              <label className="block text-xs font-bold text-gray-700 mb-2">Select Pending Purchase Order *</label>
+              <SearchableSelect
+                options={pendingPOs.map(p => ({ 
+                  value: p._id, 
+                  label: p.poNumber, 
+                  code: p.vendor?.name,
+                  sublabel: `Total: ₹${p.totalAmount}`
+                }))}
+                value={selectedPO}
+                onChange={(val) => handlePOChange(val)}
+                placeholder="Search & Select Issued PO..."
                 required
-                className="w-full bg-white/50 border border-[var(--color-glass-border)] rounded-md px-3 py-2 text-gray-900 text-sm focus:outline-none focus:border-[var(--color-primary)] transition-colors"
-              >
-                <option value="">Select Issued PO</option>
-                {pendingPOs.map((p) => (
-                  <option key={p._id} value={p._id}>{p.poNumber} - Vendor: {p.vendor?.name} (Total: ₹{p.totalAmount})</option>
-                ))}
-              </select>
+              />
             </div>
 
             <div>
-              <label className="block text-xs font-semibold text-gray-600 mb-2">Supplier Invoice Number *</label>
+              <label className="block text-xs font-bold text-gray-700 mb-2">Supplier Invoice Number *</label>
               <input 
                 type="text" 
                 value={supplierInvoiceNumber} 
                 onChange={(e) => setSupplierInvoiceNumber(e.target.value)}
                 required
                 placeholder="e.g. INV-9876"
-                className="w-full bg-white/50 border border-[var(--color-glass-border)] rounded-md px-3 py-2 text-gray-900 text-sm focus:outline-none focus:border-[var(--color-primary)] transition-colors"
+                className="w-full bg-white border border-gray-200 rounded-xl px-4 py-2.5 text-gray-900 text-sm font-semibold shadow-xs focus:outline-none focus:ring-2 focus:ring-pink-500/20 focus:border-pink-600 transition-all"
               />
             </div>
           </div>
@@ -652,7 +678,7 @@ const QCList = () => {
                     </span>
                   </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-6 gap-4">
+                  <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
                     <div>
                       <label className="block text-xs font-semibold text-gray-600 mb-1">Passed Qty *</label>
                       <input
@@ -685,18 +711,6 @@ const QCList = () => {
                         min="0"
                         value={item.purchasePrice}
                         onChange={(e) => handleItemPropertyChange(index, 'purchasePrice', e.target.value)}
-                        required
-                        className="w-full bg-white/50 border border-[var(--color-glass-border)] rounded px-3 py-1.5 text-sm focus:outline-none focus:border-[var(--color-primary)]"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-xs font-semibold text-gray-600 mb-1">MRP per Unit (₹) *</label>
-                      <input
-                        type="number"
-                        step="0.01"
-                        min="0"
-                        value={item.mrp}
-                        onChange={(e) => handleItemPropertyChange(index, 'mrp', e.target.value)}
                         required
                         className="w-full bg-white/50 border border-[var(--color-glass-border)] rounded px-3 py-1.5 text-sm focus:outline-none focus:border-[var(--color-primary)]"
                       />
@@ -780,15 +794,47 @@ const QCList = () => {
   }
 
   return (
-    <div>
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-2xl font-semibold text-gray-900 font-display">Quality Control & Stock In</h1>
-        <button 
-          onClick={() => setIsCreating(true)}
-          className="flex items-center gap-2 bg-[var(--color-primary)] hover:bg-[var(--color-primary-soft)] text-white px-4 py-2 rounded-lg transition-colors shadow-[0_0_15px_rgba(216,27,96,0.3)] font-medium"
-        >
-          <Plus size={18} /> Perform QC Check
-        </button>
+    <div className="space-y-6">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-semibold text-gray-900 font-display">Quality Control & Stock In</h1>
+          <p className="text-xs text-gray-500 mt-0.5">QC checks, store room receiving & vendor return management</p>
+        </div>
+
+        <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 bg-white p-2 rounded-xl border border-gray-200 shadow-sm text-xs">
+            <Calendar size={14} className="text-gray-400" />
+            <span className="font-bold text-gray-700 font-mono uppercase text-[11px]">Period:</span>
+            <input
+              type="date"
+              value={startDate}
+              onChange={(e) => setStartDate(e.target.value)}
+              className="bg-gray-50 border border-gray-300 rounded px-2 py-1 font-mono font-bold text-gray-900 text-xs"
+            />
+            <span className="text-gray-400">to</span>
+            <input
+              type="date"
+              value={endDate}
+              onChange={(e) => setEndDate(e.target.value)}
+              className="bg-gray-50 border border-gray-300 rounded px-2 py-1 font-mono font-bold text-gray-900 text-xs"
+            />
+            {(startDate || endDate) && (
+              <button
+                onClick={() => { setStartDate(''); setEndDate(''); }}
+                className="text-pink-600 font-bold hover:underline text-[11px] ml-1"
+              >
+                Clear
+              </button>
+            )}
+          </div>
+
+          <button 
+            onClick={() => setIsCreating(true)}
+            className="flex items-center gap-2 bg-[var(--color-primary)] hover:bg-[var(--color-primary-soft)] text-white px-4 py-2 rounded-xl transition-colors shadow-[0_0_15px_rgba(216,27,96,0.3)] font-medium text-xs"
+          >
+            <Plus size={16} /> Perform QC Check
+          </button>
+        </div>
       </div>
 
       {/* Unified Navigation Tabs */}

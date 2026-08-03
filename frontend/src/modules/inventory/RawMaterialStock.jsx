@@ -60,6 +60,7 @@ const RawMaterialStock = () => {
   };
 
   // Compile Stock Movement & Balances for all products
+  // Compile Stock Movement & Balances for all products
   const compileProductStock = () => {
     const productMap = {};
 
@@ -80,70 +81,34 @@ const RawMaterialStock = () => {
       };
     });
 
-    // 1. Process QC Logs as Inward (Stock-In Passed) & Outward (Vendor Return Rejected)
-    (qcs || []).forEach(qc => {
-      const date = qc.checkedDate || qc.createdAt || new Date();
-      (qc.items || []).forEach(item => {
-        const prodObj = item.product;
-        const pId = prodObj?._id ? prodObj._id.toString() : (typeof prodObj === 'string' ? prodObj : null);
-        if (pId && productMap[pId]) {
-          if (item.passedQty > 0) {
-            productMap[pId].inwardQty += item.passedQty;
-            productMap[pId].transactions.push({
-              id: `QC-IN-${qc._id}-${item._id || item.product}`,
-              date,
-              type: 'IN',
-              source: 'QC Stock In',
-              refNumber: qc.qcNumber,
-              batchNumber: item.batchNumber || 'N/A',
-              quantity: item.passedQty,
-              unitPrice: item.purchasePrice || 0,
-              remarks: `Passed QC / Supplier Invoice: ${qc.supplierInvoiceNumber || 'N/A'}`
-            });
-          }
-          if (item.damagedQty > 0) {
-            productMap[pId].outwardQty += item.damagedQty;
-            productMap[pId].transactions.push({
-              id: `QC-OUT-${qc._id}-${item._id || item.product}`,
-              date,
-              type: 'OUT',
-              source: 'Vendor Return (QC Damaged)',
-              refNumber: qc.qcNumber,
-              batchNumber: item.batchNumber || 'N/A',
-              quantity: item.damagedQty,
-              unitPrice: item.purchasePrice || 0,
-              remarks: item.remarks || 'Rejected during Quality Check'
-            });
-          }
-        }
-      });
-    });
-
-    // 2. Process Manual / Backend Inventory Transactions
+    // Process all Inventory Transactions (Single source of truth)
     (transactions || []).forEach(tx => {
       const pId = tx.product?._id ? tx.product._id.toString() : (typeof tx.product === 'string' ? tx.product : null);
       if (pId && productMap[pId]) {
         const date = tx.createdAt || new Date();
+        const qty = tx.quantity || 0;
+        
         if (tx.transactionType === 'IN') {
-          productMap[pId].inwardQty += tx.quantity;
+          productMap[pId].inwardQty += qty;
         } else if (tx.transactionType === 'OUT') {
-          productMap[pId].outwardQty += tx.quantity;
+          productMap[pId].outwardQty += qty;
         }
+
         productMap[pId].transactions.push({
           id: tx._id,
           date,
           type: tx.transactionType,
-          source: tx.referenceType || 'Manual Adjustment',
+          source: tx.referenceType === 'QC' ? (tx.transactionType === 'IN' ? 'QC Stock In' : 'Vendor Return (QC Damaged)') : (tx.referenceType || 'Manual Adjustment'),
           refNumber: tx.batchNumber || 'N/A',
           batchNumber: tx.batchNumber || 'N/A',
-          quantity: tx.quantity,
-          unitPrice: 0,
+          quantity: qty,
+          unitPrice: tx.purchasePrice || 0,
           remarks: tx.remarks || 'Stock transaction record'
         });
       }
     });
 
-    // 3. Sync Current On-Hand Stock from Inventory documents
+    // Sync Current On-Hand Stock from Inventory Store Room documents
     (inventory || []).forEach(inv => {
       const pId = inv.product?._id ? inv.product._id.toString() : (typeof inv.product === 'string' ? inv.product : null);
       if (pId && productMap[pId] && inv.inventoryType === 'Store Room') {
@@ -151,12 +116,11 @@ const RawMaterialStock = () => {
       }
     });
 
-    // If currentStock is 0 but inwardQty > outwardQty, compute net fallback
+    // Compute fallback & sort transactions
     Object.values(productMap).forEach(item => {
       if (item.currentStock === 0 && item.inwardQty > 0) {
         item.currentStock = Math.max(0, item.inwardQty - item.outwardQty);
       }
-      // Sort product transactions chronologically
       item.transactions.sort((a, b) => new Date(b.date) - new Date(a.date));
     });
 
@@ -707,12 +671,12 @@ const RawMaterialStock = () => {
       <Modal isOpen={isRecordModalOpen} onClose={() => setIsRecordModalOpen(false)} title="Record Stock Movement (Inward / Outward)">
         <form onSubmit={handleRecordSubmit} className="space-y-4">
           <div className="space-y-1">
-            <label className="text-xs font-semibold text-gray-600">Select Product / Raw Material *</label>
+            <label className="text-xs font-bold text-gray-700">Select Product / Raw Material *</label>
             <select
               required
               value={recordForm.productId}
               onChange={(e) => setRecordForm({ ...recordForm, productId: e.target.value })}
-              className="w-full bg-white/50 border border-[var(--color-glass-border)] rounded-md px-3 py-2 text-gray-900 text-sm focus:outline-none focus:border-[var(--color-primary)]"
+              className="w-full bg-white border border-gray-200 rounded-xl px-4 py-2.5 text-gray-900 text-sm font-semibold shadow-xs focus:outline-none focus:ring-2 focus:ring-pink-500/20 focus:border-pink-600 transition-all cursor-pointer"
             >
               <option value="">Select Raw Material</option>
               {products.map(p => (
@@ -725,11 +689,11 @@ const RawMaterialStock = () => {
 
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-1">
-              <label className="text-xs font-semibold text-gray-600">Movement Type *</label>
+              <label className="text-xs font-bold text-gray-700">Movement Type *</label>
               <select
                 value={recordForm.transactionType}
                 onChange={(e) => setRecordForm({ ...recordForm, transactionType: e.target.value })}
-                className="w-full bg-white/50 border border-[var(--color-glass-border)] rounded-md px-3 py-2 text-gray-900 text-sm font-bold focus:outline-none focus:border-[var(--color-primary)]"
+                className="w-full bg-white border border-gray-200 rounded-xl px-4 py-2.5 text-gray-900 text-sm font-semibold shadow-xs focus:outline-none focus:ring-2 focus:ring-pink-500/20 focus:border-pink-600 transition-all cursor-pointer"
               >
                 <option value="IN">🟢 INWARD (Stock Arrival / Addition)</option>
                 <option value="OUT">🔴 OUTWARD (Production Usage / Dispatch)</option>

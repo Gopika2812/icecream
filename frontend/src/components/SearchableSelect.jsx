@@ -55,7 +55,7 @@ const SearchableSelect = ({
   };
 
   return (
-    <div className={`relative w-full ${className}`} ref={containerRef}>
+    <div className={`relative w-full ${isOpen ? 'z-50' : 'z-10'} ${className}`} ref={containerRef}>
       {/* Target Trigger Input */}
       <div
         onClick={() => !disabled && setIsOpen(!isOpen)}

@@ -1,11 +1,25 @@
 const PurchaseOrder = require('../models/PurchaseOrder');
+const { getNextSequenceNumber } = require('../utils/sequenceGenerator');
 
 exports.getPurchaseOrders = async (req, res) => {
     try {
-        const pos = await PurchaseOrder.find()
-            .populate('vendor', 'name vendorCode')
-            .populate('branch', 'branchName branchCode')
-            .populate('items.product', 'name itemCode unitOfMeasure');
+        const { startDate, endDate } = req.query;
+        let filter = {};
+        if (startDate || endDate) {
+            filter.orderDate = {};
+            if (startDate) filter.orderDate.$gte = new Date(startDate);
+            if (endDate) {
+                const end = new Date(endDate);
+                end.setHours(23, 59, 59, 999);
+                filter.orderDate.$lte = end;
+            }
+        }
+
+        const pos = await PurchaseOrder.find(filter)
+            .populate('vendor')
+            .populate('branch')
+            .populate('items.product')
+            .sort({ createdAt: -1 });
         res.json({ success: true, data: pos });
     } catch (error) {
         res.status(500).json({ success: false, message: error.message });
@@ -15,9 +29,9 @@ exports.getPurchaseOrders = async (req, res) => {
 exports.getPurchaseOrder = async (req, res) => {
     try {
         const po = await PurchaseOrder.findById(req.params.id)
-            .populate('vendor', 'name vendorCode')
-            .populate('branch', 'branchName branchCode')
-            .populate('items.product', 'name itemCode unitOfMeasure');
+            .populate('vendor')
+            .populate('branch')
+            .populate('items.product');
         if (!po) return res.status(404).json({ success: false, message: 'PO not found' });
         res.json({ success: true, data: po });
     } catch (error) {
@@ -27,9 +41,8 @@ exports.getPurchaseOrder = async (req, res) => {
 
 exports.createPurchaseOrder = async (req, res) => {
     try {
-        req.body.createdBy = req.user._id;
-        // In real world, poNumber is generated sequentially (e.g. PO-2026-0001)
-        req.body.poNumber = `PO-${Date.now()}`;
+        req.body.createdBy = req.user?._id || '6a5ec376b44299bf18d9e800';
+        req.body.poNumber = await getNextSequenceNumber(PurchaseOrder, 'poNumber', 'PO', req.body.orderDate || new Date());
         const po = await PurchaseOrder.create(req.body);
         res.status(201).json({ success: true, data: po });
     } catch (error) {

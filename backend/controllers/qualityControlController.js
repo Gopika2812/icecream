@@ -4,10 +4,23 @@ const PurchaseOrder = require('../models/PurchaseOrder');
 const Inventory = require('../models/Inventory');
 const InventoryTransaction = require('../models/InventoryTransaction');
 const Product = require('../models/Product');
+const { getNextSequenceNumber } = require('../utils/sequenceGenerator');
 
 exports.getQualityControls = async (req, res) => {
     try {
-        const qcs = await QualityControl.find()
+        const { startDate, endDate } = req.query;
+        let dateFilter = {};
+        if (startDate || endDate) {
+            dateFilter.checkedDate = {};
+            if (startDate) dateFilter.checkedDate.$gte = new Date(startDate);
+            if (endDate) {
+                const end = new Date(endDate);
+                end.setHours(23, 59, 59, 999);
+                dateFilter.checkedDate.$lte = end;
+            }
+        }
+
+        const qcs = await QualityControl.find(dateFilter)
             .populate({
                 path: 'grnReference',
                 populate: {
@@ -18,7 +31,8 @@ exports.getQualityControls = async (req, res) => {
                 }
             })
             .populate('branch', 'branchName branchCode')
-            .populate('items.product', 'name itemCode unitOfMeasure itemType');
+            .populate('items.product', 'name itemCode unitOfMeasure itemType')
+            .sort({ createdAt: -1 });
         res.json({ success: true, data: qcs });
     } catch (error) {
         res.status(500).json({ success: false, message: error.message });
@@ -65,13 +79,14 @@ exports.getPendingPurchaseOrders = async (req, res) => {
 exports.createQualityControl = async (req, res) => {
     try {
         const { poReference, branch, supplierInvoiceNumber, items, status } = req.body;
+        const userId = req.user?._id || '6a5ec376b44299bf18d9e800';
 
         // 1. Verify PO exists
         const po = await PurchaseOrder.findById(poReference);
         if (!po) return res.status(404).json({ success: false, message: 'Purchase Order reference not found' });
 
-        // 2. Automatically Create GRN under the hood
-        const grnNumber = `GRN-${Date.now()}`;
+        // 2. Automatically Create GRN under the hood with sequential GRN number
+        const grnNumber = await getNextSequenceNumber(GRN, 'grnNumber', 'GRN', new Date());
         const grnItems = items.map(item => ({
             product: item.product,
             receivedQty: (item.passedQty || 0) + (item.damagedQty || 0),
@@ -86,7 +101,7 @@ exports.createQualityControl = async (req, res) => {
             branch,
             supplierInvoiceNumber,
             items: grnItems,
-            createdBy: req.user._id
+            createdBy: userId
         });
 
         const processedItems = [];
@@ -156,9 +171,9 @@ exports.createQualityControl = async (req, res) => {
                     transactionType: 'IN',
                     quantity: item.passedQty,
                     referenceType: 'QC',
-                    referenceId: null, // will update below
+                    referenceId: null,
                     remarks: `QC Passed. Temp: ${itemTemp !== undefined ? itemTemp : 'N/A'}°C`,
-                    performedBy: req.user._id
+                    performedBy: userId
                 });
             }
 
@@ -189,25 +204,25 @@ exports.createQualityControl = async (req, res) => {
                     mrp: item.mrp || 0,
                     manufacturingDate: item.manufacturingDate,
                     expiryDate: item.expiryDate,
-                    transactionType: 'IN',
+                    transactionType: 'OUT',
                     quantity: item.damagedQty,
                     referenceType: 'QC',
-                    referenceId: null, // will update below
+                    referenceId: null,
                     remarks: `QC Damaged/Rejected. Temp: ${itemTemp !== undefined ? itemTemp : 'N/A'}°C. Reason: ${item.remarks || 'No reason specified'}`,
-                    performedBy: req.user._id
+                    performedBy: userId
                 });
             }
         }
 
-        // 4. Generate unique QC Number and create QC report linking back to the newly created GRN
-        const qcNumber = `QC-${Date.now()}`;
+        // 4. Generate unique QC Number sequentially (e.g., QC-001/26-27)
+        const qcNumber = await getNextSequenceNumber(QualityControl, 'qcNumber', 'QC', new Date());
         const qc = await QualityControl.create({
             qcNumber,
             grnReference: grn._id,
             branch,
             items: processedItems,
             status,
-            createdBy: req.user._id
+            createdBy: userId
         });
 
         // 5. Update transaction references with the QC ID

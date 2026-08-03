@@ -12,7 +12,8 @@ exports.getInventory = async (req, res) => {
         
         const inventory = await Inventory.find(query)
             .populate('branch', 'branchName branchCode')
-            .populate('product', 'name itemCode category unitOfMeasure minimumStockLevel mrp wholesalePrice purchasePrice itemType piecesPerBox');
+            .populate('product', 'name itemCode category unitOfMeasure minimumStockLevel mrp wholesalePrice purchasePrice itemType piecesPerBox')
+            .sort({ lastUpdated: -1, updatedAt: -1, createdAt: -1 });
             
         res.json({ success: true, data: inventory });
     } catch (error) {

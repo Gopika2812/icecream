@@ -316,7 +316,7 @@ const ProductList = () => {
                 name="itemType" 
                 value={formData.itemType} 
                 onChange={handleInputChange} 
-                className="w-full bg-white border border-pink-200 rounded-xl px-3 py-2 text-gray-900 text-sm font-bold focus:outline-none focus:ring-1 focus:ring-pink-500"
+                className="w-full bg-white border border-gray-200 rounded-xl px-4 py-2.5 text-gray-900 text-sm font-semibold shadow-xs focus:outline-none focus:ring-2 focus:ring-pink-500/20 focus:border-pink-600 transition-all cursor-pointer"
               >
                 <option value="Raw Material">Raw Material</option>
                 <option value="Finished Goods">Finished Goods</option>
@@ -329,7 +329,7 @@ const ProductList = () => {
                 name="category" 
                 value={formData.category} 
                 onChange={handleInputChange} 
-                className="w-full bg-white border border-pink-200 rounded-xl px-3 py-2 text-gray-900 text-sm font-semibold focus:outline-none focus:ring-1 focus:ring-pink-500" 
+                className="w-full bg-white border border-gray-200 rounded-xl px-4 py-2.5 text-gray-900 text-sm font-semibold shadow-xs focus:outline-none focus:ring-2 focus:ring-pink-500/20 focus:border-pink-600 transition-all" 
                 placeholder="e.g. Dairy, Ice Cream, Packaging" 
               />
             </div>
@@ -343,7 +343,7 @@ const ProductList = () => {
                 name="unitOfMeasure" 
                 value={formData.unitOfMeasure} 
                 onChange={handleInputChange} 
-                className="w-full bg-white border border-pink-200 rounded-xl px-3 py-2 text-gray-900 text-sm font-bold focus:outline-none focus:ring-1 focus:ring-pink-500"
+                className="w-full bg-white border border-gray-200 rounded-xl px-4 py-2.5 text-gray-900 text-sm font-semibold shadow-xs focus:outline-none focus:ring-2 focus:ring-pink-500/20 focus:border-pink-600 transition-all cursor-pointer"
               >
                 <option value="Kg">Kg</option>
                 <option value="Ltr">Ltr</option>
