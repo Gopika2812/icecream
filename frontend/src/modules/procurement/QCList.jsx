@@ -660,7 +660,7 @@ const QCList = () => {
           </div>
 
           {items.length > 0 && (
-            <div className="glass-panel p-6 space-y-6">
+            <div className="glass-panel p-6 space-y-6 relative z-30">
               <h3 className="font-semibold text-gray-800 flex items-center gap-2">
                 <ShieldCheck className="text-green-600" size={20} />
                 QC Checks & Batch Registries

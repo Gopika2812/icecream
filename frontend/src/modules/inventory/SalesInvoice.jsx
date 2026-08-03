@@ -736,7 +736,7 @@ const SalesInvoice = () => {
             </div>
 
             {/* STEP 2 & 3: CUSTOMER / GUEST SELECTION & AUTO-SELECTED SALES OWNER */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 p-4 bg-gray-50/70 rounded-2xl border border-gray-200 relative z-20">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 p-4 bg-gray-50/70 rounded-2xl border border-gray-200 relative z-50">
               
               {/* If Guest -> Manual Guest / Receiver Name Entry */}
               {invoiceType === 'Guest' ? (
@@ -796,7 +796,7 @@ const SalesInvoice = () => {
             </div>
 
             {/* STEP 4: LINE ITEMS (FINISHED GOODS STOCK SELECTION) */}
-            <div>
+            <div className="relative z-30">
               <div className="flex justify-between items-center mb-2">
                 <label className="text-xs font-extrabold text-gray-700 uppercase tracking-wider block">
                   4. Select Finished Goods Stock from Cold Room *
@@ -812,7 +812,7 @@ const SalesInvoice = () => {
 
               <div className="space-y-3">
                 {lineItems.map((item, idx) => (
-                  <div key={idx} className="grid grid-cols-12 gap-2 items-center p-3 bg-white border border-pink-200 rounded-xl shadow-sm relative" style={{ zIndex: 100 - idx }}>
+                  <div key={idx} className="grid grid-cols-12 gap-2 items-center p-3 bg-white border border-pink-200 rounded-xl shadow-sm relative" style={{ zIndex: 40 - idx }}>
                     {/* Item & Batch Picker */}
                     <div className="col-span-12 sm:col-span-5 space-y-1">
                       <label className="text-[10px] text-gray-400 font-bold uppercase">Product & Cold Room Batch</label>

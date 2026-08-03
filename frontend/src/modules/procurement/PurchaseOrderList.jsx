@@ -328,7 +328,7 @@ const PurchaseOrderList = () => {
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-6">
-          <div className="glass-panel p-6 grid grid-cols-1 md:grid-cols-3 gap-6 relative z-20">
+          <div className="glass-panel p-6 grid grid-cols-1 md:grid-cols-3 gap-6 relative z-50">
             <div>
               <label className="block text-xs font-bold text-gray-700 mb-2">Vendor *</label>
               <SearchableSelect
@@ -362,11 +362,11 @@ const PurchaseOrderList = () => {
             </div>
           </div>
 
-          <div className="glass-panel p-6 relative z-10">
+          <div className="glass-panel p-6 relative z-30">
             <h3 className="font-bold text-gray-800 mb-4">Materials & Quantities</h3>
             <div className="space-y-4">
               {items.map((item, index) => (
-                <div key={index} className="grid grid-cols-1 md:grid-cols-12 gap-4 items-end relative" style={{ zIndex: 100 - index }}>
+                <div key={index} className="grid grid-cols-1 md:grid-cols-12 gap-4 items-end relative" style={{ zIndex: 40 - index }}>
                   <div className="md:col-span-5">
                     <label className="block text-xs font-bold text-gray-700 mb-1">Item Code / Name *</label>
                     <SearchableSelect
