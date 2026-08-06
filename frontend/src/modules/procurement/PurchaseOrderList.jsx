@@ -148,9 +148,9 @@ const PurchaseOrderList = () => {
               </thead>
               <tbody>
                 ${poItems.map((item, idx) => {
-                  const prod = item.product || {};
-                  const lineTotal = (item.orderedQty || 0) * (item.unitPrice || 0);
-                  return `
+      const prod = item.product || {};
+      const lineTotal = (item.orderedQty || 0) * (item.unitPrice || 0);
+      return `
                     <tr>
                       <td class="text-center font-mono">${idx + 1}</td>
                       <td><strong>${prod.name || 'Material Item'}</strong></td>
@@ -161,7 +161,7 @@ const PurchaseOrderList = () => {
                       <td class="text-right font-mono" style="font-weight: 800; color: #0f172a;">₹${lineTotal.toFixed(2)}</td>
                     </tr>
                   `;
-                }).join('')}
+    }).join('')}
                 <tr class="total-row">
                   <td colSpan="6" class="text-right uppercase">Grand Total Amount:</td>
                   <td class="text-right font-mono" style="color: #881337;">₹${(po.totalAmount || 0).toFixed(2)}</td>
@@ -232,7 +232,7 @@ const PurchaseOrderList = () => {
       const rawMaterials = productsRes.data.data.filter(p => p.itemType === 'Raw Material');
       setProducts(rawMaterials);
       setBranches(branchesRes.data.data);
-      
+
       // Default branch to user's primary branch if available
       if (currentUser.primaryBranch) {
         setSelectedBranch(currentUser.primaryBranch._id || currentUser.primaryBranch);
@@ -256,7 +256,7 @@ const PurchaseOrderList = () => {
 
   const handleItemChange = (index, field, value) => {
     const newItems = [...items];
-    
+
     if (field === 'product') {
       newItems[index].product = value;
       // Pre-fill unit price from product details (wholesalePrice)
@@ -282,7 +282,7 @@ const PurchaseOrderList = () => {
     e.preventDefault();
     if (!selectedVendor) return alert('Please select a vendor.');
     if (!selectedBranch) return alert('Please select a branch.');
-    
+
     const validItems = items.filter(item => item.product && item.orderedQty > 0);
     if (validItems.length === 0) return alert('Please add at least one product with quantity.');
 
@@ -299,7 +299,7 @@ const PurchaseOrderList = () => {
 
       await api.post('/purchase-orders', payload);
       alert('Purchase Order Created Successfully!');
-      
+
       // Reset Form
       setSelectedVendor('');
       setExpectedDeliveryDate('');
@@ -318,8 +318,8 @@ const PurchaseOrderList = () => {
     return (
       <div className="w-full">
         <div className="flex items-center gap-4 mb-6">
-          <button 
-            onClick={() => setIsCreating(false)} 
+          <button
+            onClick={() => setIsCreating(false)}
             className="p-2 rounded-lg bg-white/50 border border-[var(--color-glass-border)] hover:bg-white/80 transition-colors text-gray-700"
           >
             <ArrowLeft size={18} />
@@ -353,9 +353,9 @@ const PurchaseOrderList = () => {
 
             <div>
               <label className="block text-xs font-bold text-gray-700 mb-2">Expected Delivery Date</label>
-              <input 
-                type="date" 
-                value={expectedDeliveryDate} 
+              <input
+                type="date"
+                value={expectedDeliveryDate}
                 onChange={(e) => setExpectedDeliveryDate(e.target.value)}
                 className="w-full bg-white border border-gray-200 rounded-xl px-4 py-2.5 text-gray-900 text-sm font-semibold shadow-xs focus:outline-none focus:ring-2 focus:ring-pink-500/20 focus:border-pink-600 transition-all cursor-pointer"
               />
@@ -459,8 +459,7 @@ const PurchaseOrderList = () => {
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-semibold text-gray-900 font-display">Purchase Orders</h1>
-          <p className="text-xs text-gray-500 mt-0.5">Manage raw material purchase orders & procurement entries</p>
+          <h1 className="text-2xl font-semibold text-gray-900 font-display">Purchase Invoice</h1>
         </div>
 
         <div className="flex items-center gap-3">
@@ -490,7 +489,7 @@ const PurchaseOrderList = () => {
             )}
           </div>
 
-          <button 
+          <button
             onClick={() => setIsCreating(true)}
             className="flex items-center gap-2 bg-[var(--color-primary)] hover:bg-[var(--color-primary-soft)] text-white px-4 py-2 rounded-xl transition-colors shadow-[0_0_15px_rgba(216,27,96,0.3)] font-medium text-xs"
           >
@@ -525,11 +524,10 @@ const PurchaseOrderList = () => {
 
                   return (
                     <React.Fragment key={po._id}>
-                      <tr 
+                      <tr
                         onClick={() => setExpandedPoId(isExpanded ? null : po._id)}
-                        className={`cursor-pointer transition-colors ${
-                          isExpanded ? 'bg-pink-50/70 border-l-4 border-pink-600' : 'hover:bg-pink-50/30'
-                        }`}
+                        className={`cursor-pointer transition-colors ${isExpanded ? 'bg-pink-50/70 border-l-4 border-pink-600' : 'hover:bg-pink-50/30'
+                          }`}
                       >
                         <td className="px-6 py-4 font-mono text-xs font-bold text-pink-900 flex items-center gap-2">
                           {isExpanded ? (
@@ -549,11 +547,10 @@ const PurchaseOrderList = () => {
                           ₹{po.totalAmount?.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                         </td>
                         <td className="px-6 py-4">
-                          <span className={`px-2.5 py-1 rounded-full text-xs font-extrabold inline-flex items-center gap-1 ${
-                            po.status === 'Completed' ? 'bg-emerald-100 text-emerald-800 border border-emerald-300' :
+                          <span className={`px-2.5 py-1 rounded-full text-xs font-extrabold inline-flex items-center gap-1 ${po.status === 'Completed' ? 'bg-emerald-100 text-emerald-800 border border-emerald-300' :
                             po.status === 'Issued' ? 'bg-blue-100 text-blue-800 border border-blue-300' :
-                            'bg-amber-100 text-amber-800 border border-amber-300'
-                          }`}>
+                              'bg-amber-100 text-amber-800 border border-amber-300'
+                            }`}>
                             {po.status === 'Completed' && <CheckCircle2 size={12} />}
                             {po.status}
                           </span>
@@ -574,7 +571,7 @@ const PurchaseOrderList = () => {
                         <tr className="bg-pink-50/40 border-b border-pink-200">
                           <td colSpan="7" className="px-6 py-4">
                             <div className="bg-white rounded-2xl p-4 border border-pink-200 shadow-md space-y-3">
-                              
+
                               {/* Dropdown Header */}
                               <div className="flex justify-between items-center border-b border-gray-100 pb-2">
                                 <div className="flex items-center gap-2">

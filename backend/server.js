@@ -44,6 +44,8 @@ app.use('/api/v1/sales-orders', require('./routes/salesOrderRoutes'));
 app.use('/api/v1/auto-sales', require('./routes/autoSalesRoutes'));
 app.use('/api/v1/customer-ledger', require('./routes/customerLedgerRoutes'));
 app.use('/api/v1/vendor-ledger', require('./routes/vendorLedgerRoutes'));
+app.use('/api/v1/categories', require('./routes/categoryRoutes'));
+app.use('/api/v1/item-types', require('./routes/itemTypeRoutes'));
 
 // Error handling middleware
 app.use(notFound);

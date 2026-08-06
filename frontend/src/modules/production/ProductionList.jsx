@@ -24,6 +24,9 @@ const ProductionList = () => {
   // New Production Wizard Form State
   const [wizardStep, setWizardStep] = useState(1); // 1: Product & Qty, 2: Raw Materials, 3: Store Room Entry
   const [submitting, setSubmitting] = useState(false);
+  const [selectedMixProduct, setSelectedMixProduct] = useState('');
+  const [mixCount, setMixCount] = useState(1);
+
   const [formData, setFormData] = useState({
     finishedGoodProduct: '',
     quantityBoxes: '',
@@ -73,8 +76,34 @@ const ProductionList = () => {
   };
 
   // Filter products by type
-  const finishedGoods = products.filter(p => p.itemType === 'Finished Goods');
-  const rawMaterials = products.filter(p => p.itemType === 'Raw Material');
+  const finishedGoods = products.filter(p => p.itemType === 'Finished Goods' || p.itemType?.toLowerCase().includes('good'));
+  const rawMaterials = products.filter(p => p.itemType !== 'Finished Goods');
+  const mixProducts = products.filter(p => p.itemType?.toLowerCase().includes('mix') || (p.rawMaterials && p.rawMaterials.length > 0));
+
+  // Apply Mix Formula handler
+  const handleApplyMixFormula = () => {
+    if (!selectedMixProduct) return alert('Please select a Mix formula.');
+    const mixItem = products.find(p => p._id === selectedMixProduct);
+    if (!mixItem || !mixItem.rawMaterials || mixItem.rawMaterials.length === 0) {
+      return alert('The selected Mix item does not have any raw materials configured in its recipe master.');
+    }
+    const count = parseFloat(mixCount) || 1;
+    const newRows = mixItem.rawMaterials.map(rm => {
+      const pId = rm.product?._id || rm.product;
+      const qtyNeeded = (parseFloat(rm.quantity) || 0) * count;
+      return {
+        product: pId,
+        quantityUsed: qtyNeeded.toString(),
+        batchNumber: 'STORE-RM'
+      };
+    });
+
+    setFormData(prev => ({
+      ...prev,
+      rawMaterialsUsed: newRows
+    }));
+    alert(`Applied "${mixItem.name}" recipe (${count} Count of Mix)! Auto-populated ${newRows.length} raw materials for batch requisition.`);
+  };
 
   // Handle Finished Good selection
   const handleFgSelect = (pId) => {
@@ -686,8 +715,55 @@ const ProductionList = () => {
           {/* STEP 2: Raw Material Allocation */}
           {wizardStep === 2 && (
             <div className="space-y-4">
-              <div className="flex justify-between items-center">
-                <h4 className="text-xs font-bold text-gray-700 uppercase tracking-wider">Allocate Raw Materials for Issue</h4>
+              {/* MIX FORMULA AUTO-FILL SECTION */}
+              <div className="p-4 bg-purple-50/80 border border-purple-200 rounded-2xl space-y-3">
+                <div className="flex items-center gap-2 text-purple-950 font-extrabold text-xs uppercase tracking-wider">
+                  <Package size={16} className="text-purple-600" />
+                  <span>Select Mix Formula to Auto-Calculate Raw Materials</span>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-12 gap-3 items-end">
+                  <div className="sm:col-span-6 space-y-1">
+                    <label className="text-[11px] font-bold text-gray-700 block">Select Mix (e.g. Butterscotch Mix) *</label>
+                    <SearchableSelect
+                      placeholder="Select Mix item..."
+                      value={selectedMixProduct}
+                      options={mixProducts.map(m => ({
+                        value: m._id,
+                        label: m.name,
+                        code: m.itemCode,
+                        sublabel: `Contains ${m.rawMaterials?.length || 0} raw materials`
+                      }))}
+                      onChange={(val) => setSelectedMixProduct(val)}
+                    />
+                  </div>
+
+                  <div className="sm:col-span-3 space-y-1">
+                    <label className="text-[11px] font-bold text-gray-700 block">Count of Mix Needed *</label>
+                    <input
+                      type="number"
+                      min="1"
+                      step="0.1"
+                      value={mixCount}
+                      onChange={(e) => setMixCount(e.target.value)}
+                      placeholder="Count e.g. 2"
+                      className={`${customInputStyle} font-mono font-bold`}
+                    />
+                  </div>
+
+                  <div className="sm:col-span-3">
+                    <button
+                      type="button"
+                      onClick={handleApplyMixFormula}
+                      className="w-full bg-purple-600 hover:bg-purple-700 text-white py-2.5 px-3 rounded-xl text-xs font-extrabold shadow-sm transition-all flex items-center justify-center gap-1"
+                    >
+                      Apply Mix Recipe
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex justify-between items-center pt-2">
+                <h4 className="text-xs font-bold text-gray-700 uppercase tracking-wider">Allocated Raw Materials Requisition List</h4>
                 <button
                   type="button"
                   onClick={handleAddRawMaterialRow}
