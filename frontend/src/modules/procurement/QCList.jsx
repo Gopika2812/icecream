@@ -195,7 +195,8 @@ const QCList = () => {
     
     // Check constraints
     for (const item of items) {
-      if (item.passedQty > 0 && !item.expiryDate) {
+      const isPackingMaterial = (item.itemType || '').toLowerCase().includes('pack');
+      if (!isPackingMaterial && item.passedQty > 0 && !item.expiryDate) {
         return alert(`Please set an Expiry Date for ${item.name}.`);
       }
       if (item.damagedQty > 0 && !item.remarks.trim()) {
@@ -710,108 +711,120 @@ const QCList = () => {
                 QC Checks & Batch Registries
               </h3>
               
-              {items.map((item, index) => (
-                <div key={index} className="p-4 rounded-xl border border-[var(--color-glass-border)] bg-white/10 space-y-4">
-                  <div className="flex justify-between items-start border-b border-[var(--color-glass-border)] pb-2">
-                    <div>
-                      <span className="font-bold text-gray-900">{item.name}</span>
-                      <span className="text-xs text-gray-500 font-mono block">Code: {item.itemCode} | Ordered Qty: {item.receivedQty} {item.unitOfMeasure}</span>
-                    </div>
-                    <span className="px-2 py-0.5 rounded text-xs font-semibold bg-amber-50 text-amber-700 border border-amber-200 font-mono">
-                      Batch Code Auto-Assigned
-                    </span>
-                  </div>
+              {items.map((item, index) => {
+                const isPackingMaterial = (item.itemType || '').toLowerCase().includes('pack');
 
-                  <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
-                    <div>
-                      <label className="block text-xs font-semibold text-gray-600 mb-1">Passed Qty *</label>
-                      <input
-                        type="number"
-                        min="0"
-                        max={item.receivedQty}
-                        value={item.passedQty}
-                        onChange={(e) => handlePassedQtyChange(index, e.target.value)}
-                        required
-                        className="w-full bg-white/50 border border-green-300 text-green-700 font-semibold rounded px-3 py-1.5 text-sm focus:outline-none focus:border-green-500"
-                      />
+                return (
+                  <div key={index} className="p-4 rounded-xl border border-[var(--color-glass-border)] bg-white/10 space-y-4">
+                    <div className="flex justify-between items-start border-b border-[var(--color-glass-border)] pb-2">
+                      <div>
+                        <span className="font-bold text-gray-900">{item.name}</span>
+                        <span className="text-xs text-gray-500 font-mono block">
+                          Code: {item.itemCode} | Ordered Qty: {item.receivedQty} {item.unitOfMeasure} | Type: {item.itemType}
+                        </span>
+                      </div>
+                      <span className="px-2 py-0.5 rounded text-xs font-semibold bg-amber-50 text-amber-700 border border-amber-200 font-mono">
+                        Batch Code Auto-Assigned
+                      </span>
                     </div>
-                    <div>
-                      <label className="block text-xs font-semibold text-gray-600 mb-1">Damaged (Return Qty) *</label>
-                      <input
-                        type="number"
-                        min="0"
-                        max={item.receivedQty}
-                        value={item.damagedQty}
-                        onChange={(e) => handleDamagedQtyChange(index, e.target.value)}
-                        required
-                        className="w-full bg-white/50 border border-red-300 text-red-700 font-semibold rounded px-3 py-1.5 text-sm focus:outline-none focus:border-red-500"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-xs font-semibold text-gray-600 mb-1">Purchase Price (₹) *</label>
-                      <input
-                        type="number"
-                        step="0.01"
-                        min="0"
-                        value={item.purchasePrice}
-                        onChange={(e) => handleItemPropertyChange(index, 'purchasePrice', e.target.value)}
-                        required
-                        className="w-full bg-white/50 border border-[var(--color-glass-border)] rounded px-3 py-1.5 text-sm focus:outline-none focus:border-[var(--color-primary)]"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-xs font-semibold text-gray-600 mb-1 flex items-center gap-1">
-                        <Thermometer size={12} className="text-red-500" />
-                        Temperature (°C) {item.itemType === 'Finished Goods' ? '*' : ''}
-                      </label>
-                      <input
-                        type="number"
-                        step="0.1"
-                        value={item.temperature}
-                        onChange={(e) => handleItemPropertyChange(index, 'temperature', e.target.value)}
-                        required={item.itemType === 'Finished Goods'}
-                        placeholder="e.g. -18"
-                        className="w-full bg-white/50 border border-[var(--color-glass-border)] rounded px-3 py-1 text-sm focus:outline-none focus:border-[var(--color-primary)]"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-xs font-semibold text-gray-600 mb-1">Mfg Date</label>
-                      <input
-                        type="date"
-                        value={item.manufacturingDate}
-                        onChange={(e) => handleItemPropertyChange(index, 'manufacturingDate', e.target.value)}
-                        className="w-full bg-white/50 border border-[var(--color-glass-border)] rounded px-3 py-1 text-sm focus:outline-none focus:border-[var(--color-primary)]"
-                      />
-                    </div>
-                  </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-xs font-semibold text-gray-600 mb-1">Expiry Date *</label>
-                      <input
-                        type="date"
-                        value={item.expiryDate}
-                        required={item.passedQty > 0}
-                        onChange={(e) => handleItemPropertyChange(index, 'expiryDate', e.target.value)}
-                        className="w-full bg-white/50 border border-[var(--color-glass-border)] rounded px-3 py-1 text-sm focus:outline-none focus:border-[var(--color-primary)]"
-                      />
+                    <div className={`grid grid-cols-1 ${isPackingMaterial ? 'md:grid-cols-3' : 'md:grid-cols-5'} gap-4`}>
+                      <div>
+                        <label className="block text-xs font-semibold text-gray-600 mb-1">Passed Qty *</label>
+                        <input
+                          type="number"
+                          min="0"
+                          max={item.receivedQty}
+                          value={item.passedQty}
+                          onChange={(e) => handlePassedQtyChange(index, e.target.value)}
+                          required
+                          className="w-full bg-white/50 border border-green-300 text-green-700 font-semibold rounded px-3 py-1.5 text-sm focus:outline-none focus:border-green-500"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-semibold text-gray-600 mb-1">Damaged (Return Qty) *</label>
+                        <input
+                          type="number"
+                          min="0"
+                          max={item.receivedQty}
+                          value={item.damagedQty}
+                          onChange={(e) => handleDamagedQtyChange(index, e.target.value)}
+                          required
+                          className="w-full bg-white/50 border border-red-300 text-red-700 font-semibold rounded px-3 py-1.5 text-sm focus:outline-none focus:border-red-500"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-semibold text-gray-600 mb-1">Purchase Price (₹) *</label>
+                        <input
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          value={item.purchasePrice}
+                          onChange={(e) => handleItemPropertyChange(index, 'purchasePrice', e.target.value)}
+                          required
+                          className="w-full bg-white/50 border border-[var(--color-glass-border)] rounded px-3 py-1.5 text-sm focus:outline-none focus:border-[var(--color-primary)]"
+                        />
+                      </div>
+                      {!isPackingMaterial && (
+                        <div>
+                          <label className="block text-xs font-semibold text-gray-600 mb-1 flex items-center gap-1">
+                            <Thermometer size={12} className="text-red-500" />
+                            Temperature (°C) {item.itemType === 'Finished Goods' ? '*' : ''}
+                          </label>
+                          <input
+                            type="number"
+                            step="0.1"
+                            value={item.temperature}
+                            onChange={(e) => handleItemPropertyChange(index, 'temperature', e.target.value)}
+                            required={item.itemType === 'Finished Goods'}
+                            placeholder="e.g. -18"
+                            className="w-full bg-white/50 border border-[var(--color-glass-border)] rounded px-3 py-1 text-sm focus:outline-none focus:border-[var(--color-primary)]"
+                          />
+                        </div>
+                      )}
+                      {!isPackingMaterial && (
+                        <div>
+                          <label className="block text-xs font-semibold text-gray-600 mb-1">Mfg Date</label>
+                          <input
+                            type="date"
+                            value={item.manufacturingDate}
+                            onChange={(e) => handleItemPropertyChange(index, 'manufacturingDate', e.target.value)}
+                            className="w-full bg-white/50 border border-[var(--color-glass-border)] rounded px-3 py-1 text-sm focus:outline-none focus:border-[var(--color-primary)]"
+                          />
+                        </div>
+                      )}
                     </div>
-                    <div>
-                      <label className="block text-xs font-semibold text-gray-600 mb-1">Remarks / QC failure reason</label>
-                      <input
-                        type="text"
-                        value={item.remarks}
-                        onChange={(e) => handleRemarksChange(index, e.target.value)}
-                        required={item.damagedQty > 0}
-                        placeholder={item.damagedQty > 0 ? "Explain damage / vendor return reason *" : "Optional remarks"}
-                        className={`w-full bg-white/50 border rounded px-3 py-1.5 text-xs focus:outline-none ${
-                          item.damagedQty > 0 ? 'border-red-300 focus:border-red-500' : 'border-[var(--color-glass-border)] focus:border-[var(--color-primary)]'
-                        }`}
-                      />
+
+                    <div className={`grid grid-cols-1 ${isPackingMaterial ? 'md:grid-cols-1' : 'md:grid-cols-2'} gap-4`}>
+                      {!isPackingMaterial && (
+                        <div>
+                          <label className="block text-xs font-semibold text-gray-600 mb-1">Expiry Date *</label>
+                          <input
+                            type="date"
+                            value={item.expiryDate}
+                            required={item.passedQty > 0}
+                            onChange={(e) => handleItemPropertyChange(index, 'expiryDate', e.target.value)}
+                            className="w-full bg-white/50 border border-[var(--color-glass-border)] rounded px-3 py-1 text-sm focus:outline-none focus:border-[var(--color-primary)]"
+                          />
+                        </div>
+                      )}
+                      <div>
+                        <label className="block text-xs font-semibold text-gray-600 mb-1">Remarks / QC failure reason</label>
+                        <input
+                          type="text"
+                          value={item.remarks}
+                          onChange={(e) => handleRemarksChange(index, e.target.value)}
+                          required={item.damagedQty > 0}
+                          placeholder={item.damagedQty > 0 ? "Explain damage / vendor return reason *" : "Optional remarks"}
+                          className={`w-full bg-white/50 border rounded px-3 py-1.5 text-xs focus:outline-none ${
+                            item.damagedQty > 0 ? 'border-red-300 focus:border-red-500' : 'border-[var(--color-glass-border)] focus:border-[var(--color-primary)]'
+                          }`}
+                        />
+                      </div>
                     </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
 
