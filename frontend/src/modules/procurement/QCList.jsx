@@ -1507,215 +1507,248 @@ const QCList = () => {
           </div>
         </div>
       )}
-      {/* 3. Detail Popup Modal for QC Check Report */}
-      {selectedQcDetails && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl max-w-4xl w-full max-h-[90vh] overflow-hidden shadow-2xl flex flex-col animate-in fade-in zoom-in-95 duration-150">
-            {/* Modal Header */}
-            <div className="p-6 bg-gradient-to-r from-pink-600 to-rose-600 text-white flex justify-between items-start">
-              <div>
-                <div className="flex items-center gap-3">
-                  <h2 className="text-xl font-bold font-mono tracking-wide">{selectedQcDetails.qcNumber}</h2>
-                  <span className={`px-3 py-0.5 rounded-full text-xs font-bold ${
-                    selectedQcDetails.status === 'Passed' ? 'bg-emerald-500 text-white' :
-                    selectedQcDetails.status === 'Partial' ? 'bg-amber-500 text-white' :
-                    'bg-rose-500 text-white'
-                  }`}>
-                    {selectedQcDetails.status} QC Report
-                  </span>
-                </div>
-                <p className="text-pink-100 text-xs mt-1">
-                  Vendor: <span className="font-semibold text-white">{selectedQcDetails.grnReference?.poReference?.vendor?.name || selectedQcDetails.vendor?.name || 'N/A'}</span> | GRN: <span className="font-mono text-white">{selectedQcDetails.grnReference?.grnNumber || 'N/A'}</span> | PO: <span className="font-mono text-white">{selectedQcDetails.grnReference?.poReference?.poNumber || 'N/A'}</span>
-                </p>
-                <p className="text-pink-200 text-xs mt-0.5">
-                  Checked Date: {selectedQcDetails.checkedDate || selectedQcDetails.createdAt ? new Date(selectedQcDetails.checkedDate || selectedQcDetails.createdAt).toLocaleString() : 'N/A'} | Branch: {selectedQcDetails.branch?.branchName || 'Main Branch'}
-                </p>
-              </div>
-              <button 
-                onClick={() => setSelectedQcDetails(null)}
-                className="p-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-white transition-colors"
-              >
-                <X size={20} />
-              </button>
-            </div>
+      {/* 3. Ultra-Clean Modern Modal for QC Check Report */}
+      {selectedQcDetails && (() => {
+        const poObj = selectedQcDetails.grnReference?.poReference;
+        const vendorName = poObj?.vendor?.name || selectedQcDetails.vendor?.name || 'N/A';
+        const grnNo = selectedQcDetails.grnReference?.grnNumber || (typeof selectedQcDetails.grnReference === 'string' ? selectedQcDetails.grnReference : 'N/A');
+        const poNo = poObj?.poNumber || 'N/A';
+        const branchName = selectedQcDetails.branch?.branchName || selectedQcDetails.branch?.name || selectedQcDetails.branchName || 'Main Branch';
+        const checkedDateStr = selectedQcDetails.checkedDate || selectedQcDetails.createdAt ? new Date(selectedQcDetails.checkedDate || selectedQcDetails.createdAt).toLocaleString() : 'N/A';
 
-            {/* Modal Content */}
-            <div className="p-6 overflow-y-auto space-y-6 flex-1">
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                <div className="p-3 bg-gray-50 rounded-xl border border-gray-200 text-center">
-                  <p className="text-[11px] font-bold text-gray-500 uppercase">Total Items Checked</p>
-                  <p className="text-lg font-bold text-gray-900 mt-0.5">{selectedQcDetails.items?.length || 0} Products</p>
-                </div>
-                <div className="p-3 bg-emerald-50 rounded-xl border border-emerald-200 text-center">
-                  <p className="text-[11px] font-bold text-emerald-700 uppercase">Passed Qty (Stock In)</p>
-                  <p className="text-lg font-bold text-emerald-800 mt-0.5">
-                    {selectedQcDetails.items?.reduce((acc, i) => acc + Number(i.passedQty || 0), 0)} Units
+        // Calculate items with resolved unit prices & totals
+        const itemsWithPrices = (selectedQcDetails.items || []).map(item => {
+          let price = Number(item.purchasePrice || 0);
+          if (price === 0 && poObj?.items) {
+            const matchingPoItem = poObj.items.find(pi => (pi.product?._id || pi.product)?.toString() === (item.product?._id || item.product)?.toString());
+            if (matchingPoItem) price = Number(matchingPoItem.unitPrice || 0);
+          }
+          if (price === 0 && item.product) {
+            price = Number(item.product.purchasePrice || item.product.wholesalePrice || 0);
+          }
+          return {
+            ...item,
+            resolvedUnitPrice: price,
+            lineTotal: Number(item.passedQty || 0) * price
+          };
+        });
+
+        const totalPassedValue = itemsWithPrices.reduce((acc, i) => acc + i.lineTotal, 0);
+        const totalPassedQty = itemsWithPrices.reduce((acc, i) => acc + Number(i.passedQty || 0), 0);
+        const totalDamagedQty = itemsWithPrices.reduce((acc, i) => acc + Number(i.damagedQty || 0), 0);
+
+        return (
+          <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-md z-50 flex items-center justify-center p-4 sm:p-6 animate-in fade-in duration-200">
+            <div className="bg-white rounded-3xl max-w-4xl w-full max-h-[88vh] overflow-hidden shadow-2xl border border-slate-100 flex flex-col">
+              {/* Ultra-Clean Header */}
+              <div className="p-6 bg-white border-b border-slate-100 flex justify-between items-start">
+                <div>
+                  <div className="flex items-center gap-3">
+                    <h2 className="text-xl font-bold font-mono text-slate-900 tracking-tight">{selectedQcDetails.qcNumber}</h2>
+                    <span className={`px-3 py-1 rounded-full text-xs font-bold inline-flex items-center gap-1.5 ${
+                      selectedQcDetails.status === 'Passed' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' :
+                      selectedQcDetails.status === 'Partial' ? 'bg-amber-50 text-amber-700 border border-amber-200' :
+                      'bg-rose-50 text-rose-700 border border-rose-200'
+                    }`}>
+                      <span className={`w-1.5 h-1.5 rounded-full ${
+                        selectedQcDetails.status === 'Passed' ? 'bg-emerald-500' :
+                        selectedQcDetails.status === 'Partial' ? 'bg-amber-500' :
+                        'bg-rose-500'
+                      }`} />
+                      {selectedQcDetails.status} QC Report
+                    </span>
+                  </div>
+                  <p className="text-slate-700 text-xs font-medium mt-2">
+                    Vendor: <span className="font-semibold text-slate-900">{vendorName}</span> | GRN: <span className="font-mono text-slate-900 font-semibold">{grnNo}</span> | PO: <span className="font-mono text-slate-900 font-semibold">{poNo}</span>
+                  </p>
+                  <p className="text-slate-500 text-xs mt-0.5">
+                    Checked Date: <span className="font-medium text-slate-700">{checkedDateStr}</span> | Branch: <span className="font-medium text-slate-700">{branchName}</span>
                   </p>
                 </div>
-                <div className="p-3 bg-rose-50 rounded-xl border border-rose-200 text-center">
-                  <p className="text-[11px] font-bold text-rose-700 uppercase">Return / Damaged Qty</p>
-                  <p className="text-lg font-bold text-rose-800 mt-0.5">
-                    {selectedQcDetails.items?.reduce((acc, i) => acc + Number(i.damagedQty || 0), 0)} Pcs
-                  </p>
-                </div>
-                <div className="p-3 bg-indigo-50 rounded-xl border border-indigo-200 text-center">
-                  <p className="text-[11px] font-bold text-indigo-700 uppercase">Total Passed Value</p>
-                  <p className="text-lg font-bold text-indigo-900 mt-0.5 font-mono">
-                    ₹{selectedQcDetails.items?.reduce((acc, i) => acc + (Number(i.passedQty || 0) * Number(i.purchasePrice || 0)), 0).toFixed(2)}
-                  </p>
-                </div>
+                <button 
+                  onClick={() => setSelectedQcDetails(null)}
+                  className="p-2 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-500 hover:text-slate-800 transition-colors"
+                >
+                  <X size={18} />
+                </button>
               </div>
 
-              {/* Items Breakdown Table */}
-              <div className="rounded-xl border border-gray-200 overflow-hidden shadow-sm">
-                <table className="w-full text-left text-sm text-gray-700">
-                  <thead className="bg-gray-50 text-gray-600 font-semibold text-xs uppercase tracking-wider border-b border-gray-200">
-                    <tr>
-                      <th className="px-4 py-3">Product Name</th>
-                      <th className="px-4 py-3 text-center">Batch No</th>
-                      <th className="px-4 py-3 text-right">Passed Qty</th>
-                      <th className="px-4 py-3 text-right text-rose-600">Damaged Qty</th>
-                      <th className="px-4 py-3 text-right">Unit Price</th>
-                      <th className="px-4 py-3 text-center">Temp Log</th>
-                      <th className="px-4 py-3">Remarks / Reason</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-200">
-                    {selectedQcDetails.items?.map((item, idx) => (
-                      <tr key={idx} className="hover:bg-gray-50 transition-colors">
-                        <td className="px-4 py-3 font-semibold text-gray-900">
-                          {item.product?.name || item.productName || 'Product'}
-                          <span className="block font-mono text-[10px] text-gray-400 font-normal">Code: {item.product?.itemCode || 'N/A'}</span>
-                        </td>
-                        <td className="px-4 py-3 text-center font-mono text-xs font-semibold">
-                          <span className="px-2 py-0.5 rounded bg-blue-50 text-blue-700 border border-blue-200">
-                            {item.batchNumber}
-                          </span>
-                        </td>
-                        <td className="px-4 py-3 text-right font-bold text-emerald-600">
-                          {item.passedQty} {item.product?.unitOfMeasure || ''}
-                        </td>
-                        <td className="px-4 py-3 text-right font-bold text-rose-600">
-                          {item.damagedQty > 0 ? `${item.damagedQty} ${item.product?.unitOfMeasure || ''}` : '-'}
-                        </td>
-                        <td className="px-4 py-3 text-right font-mono font-semibold">
-                          ₹{Number(item.purchasePrice || 0).toFixed(2)}
-                        </td>
-                        <td className="px-4 py-3 text-center font-mono text-xs font-semibold">
-                          {item.temperature !== undefined && item.temperature !== null ? `${item.temperature} °C` : 'N/A'}
-                        </td>
-                        <td className="px-4 py-3 text-xs text-gray-600">
-                          {item.remarks || '-'}
-                        </td>
+              {/* Modal Body */}
+              <div className="p-6 overflow-y-auto space-y-6 flex-1 bg-slate-50/40">
+                {/* Modern Metric Cards */}
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  <div className="p-4 bg-white rounded-2xl border border-slate-200/80 text-center shadow-xs">
+                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Total Items Checked</p>
+                    <p className="text-xl font-bold text-slate-900 mt-1">{itemsWithPrices.length} Products</p>
+                  </div>
+                  <div className="p-4 bg-emerald-50/50 rounded-2xl border border-emerald-200/80 text-center shadow-xs">
+                    <p className="text-[10px] font-bold text-emerald-800 uppercase tracking-wider">Passed Qty (Stock In)</p>
+                    <p className="text-xl font-bold text-emerald-700 mt-1">{totalPassedQty} Units</p>
+                  </div>
+                  <div className="p-4 bg-rose-50/50 rounded-2xl border border-rose-200/80 text-center shadow-xs">
+                    <p className="text-[10px] font-bold text-rose-800 uppercase tracking-wider">Return / Damaged Qty</p>
+                    <p className="text-xl font-bold text-rose-700 mt-1">{totalDamagedQty > 0 ? `${totalDamagedQty} Pcs` : '0 Pcs'}</p>
+                  </div>
+                  <div className="p-4 bg-indigo-50/50 rounded-2xl border border-indigo-200/80 text-center shadow-xs">
+                    <p className="text-[10px] font-bold text-indigo-800 uppercase tracking-wider">Total Passed Value</p>
+                    <p className="text-xl font-bold text-indigo-900 font-mono mt-1">
+                      ₹{totalPassedValue.toFixed(2)}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Items Breakdown Table */}
+                <div className="bg-white rounded-2xl border border-slate-200/80 overflow-hidden shadow-xs">
+                  <table className="w-full text-left text-sm text-slate-700">
+                    <thead className="bg-slate-100/70 text-slate-700 font-bold text-xs uppercase tracking-wider border-b border-slate-200">
+                      <tr>
+                        <th className="px-4 py-3.5">Product Name</th>
+                        <th className="px-4 py-3.5 text-center">Batch No</th>
+                        <th className="px-4 py-3.5 text-right">Passed Qty</th>
+                        <th className="px-4 py-3.5 text-right text-rose-600">Damaged Qty</th>
+                        <th className="px-4 py-3.5 text-right">Unit Price</th>
+                        <th className="px-4 py-3.5 text-center">Temp Log</th>
+                        <th className="px-4 py-3.5">Remarks / Reason</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {itemsWithPrices.map((item, idx) => (
+                        <tr key={idx} className="hover:bg-slate-50/80 transition-colors">
+                          <td className="px-4 py-3.5 font-bold text-slate-900">
+                            {item.product?.name || item.productName || 'Product'}
+                            <span className="block font-mono text-[11px] text-slate-500 font-medium mt-0.5">Code: {item.product?.itemCode || 'N/A'}</span>
+                          </td>
+                          <td className="px-4 py-3.5 text-center">
+                            <span className="px-2.5 py-0.5 rounded bg-blue-50 text-blue-700 border border-blue-200 font-mono text-xs font-semibold">
+                              {item.batchNumber}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3.5 text-right font-bold text-emerald-600">
+                            {item.passedQty} {item.product?.unitOfMeasure || ''}
+                          </td>
+                          <td className="px-4 py-3.5 text-right font-bold text-rose-600">
+                            {item.damagedQty > 0 ? `${item.damagedQty} ${item.product?.unitOfMeasure || ''}` : '-'}
+                          </td>
+                          <td className="px-4 py-3.5 text-right font-mono font-semibold text-slate-800">
+                            ₹{item.resolvedUnitPrice.toFixed(2)}
+                          </td>
+                          <td className="px-4 py-3.5 text-center font-mono text-xs font-semibold text-slate-700">
+                            {item.temperature !== undefined && item.temperature !== null ? `${item.temperature} °C` : 'N/A'}
+                          </td>
+                          <td className="px-4 py-3.5 text-xs font-medium text-slate-600">
+                            {item.remarks || '-'}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
               </div>
-            </div>
 
-            <div className="p-4 border-t border-gray-200 bg-gray-50 flex justify-between items-center">
-              <button
-                onClick={() => window.print()}
-                className="px-4 py-2 bg-white border border-gray-300 hover:bg-gray-100 text-gray-700 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-colors"
-              >
-                <Printer size={14} /> Print QC Summary
-              </button>
-              <button
-                onClick={() => setSelectedQcDetails(null)}
-                className="px-5 py-2 bg-pink-600 hover:bg-pink-700 text-white rounded-xl text-xs font-bold transition-colors"
-              >
-                Close Breakdown
-              </button>
+              {/* Modal Footer */}
+              <div className="p-4 bg-white border-t border-slate-100 flex justify-between items-center">
+                <button
+                  onClick={() => window.print()}
+                  className="px-4 py-2 bg-slate-50 border border-slate-300 hover:bg-slate-100 text-slate-700 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-colors"
+                >
+                  <Printer size={14} /> Print Report
+                </button>
+                <button
+                  onClick={() => setSelectedQcDetails(null)}
+                  className="px-6 py-2.5 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold shadow-md transition-colors"
+                >
+                  Close Breakdown
+                </button>
+              </div>
             </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
 
-      {/* 4. Detail Popup Modal for Store Room Grouped Receiving */}
+      {/* 4. Ultra-Clean Modern Modal for Store Room Grouped Receiving */}
       {selectedStoreRoomGroup && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl max-w-4xl w-full max-h-[90vh] overflow-hidden shadow-2xl flex flex-col animate-in fade-in zoom-in-95 duration-150">
-            <div className="p-6 bg-gradient-to-r from-blue-600 to-indigo-600 text-white flex justify-between items-start">
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-md z-50 flex items-center justify-center p-4 sm:p-6 animate-in fade-in duration-200">
+          <div className="bg-white rounded-3xl max-w-4xl w-full max-h-[88vh] overflow-hidden shadow-2xl border border-slate-100 flex flex-col">
+            <div className="p-6 bg-white border-b border-slate-100 flex justify-between items-start">
               <div>
                 <div className="flex items-center gap-3">
-                  <h2 className="text-xl font-bold font-mono tracking-wide">
+                  <h2 className="text-xl font-bold font-mono text-slate-900 tracking-tight">
                     {selectedStoreRoomGroup.qcNumber !== 'QC-N/A' ? selectedStoreRoomGroup.qcNumber : selectedStoreRoomGroup.grnNumber}
                   </h2>
-                  <span className="px-3 py-0.5 rounded-full text-xs font-bold bg-blue-400 text-blue-950">
+                  <span className="px-3 py-1 rounded-full text-xs font-bold bg-blue-50 text-blue-700 border border-blue-200">
                     Store Room Receiving
                   </span>
                 </div>
-                <p className="text-blue-100 text-xs mt-1">
-                  Vendor: <span className="font-semibold text-white">{selectedStoreRoomGroup.vendorName}</span> | Invoice Ref: <span className="font-mono text-white">{selectedStoreRoomGroup.invoiceNumber}</span>
+                <p className="text-slate-700 text-xs font-medium mt-2">
+                  Vendor: <span className="font-semibold text-slate-900">{selectedStoreRoomGroup.vendorName}</span> | Invoice Ref: <span className="font-mono text-slate-900 font-semibold">{selectedStoreRoomGroup.invoiceNumber}</span>
                 </p>
-                <p className="text-blue-200 text-xs mt-0.5">
-                  Date Received: {new Date(selectedStoreRoomGroup.dateStr).toLocaleString()} | Branch: {selectedStoreRoomGroup.branchName}
+                <p className="text-slate-500 text-xs mt-0.5">
+                  Date Received: <span className="font-medium text-slate-700">{new Date(selectedStoreRoomGroup.dateStr).toLocaleString()}</span> | Branch: <span className="font-medium text-slate-700">{selectedStoreRoomGroup.branchName}</span>
                 </p>
               </div>
               <button 
                 onClick={() => setSelectedStoreRoomGroup(null)}
-                className="p-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-white transition-colors"
+                className="p-2 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-600 hover:text-slate-900 transition-colors"
               >
-                <X size={20} />
+                <X size={18} />
               </button>
             </div>
 
-            <div className="p-6 overflow-y-auto space-y-6 flex-1">
+            <div className="p-6 overflow-y-auto space-y-6 flex-1 bg-slate-50/40">
               <div className="grid grid-cols-3 gap-4">
-                <div className="p-3 bg-gray-50 rounded-xl border border-gray-200 text-center">
-                  <p className="text-[11px] font-bold text-gray-500 uppercase">Products Received</p>
-                  <p className="text-lg font-bold text-gray-900 mt-0.5">{selectedStoreRoomGroup.items.length} Products</p>
+                <div className="p-4 bg-white rounded-2xl border border-slate-200/80 text-center shadow-xs">
+                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Products Received</p>
+                  <p className="text-xl font-bold text-slate-900 mt-1">{selectedStoreRoomGroup.items.length} Products</p>
                 </div>
-                <div className="p-3 bg-emerald-50 rounded-xl border border-emerald-200 text-center">
-                  <p className="text-[11px] font-bold text-emerald-700 uppercase">Total In-Stock Qty</p>
-                  <p className="text-lg font-bold text-emerald-800 mt-0.5">{selectedStoreRoomGroup.totalQty} Units</p>
+                <div className="p-4 bg-emerald-50/50 rounded-2xl border border-emerald-200/80 text-center shadow-xs">
+                  <p className="text-[10px] font-bold text-emerald-800 uppercase tracking-wider">Total In-Stock Qty</p>
+                  <p className="text-xl font-bold text-emerald-700 mt-1">{selectedStoreRoomGroup.totalQty} Units</p>
                 </div>
-                <div className="p-3 bg-indigo-50 rounded-xl border border-indigo-200 text-center">
-                  <p className="text-[11px] font-bold text-indigo-700 uppercase">Total Stock Valuation</p>
-                  <p className="text-lg font-bold text-indigo-900 mt-0.5 font-mono">
+                <div className="p-4 bg-indigo-50/50 rounded-2xl border border-indigo-200/80 text-center shadow-xs">
+                  <p className="text-[10px] font-bold text-indigo-800 uppercase tracking-wider">Total Stock Valuation</p>
+                  <p className="text-xl font-bold text-indigo-900 font-mono mt-1">
                     ₹{selectedStoreRoomGroup.totalValue.toFixed(2)}
                   </p>
                 </div>
               </div>
 
-              <div className="rounded-xl border border-gray-200 overflow-hidden shadow-sm">
-                <table className="w-full text-left text-sm text-gray-700">
-                  <thead className="bg-gray-50 text-gray-600 font-semibold text-xs uppercase tracking-wider border-b border-gray-200">
+              <div className="bg-white rounded-2xl border border-slate-200/80 overflow-hidden shadow-xs">
+                <table className="w-full text-left text-sm text-slate-700">
+                  <thead className="bg-slate-100/70 text-slate-700 font-bold text-xs uppercase tracking-wider border-b border-slate-200">
                     <tr>
-                      <th className="px-4 py-3">Product Name</th>
-                      <th className="px-4 py-3 text-center">Batch No</th>
-                      <th className="px-4 py-3 text-right">In-Stock Qty</th>
-                      <th className="px-4 py-3 text-right">Unit Price</th>
-                      <th className="px-4 py-3 text-right">Total Line Value</th>
-                      <th className="px-4 py-3 text-center">Temp Log</th>
+                      <th className="px-4 py-3.5">Product Name</th>
+                      <th className="px-4 py-3.5 text-center">Batch No</th>
+                      <th className="px-4 py-3.5 text-right">In-Stock Qty</th>
+                      <th className="px-4 py-3.5 text-right">Unit Price</th>
+                      <th className="px-4 py-3.5 text-right">Total Line Value</th>
+                      <th className="px-4 py-3.5 text-center">Temp Log</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-gray-200">
+                  <tbody className="divide-y divide-slate-100">
                     {selectedStoreRoomGroup.items.map((item, idx) => {
                       const qty = Number(item.quantity || 0);
                       const price = Number(item.purchasePrice || 0);
                       return (
-                        <tr key={idx} className="hover:bg-gray-50 transition-colors">
-                          <td className="px-4 py-3 font-semibold text-gray-900">
+                        <tr key={idx} className="hover:bg-slate-50/80 transition-colors">
+                          <td className="px-4 py-3.5 font-bold text-slate-900">
                             {item.product?.name || item.productName || item.name || 'Product'}
-                            <span className="block font-mono text-[10px] text-gray-400 font-normal">Code: {item.product?.itemCode || item.itemCode || 'N/A'}</span>
+                            <span className="block font-mono text-[11px] text-slate-500 font-medium mt-0.5">Code: {item.product?.itemCode || item.itemCode || 'N/A'}</span>
                           </td>
-                          <td className="px-4 py-3 text-center font-mono text-xs font-semibold">
-                            <span className="px-2 py-0.5 rounded bg-blue-50 text-blue-700 border border-blue-200">
+                          <td className="px-4 py-3.5 text-center">
+                            <span className="px-2.5 py-0.5 rounded bg-blue-50 text-blue-700 border border-blue-200 font-mono text-xs font-semibold">
                               {item.batchNumber}
                             </span>
                           </td>
-                          <td className="px-4 py-3 text-right font-bold text-emerald-600">
+                          <td className="px-4 py-3.5 text-right font-bold text-emerald-600">
                             {qty} {item.product?.unitOfMeasure || ''}
                           </td>
-                          <td className="px-4 py-3 text-right font-mono font-semibold">
+                          <td className="px-4 py-3.5 text-right font-mono font-semibold text-slate-800">
                             ₹{price.toFixed(2)}
                           </td>
-                          <td className="px-4 py-3 text-right font-mono font-bold text-gray-900">
+                          <td className="px-4 py-3.5 text-right font-mono font-bold text-slate-900">
                             ₹{(qty * price).toFixed(2)}
                           </td>
-                          <td className="px-4 py-3 text-center font-mono text-xs font-semibold">
+                          <td className="px-4 py-3.5 text-center font-mono text-xs font-semibold text-slate-700">
                             {item.temperature !== undefined && item.temperature !== null ? `${item.temperature} °C` : 'N/A'}
                           </td>
                         </tr>
@@ -1726,102 +1759,102 @@ const QCList = () => {
               </div>
             </div>
 
-            <div className="p-4 border-t border-gray-200 bg-gray-50 flex justify-end">
+            <div className="p-4 bg-white border-t border-slate-100 flex justify-end">
               <button
                 onClick={() => setSelectedStoreRoomGroup(null)}
-                className="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold transition-colors"
+                className="px-6 py-2.5 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold shadow-md transition-colors"
               >
-                Close Store Room Items
+                Close Breakdown
               </button>
             </div>
           </div>
         </div>
       )}
 
-      {/* 5. Detail Popup Modal for Return to Vendor Group */}
+      {/* 5. Ultra-Clean Modern Modal for Return to Vendor Group */}
       {selectedReturnGroup && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl max-w-4xl w-full max-h-[90vh] overflow-hidden shadow-2xl flex flex-col animate-in fade-in zoom-in-95 duration-150">
-            <div className="p-6 bg-gradient-to-r from-red-600 to-rose-600 text-white flex justify-between items-start">
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-md z-50 flex items-center justify-center p-4 sm:p-6 animate-in fade-in duration-200">
+          <div className="bg-white rounded-3xl max-w-4xl w-full max-h-[88vh] overflow-hidden shadow-2xl border border-slate-100 flex flex-col">
+            <div className="p-6 bg-white border-b border-slate-100 flex justify-between items-start">
               <div>
                 <div className="flex items-center gap-3">
-                  <h2 className="text-xl font-bold font-mono tracking-wide">
+                  <h2 className="text-xl font-bold font-mono text-slate-900 tracking-tight">
                     {selectedReturnGroup.qcNumber !== 'QC-N/A' ? selectedReturnGroup.qcNumber : selectedReturnGroup.grnNumber}
                   </h2>
-                  <span className="px-3 py-0.5 rounded-full text-xs font-bold bg-rose-400 text-rose-950">
+                  <span className="px-3 py-1 rounded-full text-xs font-bold bg-rose-50 text-rose-700 border border-rose-200">
                     Vendor Return Log
                   </span>
                 </div>
-                <p className="text-red-100 text-xs mt-1">
-                  Vendor: <span className="font-semibold text-white">{selectedReturnGroup.vendorName}</span> | Invoice Ref: <span className="font-mono text-white">{selectedReturnGroup.invoiceNumber}</span>
+                <p className="text-slate-700 text-xs font-medium mt-2">
+                  Vendor: <span className="font-semibold text-slate-900">{selectedReturnGroup.vendorName}</span> | Invoice Ref: <span className="font-mono text-slate-900 font-semibold">{selectedReturnGroup.invoiceNumber}</span>
                 </p>
-                <p className="text-red-200 text-xs mt-0.5">
-                  Date Logged: {new Date(selectedReturnGroup.dateStr).toLocaleString()}
+                <p className="text-slate-500 text-xs mt-0.5">
+                  Date Logged: <span className="font-medium text-slate-700">{new Date(selectedReturnGroup.dateStr).toLocaleString()}</span>
                 </p>
               </div>
               <button 
                 onClick={() => setSelectedReturnGroup(null)}
-                className="p-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-white transition-colors"
+                className="p-2 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-600 hover:text-slate-900 transition-colors"
               >
-                <X size={20} />
+                <X size={18} />
               </button>
             </div>
 
-            <div className="p-6 overflow-y-auto space-y-6 flex-1">
+            <div className="p-6 overflow-y-auto space-y-6 flex-1 bg-slate-50/40">
               <div className="grid grid-cols-3 gap-4">
-                <div className="p-3 bg-gray-50 rounded-xl border border-gray-200 text-center">
-                  <p className="text-[11px] font-bold text-gray-500 uppercase">Damaged Products</p>
-                  <p className="text-lg font-bold text-gray-900 mt-0.5">{selectedReturnGroup.items.length} Products</p>
+                <div className="p-4 bg-white rounded-2xl border border-slate-200/80 text-center shadow-xs">
+                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Damaged Products</p>
+                  <p className="text-xl font-bold text-slate-900 mt-1">{selectedReturnGroup.items.length} Products</p>
                 </div>
-                <div className="p-3 bg-rose-50 rounded-xl border border-rose-200 text-center">
-                  <p className="text-[11px] font-bold text-rose-700 uppercase">Total Return Quantity</p>
-                  <p className="text-lg font-bold text-rose-800 mt-0.5">{selectedReturnGroup.totalQty} Pcs</p>
+                <div className="p-4 bg-rose-50/50 rounded-2xl border border-rose-200/80 text-center shadow-xs">
+                  <p className="text-[10px] font-bold text-rose-800 uppercase tracking-wider">Total Return Quantity</p>
+                  <p className="text-xl font-bold text-rose-700 mt-1">{selectedReturnGroup.totalQty} Pcs</p>
                 </div>
-                <div className="p-3 bg-rose-100/50 rounded-xl border border-rose-300 text-center">
-                  <p className="text-[11px] font-bold text-rose-800 uppercase">Total Return Debit Value</p>
-                  <p className="text-lg font-bold text-rose-900 mt-0.5 font-mono">
+                <div className="p-4 bg-rose-100/50 rounded-2xl border border-rose-300/80 text-center shadow-xs">
+                  <p className="text-[10px] font-bold text-rose-900 uppercase tracking-wider">Total Return Debit Value</p>
+                  <p className="text-xl font-bold text-rose-950 font-mono mt-1">
                     ₹{selectedReturnGroup.totalValue.toFixed(2)}
                   </p>
                 </div>
               </div>
 
-              <div className="rounded-xl border border-gray-200 overflow-hidden shadow-sm">
-                <table className="w-full text-left text-sm text-gray-700">
-                  <thead className="bg-gray-50 text-gray-600 font-semibold text-xs uppercase tracking-wider border-b border-gray-200">
+              <div className="bg-white rounded-2xl border border-slate-200/80 overflow-hidden shadow-xs">
+                <table className="w-full text-left text-sm text-slate-700">
+                  <thead className="bg-slate-100/70 text-slate-700 font-bold text-xs uppercase tracking-wider border-b border-slate-200">
                     <tr>
-                      <th className="px-4 py-3">Product Name</th>
-                      <th className="px-4 py-3 text-center">Batch No</th>
-                      <th className="px-4 py-3 text-right">Damaged Qty</th>
-                      <th className="px-4 py-3 text-right">Unit Rate</th>
-                      <th className="px-4 py-3 text-right">Total Debit Value</th>
-                      <th className="px-4 py-3">QC Failure Reason / Remarks</th>
+                      <th className="px-4 py-3.5">Product Name</th>
+                      <th className="px-4 py-3.5 text-center">Batch No</th>
+                      <th className="px-4 py-3.5 text-right">Damaged Qty</th>
+                      <th className="px-4 py-3.5 text-right">Unit Rate</th>
+                      <th className="px-4 py-3.5 text-right">Total Debit Value</th>
+                      <th className="px-4 py-3.5">QC Failure Reason / Remarks</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-gray-200">
+                  <tbody className="divide-y divide-slate-100">
                     {selectedReturnGroup.items.map((item, idx) => {
                       const qty = Number(item.quantity || 0);
                       const price = Number(item.purchasePrice || 0);
                       return (
-                        <tr key={idx} className="hover:bg-gray-50 transition-colors">
-                          <td className="px-4 py-3 font-semibold text-gray-900">
+                        <tr key={idx} className="hover:bg-slate-50/80 transition-colors">
+                          <td className="px-4 py-3.5 font-bold text-slate-900">
                             {item.product?.name || item.productName || item.name || 'Product'}
-                            <span className="block font-mono text-[10px] text-gray-400 font-normal">Code: {item.product?.itemCode || item.itemCode || 'N/A'}</span>
+                            <span className="block font-mono text-[11px] text-slate-500 font-medium mt-0.5">Code: {item.product?.itemCode || item.itemCode || 'N/A'}</span>
                           </td>
-                          <td className="px-4 py-3 text-center font-mono text-xs font-semibold">
-                            <span className="px-2 py-0.5 rounded bg-red-50 text-red-700 border border-red-200">
+                          <td className="px-4 py-3.5 text-center">
+                            <span className="px-2.5 py-0.5 rounded bg-red-50 text-red-700 border border-red-200 font-mono text-xs font-semibold">
                               {item.batchNumber}
                             </span>
                           </td>
-                          <td className="px-4 py-3 text-right font-bold text-rose-600">
+                          <td className="px-4 py-3.5 text-right font-bold text-rose-600">
                             {qty} {item.product?.unitOfMeasure || ''}
                           </td>
-                          <td className="px-4 py-3 text-right font-mono font-semibold">
+                          <td className="px-4 py-3.5 text-right font-mono font-semibold text-slate-800">
                             ₹{price.toFixed(2)}
                           </td>
-                          <td className="px-4 py-3 text-right font-mono font-bold text-rose-700">
+                          <td className="px-4 py-3.5 text-right font-mono font-bold text-rose-700">
                             ₹{(qty * price).toFixed(2)}
                           </td>
-                          <td className="px-4 py-3 text-xs font-medium text-amber-700">
+                          <td className="px-4 py-3.5 text-xs font-medium text-amber-700">
                             {item.remarks || 'QC Damaged / Ready for return'}
                           </td>
                         </tr>
@@ -1832,10 +1865,10 @@ const QCList = () => {
               </div>
             </div>
 
-            <div className="p-4 border-t border-gray-200 bg-gray-50 flex justify-end">
+            <div className="p-4 bg-white border-t border-slate-100 flex justify-end">
               <button
                 onClick={() => setSelectedReturnGroup(null)}
-                className="px-5 py-2 bg-red-600 hover:bg-red-700 text-white rounded-xl text-xs font-bold transition-colors"
+                className="px-6 py-2.5 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold shadow-md transition-colors"
               >
                 Close Vendor Returns
               </button>
