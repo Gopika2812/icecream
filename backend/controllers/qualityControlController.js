@@ -266,14 +266,13 @@ exports.createQualityControl = async (req, res) => {
         });
 
         // 5. Update transaction references with the QC ID
-        await InventoryTransaction.updateMany(
-            { referenceType: 'QC', referenceId: null },
-            { $set: { referenceId: qc._id } }
-        );
+        const pendingTxList = await InventoryTransaction.find({ referenceType: 'QC', referenceId: null });
+        for (const tx of (pendingTxList || [])) {
+            await InventoryTransaction.findByIdAndUpdate(tx._id, { referenceId: qc._id });
+        }
 
         // 6. Complete the Purchase Order status
-        po.status = 'Completed';
-        await po.save();
+        await PurchaseOrder.findByIdAndUpdate(po._id, { status: 'Completed' });
 
         res.status(201).json({ success: true, data: qc });
     } catch (error) {
