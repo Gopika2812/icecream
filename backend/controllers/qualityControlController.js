@@ -8,6 +8,76 @@ const Vendor = require('../models/Vendor');
 const Branch = require('../models/Branch');
 const { getNextSequenceNumber } = require('../utils/sequenceGenerator');
 
+const populateQCReferences = async (qcs = []) => {
+    if (!Array.isArray(qcs) || qcs.length === 0) return [];
+
+    const [allGrns, allPos, allVendors, allBranches, allProducts] = await Promise.all([
+        GRN.find({}),
+        PurchaseOrder.find({}),
+        Vendor.find({}),
+        Branch.find({}),
+        Product.find({})
+    ]);
+
+    const grnMap = {};
+    (allGrns || []).forEach(g => { if (g._id) grnMap[g._id.toString()] = g; });
+
+    const poMap = {};
+    (allPos || []).forEach(p => { if (p._id) poMap[p._id.toString()] = p; });
+
+    const vendorMap = {};
+    (allVendors || []).forEach(v => { if (v._id) vendorMap[v._id.toString()] = v; });
+
+    const branchMap = {};
+    (allBranches || []).forEach(b => { if (b._id) branchMap[b._id.toString()] = b; });
+
+    const productMap = {};
+    (allProducts || []).forEach(pr => { if (pr._id) productMap[pr._id.toString()] = pr; });
+
+    return qcs.map(qc => {
+        const qcObj = { ...qc };
+
+        if (!qcObj.checkedDate) {
+            qcObj.checkedDate = qcObj.createdAt || new Date().toISOString();
+        }
+
+        // Populate Branch
+        const bId = qcObj.branch?._id ? qcObj.branch._id.toString() : (typeof qcObj.branch === 'string' ? qcObj.branch : null);
+        if (bId && branchMap[bId]) {
+            qcObj.branch = branchMap[bId];
+        }
+
+        // Populate GRN -> PO -> Vendor
+        const gId = qcObj.grnReference?._id ? qcObj.grnReference._id.toString() : (typeof qcObj.grnReference === 'string' ? qcObj.grnReference : null);
+        if (gId && grnMap[gId]) {
+            const grnObj = { ...grnMap[gId] };
+            const pId = grnObj.poReference?._id ? grnObj.poReference._id.toString() : (typeof grnObj.poReference === 'string' ? grnObj.poReference : null);
+            if (pId && poMap[pId]) {
+                const poObj = { ...poMap[pId] };
+                const vId = poObj.vendor?._id ? poObj.vendor._id.toString() : (typeof poObj.vendor === 'string' ? poObj.vendor : null);
+                if (vId && vendorMap[vId]) {
+                    poObj.vendor = vendorMap[vId];
+                }
+                grnObj.poReference = poObj;
+            }
+            qcObj.grnReference = grnObj;
+        }
+
+        // Populate Items Product
+        if (Array.isArray(qcObj.items)) {
+            qcObj.items = qcObj.items.map(item => {
+                const prId = item.product?._id ? item.product._id.toString() : (typeof item.product === 'string' ? item.product : null);
+                return {
+                    ...item,
+                    product: (prId && productMap[prId]) ? productMap[prId] : item.product
+                };
+            });
+        }
+
+        return qcObj;
+    });
+};
+
 exports.getQualityControls = async (req, res) => {
     try {
         const { startDate, endDate } = req.query;
@@ -22,20 +92,11 @@ exports.getQualityControls = async (req, res) => {
             }
         }
 
-        const qcs = await QualityControl.find(dateFilter)
-            .populate({
-                path: 'grnReference',
-                populate: {
-                    path: 'poReference',
-                    populate: {
-                        path: 'vendor'
-                    }
-                }
-            })
-            .populate('branch', 'branchName branchCode')
-            .populate('items.product', 'name itemCode unitOfMeasure itemType')
-            .sort({ createdAt: -1 });
-        res.json({ success: true, data: qcs });
+        const rawQcs = await QualityControl.find(dateFilter);
+        const sorted = (rawQcs || []).sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
+        const populated = await populateQCReferences(sorted);
+
+        res.json({ success: true, data: populated });
     } catch (error) {
         res.status(500).json({ success: false, message: error.message });
     }
@@ -43,20 +104,10 @@ exports.getQualityControls = async (req, res) => {
 
 exports.getQualityControl = async (req, res) => {
     try {
-        const qc = await QualityControl.findById(req.params.id)
-            .populate({
-                path: 'grnReference',
-                populate: {
-                    path: 'poReference',
-                    populate: {
-                        path: 'vendor'
-                    }
-                }
-            })
-            .populate('branch', 'branchName branchCode')
-            .populate('items.product', 'name itemCode unitOfMeasure itemType');
-        if (!qc) return res.status(404).json({ success: false, message: 'QC report not found' });
-        res.json({ success: true, data: qc });
+        const rawQc = await QualityControl.findById(req.params.id);
+        if (!rawQc) return res.status(404).json({ success: false, message: 'QC report not found' });
+        const populatedList = await populateQCReferences([rawQc]);
+        res.json({ success: true, data: populatedList[0] });
     } catch (error) {
         res.status(500).json({ success: false, message: error.message });
     }
@@ -262,6 +313,7 @@ exports.createQualityControl = async (req, res) => {
             branch,
             items: processedItems,
             status,
+            checkedDate: new Date().toISOString(),
             createdBy: userId
         });
 

@@ -949,12 +949,12 @@ const QCList = () => {
                           {qc.qcNumber}
                         </td>
                         <td className="px-6 py-4 font-medium text-gray-900">
-                          {qc.grnReference?.poReference?.vendor?.name || 'N/A'}
+                          {qc.grnReference?.poReference?.vendor?.name || qc.vendor?.name || 'N/A'}
                         </td>
-                        <td className="px-6 py-4 font-mono text-xs">{qc.grnReference?.grnNumber || 'N/A'}</td>
-                        <td className="px-6 py-4">{qc.branch?.branchName}</td>
+                        <td className="px-6 py-4 font-mono text-xs">{qc.grnReference?.grnNumber || (typeof qc.grnReference === 'string' ? qc.grnReference : 'N/A')}</td>
+                        <td className="px-6 py-4">{qc.branch?.branchName || qc.branch?.name || qc.branchName || 'Main Branch'}</td>
                         <td className="px-6 py-4 text-xs font-semibold">
-                          {new Date(qc.checkedDate).toLocaleString()}
+                          {qc.checkedDate || qc.createdAt ? new Date(qc.checkedDate || qc.createdAt).toLocaleString() : 'N/A'}
                         </td>
                         <td className="px-6 py-4">
                           <span className={`px-2.5 py-1 rounded-full text-xs font-semibold inline-flex items-center gap-1 ${
