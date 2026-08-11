@@ -888,13 +888,14 @@ const RawMaterialStock = () => {
                       <th className="px-4 py-3 text-center">Batch No</th>
                       <th className="px-4 py-3 text-right">Inward Qty</th>
                       <th className="px-4 py-3 text-right">Outward Qty</th>
-                      <th className="px-4 py-3">Ref / Remarks</th>
+                      <th className="px-4 py-3">Proof / Ref ID</th>
+                      <th className="px-4 py-3">Remarks / Reason</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-200">
                     {selectedProductModal.transactions.map((tx) => (
                       <tr key={tx.id} className="hover:bg-gray-50 transition-colors">
-                        <td className="px-4 py-3 text-xs text-gray-600">{new Date(tx.date).toLocaleDateString()}</td>
+                        <td className="px-4 py-3 text-xs text-gray-600 font-mono whitespace-nowrap">{new Date(tx.date).toLocaleDateString()}</td>
                         <td className="px-4 py-3 text-center">
                           {tx.type === 'IN' ? (
                             <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">INWARD</span>
@@ -902,11 +903,13 @@ const RawMaterialStock = () => {
                             <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-rose-50 text-rose-700 border border-rose-200">OUTWARD</span>
                           )}
                         </td>
-                        <td className="px-4 py-3 text-center font-mono text-xs">{tx.batchNumber}</td>
+                        <td className="px-4 py-3 text-center font-mono text-xs font-semibold">
+                          <span className="px-2 py-0.5 bg-gray-100 rounded border border-gray-200">{tx.batchNumber}</span>
+                        </td>
                         <td className="px-4 py-3 text-right font-mono font-bold text-emerald-600">{tx.type === 'IN' ? `+ ${tx.quantity}` : '-'}</td>
                         <td className="px-4 py-3 text-right font-mono font-bold text-rose-600">{tx.type === 'OUT' ? `- ${tx.quantity}` : '-'}</td>
-                        <td className="px-4 py-3 text-xs">
-                          <div className="flex flex-wrap items-center gap-1.5 mb-1">
+                        <td className="px-4 py-3 text-xs font-mono">
+                          <div className="flex flex-wrap items-center gap-1.5">
                             {/* Inward Proof: PO / QC / GRN */}
                             {tx.type === 'IN' && (
                               <>
@@ -931,7 +934,7 @@ const RawMaterialStock = () => {
                             {/* Outward Proof: Production */}
                             {tx.type === 'OUT' && (tx.referenceType === 'PRODUCTION' || (tx.remarks && (tx.remarks.toLowerCase().includes('batch') || tx.remarks.toLowerCase().includes('prod')))) && (
                               <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-amber-50 text-amber-800 border border-amber-200">
-                                Production: {tx.proof?.productionNumber || `PROD-${(tx.batchNumber || '001').replace('B-', '')}/26-27`}
+                                PROD: {tx.proof?.productionNumber || `PROD-${(tx.batchNumber || '001').replace('B-', '')}/26-27`}
                               </span>
                             )}
 
@@ -952,17 +955,19 @@ const RawMaterialStock = () => {
                             {/* Outward Proof: Sales */}
                             {tx.type === 'OUT' && (tx.referenceType === 'SALES' || (tx.remarks && (tx.remarks.toLowerCase().includes('so-') || tx.remarks.toLowerCase().includes('sales')))) && (
                               <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-emerald-50 text-emerald-800 border border-emerald-200">
-                                Sales Order: {tx.proof?.soNumber || `SO-001/26-27`}
+                                SO: {tx.proof?.soNumber || `SO-001/26-27`}
                               </span>
                             )}
                           </div>
-                          <span className="text-gray-600 font-medium block leading-tight">{tx.remarks}</span>
+                        </td>
+                        <td className="px-4 py-3 text-xs text-gray-600 font-medium">
+                          {tx.remarks}
                         </td>
                       </tr>
                     ))}
                     {selectedProductModal.transactions.length === 0 && (
                       <tr>
-                        <td colSpan="6" className="px-6 py-6 text-center text-gray-500">No stock movement logs found for this product.</td>
+                        <td colSpan="7" className="px-6 py-6 text-center text-gray-500">No stock movement logs found for this product.</td>
                       </tr>
                     )}
                   </tbody>
