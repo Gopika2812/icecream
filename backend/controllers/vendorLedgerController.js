@@ -49,8 +49,6 @@ const getPopulatedQCEntries = async () => {
             const pIdDirect = qcObj.poReference?._id ? qcObj.poReference._id.toString() : (typeof qcObj.poReference === 'string' ? qcObj.poReference : null);
             if (pIdDirect && poMap[pIdDirect]) {
                 poObj = poMap[pIdDirect];
-            } else if (allPos.length > 0) {
-                poObj = allPos[0];
             }
         }
 

@@ -52,6 +52,9 @@ const VendorLedgers = () => {
   const [recordsVendorFilter, setRecordsVendorFilter] = useState('ALL');
   const [recordsSearchQuery, setRecordsSearchQuery] = useState('');
 
+  // All QC entries list for exact vendor return calculations
+  const [allQcsList, setAllQcsList] = useState([]);
+
   useEffect(() => {
     fetchVendorsAndBalances();
     fetchPaymentRecords();
@@ -75,6 +78,8 @@ const VendorLedgers = () => {
       const vendorList = vRes.data.data || [];
       const balancesMap = bRes.data.data || {};
       const allQcs = qcRes.data.data || [];
+
+      setAllQcsList(allQcs);
 
       // Client-side enrichment for vendor summary balances
       allQcs.forEach(qc => {
@@ -1118,10 +1123,10 @@ const VendorLedgers = () => {
                     >
                       {vendorPOs.map(po => {
                         const netPayable = getNetPOPayable(po, paymentVendor._id);
-                        const returnDebit = (vendorBalances[paymentVendor._id]?.totalDebit || 0);
+                        const qcReturnTotal = getQCReturnTotalForVendor(paymentVendor._id);
                         return (
                           <option key={po._id} value={po._id}>
-                            {po.poNumber} — Inward Bill (Net Payable: ₹{netPayable.toFixed(2)}{returnDebit > 0 ? ` | Return Adj: ₹${returnDebit.toFixed(2)}` : ''})
+                            {po.poNumber} — Inward Bill (Net Payable: ₹{netPayable.toFixed(2)}{qcReturnTotal > 0 ? ` | Return Adj: ₹${qcReturnTotal.toFixed(2)}` : ''})
                           </option>
                         );
                       })}
@@ -1139,18 +1144,18 @@ const VendorLedgers = () => {
                     {(() => {
                       const selPO = vendorPOs.find(p => p._id === selectedPOId);
                       const gross = selPO?.totalAmount || selPO?.grandTotal || 0;
-                      const returnDebit = (vendorBalances[paymentVendor._id]?.totalDebit || 0);
-                      const netPayable = Math.max(0, gross - returnDebit);
+                      const qcReturnTotal = getQCReturnTotalForVendor(paymentVendor._id);
+                      const netPayable = Math.max(0, gross - qcReturnTotal);
                       return (
                         <>
                           <div className="flex justify-between text-slate-600 font-medium">
                             <span>Original Purchase Inward Bill Gross:</span>
                             <span className="font-mono font-bold text-slate-800">₹{gross.toFixed(2)}</span>
                           </div>
-                          {returnDebit > 0 && (
+                          {qcReturnTotal > 0 && (
                             <div className="flex justify-between text-rose-700 font-medium">
                               <span>Vendor Damaged Goods Returns Adjustment:</span>
-                              <span className="font-mono font-bold">- ₹{returnDebit.toFixed(2)}</span>
+                              <span className="font-mono font-bold">- ₹{qcReturnTotal.toFixed(2)}</span>
                             </div>
                           )}
                           <div className="flex justify-between pt-1 border-t border-purple-200 text-purple-950 font-bold text-xs">
