@@ -250,12 +250,33 @@ const VendorLedgers = () => {
     }
   };
 
+  const getQCReturnTotalForVendor = (vendorId) => {
+    if (!vendorId) return 0;
+    let total = 0;
+    allQcsList.forEach(qc => {
+      const matchVendor = 
+        (qc.vendorId && qc.vendorId.toString() === vendorId.toString()) || 
+        (qc.grnReference?.poReference?.vendor?._id && qc.grnReference.poReference.vendor._id.toString() === vendorId.toString()) ||
+        (qc.vendor?.name && paymentVendor?.name && qc.vendor.name.toLowerCase().includes(paymentVendor.name.toLowerCase()));
+
+      if (matchVendor) {
+        (qc.items || []).forEach(item => {
+          const damaged = item.damagedQty || item.rejectedQty || 0;
+          if (damaged > 0) {
+            const price = item.purchasePrice || item.unitPrice || 0.25;
+            total += (damaged * price);
+          }
+        });
+      }
+    });
+    return total;
+  };
+
   const getNetPOPayable = (po, vendorId) => {
-    if (!po) return 0;
+    if (!po || !vendorId) return 0;
     const grossAmt = po.totalAmount || po.grandTotal || 0;
-    const vendorSummary = vendorBalances[vendorId] || {};
-    const returnDebit = vendorSummary.totalDebit || 0;
-    return Math.max(0, grossAmt - returnDebit);
+    const qcReturnTotal = getQCReturnTotalForVendor(vendorId);
+    return Math.max(0, grossAmt - qcReturnTotal);
   };
 
   const handleOpenPaymentModal = async (vendor) => {
