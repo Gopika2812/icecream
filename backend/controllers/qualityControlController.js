@@ -4,6 +4,8 @@ const PurchaseOrder = require('../models/PurchaseOrder');
 const Inventory = require('../models/Inventory');
 const InventoryTransaction = require('../models/InventoryTransaction');
 const Product = require('../models/Product');
+const Vendor = require('../models/Vendor');
+const Branch = require('../models/Branch');
 const { getNextSequenceNumber } = require('../utils/sequenceGenerator');
 
 exports.getQualityControls = async (req, res) => {
@@ -63,14 +65,51 @@ exports.getQualityControl = async (req, res) => {
 // Get list of Purchase Orders pending QC check (status is Issued or Partially Received)
 exports.getPendingPurchaseOrders = async (req, res) => {
     try {
-        const pendingPOs = await PurchaseOrder.find({ 
+        const rawPendingPOs = await PurchaseOrder.find({ 
             status: { $in: ['Issued', 'Partially Received'] } 
-        })
-        .populate('vendor', 'name vendorCode')
-        .populate('branch', 'branchName')
-        .populate('items.product', 'name itemCode unitOfMeasure itemType');
+        });
+
+        if (rawPendingPOs.length === 0) {
+            return res.json({ success: true, data: [] });
+        }
+
+        const [allVendors, allBranches, allProducts] = await Promise.all([
+            Vendor.find({}),
+            Branch.find({}),
+            Product.find({})
+        ]);
+
+        const vendorMap = {};
+        allVendors.forEach(v => { vendorMap[v._id || v.id] = v; });
+
+        const branchMap = {};
+        allBranches.forEach(b => { branchMap[b._id || b.id] = b; });
+
+        const productMap = {};
+        allProducts.forEach(p => { productMap[p._id || p.id] = p; });
+
+        const populatedPOs = rawPendingPOs.map(po => {
+            const vObj = typeof po.vendor === 'object' ? po.vendor : (vendorMap[po.vendor] || null);
+            const bObj = typeof po.branch === 'object' ? po.branch : (branchMap[po.branch] || null);
+            const populatedItems = (po.items || []).map(item => {
+                const pId = typeof item.product === 'object' ? (item.product._id || item.product.id) : item.product;
+                const pObj = typeof item.product === 'object' ? item.product : (productMap[pId] || null);
+                return {
+                    ...item,
+                    product: pObj || { name: 'Raw Material Item', itemCode: '-', unitOfMeasure: 'Units' }
+                };
+            });
+
+            return {
+                ...po,
+                orderDate: po.orderDate || po.createdAt || new Date().toISOString(),
+                vendor: vObj || { name: 'Vendor' },
+                branch: bObj || { branchName: 'Main Branch' },
+                items: populatedItems
+            };
+        });
         
-        res.json({ success: true, data: pendingPOs });
+        res.json({ success: true, data: populatedPOs });
     } catch (error) {
         res.status(500).json({ success: false, message: error.message });
     }

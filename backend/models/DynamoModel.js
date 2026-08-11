@@ -72,6 +72,14 @@ class DynamoModel {
                     for (const [key, val] of Object.entries(query)) {
                         if (val === undefined || val === null) continue;
                         
+                        // Handle $in array filter {$in: [...]}
+                        if (typeof val === 'object' && val.$in && Array.isArray(val.$in)) {
+                            const itemVal = item[key]?._id ? item[key]._id.toString() : item[key]?.toString();
+                            const inList = val.$in.map(v => (v?._id ? v._id.toString() : v?.toString()));
+                            if (!inList.includes(itemVal)) return false;
+                            continue;
+                        }
+
                         // Handle date range object filter {$gte, $lte}
                         if (typeof val === 'object' && (val.$gte || val.$lte)) {
                             const itemDate = new Date(item[key]);
