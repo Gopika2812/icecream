@@ -52,15 +52,21 @@ const ProductList = () => {
   const fetchInitialData = async () => {
     try {
       setLoading(true);
-      const [prodRes, catRes, typeRes] = await Promise.all([
+      const [prodRes, catRes, typeRes] = await Promise.allSettled([
         api.get('/products'),
         api.get('/categories'),
         api.get('/item-types')
       ]);
 
-      setProducts(prodRes.data.data || []);
-      setCategories(catRes.data.data || []);
-      setItemTypes(typeRes.data.data || []);
+      if (prodRes.status === 'fulfilled') {
+        setProducts(prodRes.value.data?.data || []);
+      }
+      if (catRes.status === 'fulfilled' && catRes.value?.data?.data?.length > 0) {
+        setCategories(catRes.value.data.data);
+      }
+      if (typeRes.status === 'fulfilled' && typeRes.value?.data?.data?.length > 0) {
+        setItemTypes(typeRes.value.data.data);
+      }
     } catch (error) {
       console.error('Failed to fetch product catalog data', error);
     } finally {
@@ -232,7 +238,10 @@ const ProductList = () => {
   const filteredProducts = products.filter((item) => {
     const itemCodeMatch = (item.itemCode || '').toLowerCase().includes(searchFilters.itemCode.toLowerCase());
     const nameMatch = (item.name || '').toLowerCase().includes(searchFilters.name.toLowerCase());
-    const typeMatch = searchFilters.itemType === '' || item.itemType === searchFilters.itemType;
+    const typeMatch = searchFilters.itemType === '' || 
+      item.itemType === searchFilters.itemType ||
+      ((item.itemType || '').toLowerCase().replace(/s$/, '') === searchFilters.itemType.toLowerCase().replace(/s$/, '')) ||
+      ((item.itemType || '').toLowerCase().includes('pack') && searchFilters.itemType.toLowerCase().includes('pack'));
     const categoryMatch = (item.category || '').toLowerCase().includes(searchFilters.category.toLowerCase());
     const uomMatch = (item.unitOfMeasure || '').toLowerCase().includes(searchFilters.unitOfMeasure.toLowerCase());
     const priceMatch = searchFilters.wholesalePrice === '' || (item.wholesalePrice || '').toString().includes(searchFilters.wholesalePrice);
@@ -241,13 +250,25 @@ const ProductList = () => {
     return itemCodeMatch && nameMatch && typeMatch && categoryMatch && uomMatch && priceMatch && hsnMatch;
   });
 
+  // Helper to determine normalized item type key
+  const getItemTypeGroup = () => {
+    if (!formData.itemType) return 'raw_material';
+    const typeLower = formData.itemType.toLowerCase().trim();
+    if (typeLower.includes('finish')) return 'finished_goods';
+    if (typeLower.includes('pack')) return 'packing_material';
+    if (typeLower.includes('mix') || isSelectedTypeMix()) return 'mix';
+    return 'raw_material';
+  };
+
+  const itemTypeGroup = getItemTypeGroup();
+
   return (
     <div>
       {/* Header Bar */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
         <div>
           <h1 className="text-2xl font-bold text-gray-900 font-display">Products & Materials Catalog</h1>
-          <p className="text-xs text-gray-500 mt-0.5">Manage raw materials, composite formulas (Mixes) & finished ice cream products</p>
+          <p className="text-xs text-gray-500 mt-0.5">Manage raw materials, packing materials, composite formulas (Mixes) & finished ice cream products</p>
         </div>
 
         <div className="flex items-center gap-3">
@@ -283,7 +304,7 @@ const ProductList = () => {
                   <th className="px-5 py-3.5">Type</th>
                   <th className="px-5 py-3.5">Category</th>
                   <th className="px-5 py-3.5">UoM / Pack Config</th>
-                  <th className="px-5 py-3.5 text-right">Selling Price (₹)</th>
+                  <th className="px-5 py-3.5 text-right">Price (₹)</th>
                   <th className="px-5 py-3.5 text-center">Actions</th>
                 </tr>
                 {/* Search Filter Inputs */}
@@ -393,7 +414,9 @@ const ProductList = () => {
                             ? 'bg-purple-100 text-purple-800 border-purple-300' 
                             : item.itemType === 'Raw Material' 
                               ? 'bg-amber-100 text-amber-800 border-amber-300' 
-                              : 'bg-blue-100 text-blue-800 border-blue-300'
+                              : item.itemType === 'Packing Material' || item.itemType === 'Packaging'
+                                ? 'bg-indigo-100 text-indigo-800 border-indigo-300'
+                                : 'bg-blue-100 text-blue-800 border-blue-300'
                         }`}>
                           {item.itemType}
                         </span>
@@ -401,12 +424,12 @@ const ProductList = () => {
                       <td className="px-5 py-4 font-semibold text-gray-700">{item.category}</td>
                       <td className="px-5 py-4 text-xs">
                         <span className="font-bold text-gray-800 block">{item.unitOfMeasure}</span>
-                        {item.itemType === 'Finished Goods' && (
-                          <span className="font-mono text-[10px] text-gray-500">1 Box = {item.piecesPerBox || 12} Pcs</span>
+                        {item.piecesPerBox > 0 && (
+                          <span className="font-mono text-[10px] text-gray-500">1 Box = {item.piecesPerBox} Pcs</span>
                         )}
                       </td>
                       <td className="px-5 py-4 text-right font-mono font-extrabold text-gray-900 text-sm">
-                        ₹{item.wholesalePrice?.toFixed(2)}
+                        {item.mrp > 0 ? `MRP ₹${item.mrp?.toFixed(2)}` : `₹${(item.wholesalePrice || 0)?.toFixed(2)}`}
                       </td>
                       <td className="px-5 py-4 text-center">
                         <div className="flex items-center justify-center gap-1.5">
@@ -450,256 +473,324 @@ const ProductList = () => {
         title={editingProductId ? "Edit Product / Material Item" : "Add New Product / Material Item"}
         size="lg"
       >
-        <form onSubmit={handleSubmit} className="space-y-4">
-          {/* ROW 1: ITEM TYPE & CATEGORY (TOP PRIORITY SELECTION) */}
-          <div className="grid grid-cols-2 gap-4 bg-pink-50/60 p-3 rounded-2xl border border-pink-100/90">
-            <div className="space-y-1">
-              <div className="flex justify-between items-center mb-1">
-                <label className="text-xs font-bold text-pink-950 uppercase tracking-wider block">Item Type *</label>
-                <button
-                  type="button"
-                  onClick={() => setIsManagerModalOpen(true)}
-                  className="text-[10px] font-bold text-[var(--color-primary)] hover:underline"
+        <form onSubmit={handleSubmit} className="space-y-5">
+          {/* SECTION 1: ITEM TYPE & CATEGORY */}
+          <div className="bg-gradient-to-r from-pink-50/80 via-white to-purple-50/50 p-4 rounded-2xl border border-pink-100/90 shadow-xs">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="space-y-1.5">
+                <div className="flex justify-between items-center">
+                  <label className="text-[11px] font-extrabold text-pink-950 uppercase tracking-wider block">Item Type *</label>
+                  <button
+                    type="button"
+                    onClick={() => setIsManagerModalOpen(true)}
+                    className="text-[10px] font-bold text-[var(--color-primary)] hover:underline"
+                  >
+                    + Create New Type
+                  </button>
+                </div>
+                <select 
+                  required 
+                  name="itemType" 
+                  value={formData.itemType} 
+                  onChange={handleInputChange} 
+                  className="w-full bg-white border border-pink-200 rounded-xl px-3.5 py-2.5 text-gray-900 text-sm font-extrabold shadow-xs focus:outline-none focus:ring-2 focus:ring-pink-500/20 focus:border-[var(--color-primary)] transition-all cursor-pointer"
                 >
-                  + Create New Type
-                </button>
+                  {itemTypes.length > 0 ? (
+                    itemTypes.map(t => (
+                      <option key={t._id} value={t.name}>
+                        {t.name} {t.isMix ? '(Mix Formula)' : ''}
+                      </option>
+                    ))
+                  ) : (
+                    <>
+                      <option value="Raw Material">Raw Material</option>
+                      <option value="Finished Goods">Finished Goods</option>
+                      <option value="Packing Material">Packing Material</option>
+                      <option value="Mix">Mix</option>
+                    </>
+                  )}
+                </select>
               </div>
-              <select 
-                required 
-                name="itemType" 
-                value={formData.itemType} 
-                onChange={handleInputChange} 
-                className="w-full bg-white border border-pink-200 rounded-xl px-4 py-2 text-gray-900 text-sm font-extrabold shadow-xs focus:outline-none focus:ring-2 focus:ring-pink-500/20 focus:border-pink-600 transition-all cursor-pointer"
-              >
-                {itemTypes.length > 0 ? (
-                  itemTypes.map(t => (
-                    <option key={t._id} value={t.name}>
-                      {t.name} {t.isMix ? '(Mix Formula)' : ''}
-                    </option>
-                  ))
-                ) : (
-                  <>
-                    <option value="Raw Material">Raw Material</option>
-                    <option value="Finished Goods">Finished Goods</option>
-                    <option value="Mix">Mix</option>
-                  </>
-                )}
-              </select>
-            </div>
 
-            <div className="space-y-1">
-              <div className="flex justify-between items-center mb-1">
-                <label className="text-xs font-bold text-pink-950 uppercase tracking-wider block">Category *</label>
-                <button
-                  type="button"
-                  onClick={() => setIsManagerModalOpen(true)}
-                  className="text-[10px] font-bold text-[var(--color-primary)] hover:underline"
+              <div className="space-y-1.5">
+                <div className="flex justify-between items-center">
+                  <label className="text-[11px] font-extrabold text-pink-950 uppercase tracking-wider block">Category *</label>
+                  <button
+                    type="button"
+                    onClick={() => setIsManagerModalOpen(true)}
+                    className="text-[10px] font-bold text-[var(--color-primary)] hover:underline"
+                  >
+                    + Create New Category
+                  </button>
+                </div>
+                <select 
+                  required 
+                  name="category" 
+                  value={formData.category} 
+                  onChange={handleInputChange} 
+                  className="w-full bg-white border border-pink-200 rounded-xl px-3.5 py-2.5 text-gray-900 text-sm font-bold shadow-xs focus:outline-none focus:ring-2 focus:ring-pink-500/20 focus:border-[var(--color-primary)] transition-all cursor-pointer"
                 >
-                  + Create New Category
-                </button>
+                  {categories.length > 0 ? (
+                    categories.map(c => (
+                      <option key={c._id} value={c.name}>{c.name}</option>
+                    ))
+                  ) : (
+                    <>
+                      <option value="Dairy">Dairy</option>
+                      <option value="Ice Cream">Ice Cream</option>
+                      <option value="Packaging">Packaging</option>
+                    </>
+                  )}
+                </select>
               </div>
-              <select 
-                required 
-                name="category" 
-                value={formData.category} 
-                onChange={handleInputChange} 
-                className="w-full bg-white border border-pink-200 rounded-xl px-4 py-2 text-gray-900 text-sm font-semibold shadow-xs focus:outline-none focus:ring-2 focus:ring-pink-500/20 focus:border-pink-600 transition-all cursor-pointer"
-              >
-                {categories.length > 0 ? (
-                  categories.map(c => (
-                    <option key={c._id} value={c.name}>{c.name}</option>
-                  ))
-                ) : (
-                  <>
-                    <option value="Dairy">Dairy</option>
-                    <option value="Ice Cream">Ice Cream</option>
-                    <option value="Packaging">Packaging</option>
-                  </>
-                )}
-              </select>
             </div>
           </div>
 
-          {/* ROW 2: ITEM CODE & ITEM NAME */}
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-1">
-              <label className="text-xs font-bold text-gray-600 uppercase tracking-wider block">Item Code *</label>
+          {/* SECTION 2: ITEM CODE & ITEM NAME (Always Required for All Item Types) */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="space-y-1.5">
+              <label className="text-[11px] font-bold text-gray-700 uppercase tracking-wider block">Item Code *</label>
               <input 
                 required 
                 name="itemCode" 
                 value={formData.itemCode} 
                 onChange={handleInputChange} 
-                className="w-full bg-white border border-pink-200 rounded-xl px-3 py-2 text-gray-900 text-sm font-mono font-bold focus:outline-none focus:ring-1 focus:ring-pink-500" 
-                placeholder="e.g. RM-001 or FG-001 or MIX-01" 
+                className="w-full bg-white border border-gray-300 rounded-xl px-3.5 py-2.5 text-gray-900 text-sm font-mono font-bold focus:outline-none focus:ring-2 focus:ring-pink-500/20 focus:border-[var(--color-primary)] transition-all placeholder:font-sans" 
+                placeholder="e.g. RM-001 or FG-001 or PKG-001 or MIX-01" 
               />
             </div>
-            <div className="space-y-1">
-              <label className="text-xs font-bold text-gray-600 uppercase tracking-wider block">Item Name *</label>
+            <div className="space-y-1.5">
+              <label className="text-[11px] font-bold text-gray-700 uppercase tracking-wider block">Item Name *</label>
               <input 
                 required 
                 name="name" 
                 value={formData.name} 
                 onChange={handleInputChange} 
-                className="w-full bg-white border border-pink-200 rounded-xl px-3 py-2 text-gray-900 text-sm font-bold focus:outline-none focus:ring-1 focus:ring-pink-500" 
-                placeholder="Milk / Vanilla Ice Cream / Butterscotch Mix" 
+                className="w-full bg-white border border-gray-300 rounded-xl px-3.5 py-2.5 text-gray-900 text-sm font-bold focus:outline-none focus:ring-2 focus:ring-pink-500/20 focus:border-[var(--color-primary)] transition-all" 
+                placeholder="e.g. Milk / Vanilla Ice Cream / Paper Cup 100ml / Chocolate Mix" 
               />
             </div>
           </div>
 
-          {/* ROW 3: HSN CODE & GST % FIELDS */}
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-1">
-              <label className="text-xs font-bold text-gray-700 uppercase tracking-wider block">HSN Code</label>
-              <input 
-                name="hsnCode" 
-                value={formData.hsnCode} 
-                onChange={handleInputChange} 
-                className="w-full bg-white border border-pink-200 rounded-xl px-3 py-2 text-gray-900 text-sm font-mono focus:outline-none focus:ring-1 focus:ring-pink-500" 
-                placeholder="e.g. 21050000" 
-              />
-            </div>
+          {/* DYNAMIC FIELDS BASED ON ITEM TYPE */}
+          
+          {/* MIX ITEM TYPE: ONLY ITEM CODE & NAME REQUIRED (Plus Mix Recipe Composition) */}
+          {itemTypeGroup === 'mix' ? (
+            <div className="space-y-4 pt-3 border-t border-gray-100">
+              <div className="bg-purple-50/60 p-4 rounded-2xl border border-purple-200/60">
+                <div className="flex justify-between items-center mb-3">
+                  <div>
+                    <h3 className="text-xs font-extrabold text-purple-950 uppercase tracking-wider flex items-center gap-1.5">
+                      <FlaskConical size={15} className="text-purple-600" /> Mix Composition Formula (Raw Materials)
+                    </h3>
+                    <p className="text-[10px] text-purple-700 mt-0.5">Attach raw material ingredients & recipe quantities for this mix formula</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleAddMixRecipeRow}
+                    className="flex items-center gap-1 bg-purple-600 hover:bg-purple-700 text-white px-3 py-1.5 rounded-xl text-xs font-bold transition-all shadow-xs"
+                  >
+                    <Plus size={14} /> Add Ingredient
+                  </button>
+                </div>
 
-            <div className="space-y-1">
-              <label className="text-xs font-bold text-gray-700 uppercase tracking-wider block">GST % (Autofilled 5%) *</label>
-              <div className="relative flex items-center">
-                <input 
-                  type="number"
-                  step="0.01"
-                  required
-                  name="gstPercent" 
-                  value={formData.gstPercent} 
-                  onChange={handleInputChange} 
-                  className="w-full bg-white border border-pink-200 rounded-xl px-3 py-2 text-gray-900 text-sm font-mono font-bold focus:outline-none focus:ring-1 focus:ring-pink-500 pr-8" 
-                  placeholder="5" 
-                />
-                <span className="absolute right-3 text-xs font-bold text-gray-500 pointer-events-none">%</span>
+                {formData.rawMaterials?.length > 0 ? (
+                  <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
+                    {formData.rawMaterials.map((rm, idx) => (
+                      <div key={idx} className="flex items-center gap-2 bg-white p-2.5 rounded-xl border border-purple-100 shadow-2xs">
+                        <div className="flex-1">
+                          <SearchableSelect
+                            options={rawMaterialOptions.map(p => ({
+                              value: p._id,
+                              label: `${p.name} (${p.itemCode})`,
+                              subLabel: `Cat: ${p.category} | UOM: ${p.unitOfMeasure}`
+                            }))}
+                            value={rm.product}
+                            onChange={(val) => handleMixRecipeChange(idx, 'product', val)}
+                            placeholder="Select Raw Material..."
+                          />
+                        </div>
+
+                        <div className="w-28">
+                          <input
+                            type="number"
+                            step="0.001"
+                            required
+                            placeholder="Qty"
+                            value={rm.quantity}
+                            onChange={(e) => handleMixRecipeChange(idx, 'quantity', e.target.value)}
+                            className="w-full bg-gray-50 border border-gray-300 rounded-lg px-2.5 py-1.5 text-xs text-gray-900 font-mono font-bold focus:outline-none focus:ring-1 focus:ring-purple-500"
+                          />
+                        </div>
+
+                        <div className="w-20">
+                          <span className="w-full bg-gray-100 border border-gray-200 rounded-lg px-2 py-1.5 text-xs text-gray-700 font-bold block text-center truncate">
+                            {rm.unitOfMeasure || 'Kg'}
+                          </span>
+                        </div>
+
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveMixRecipeRow(idx)}
+                          className="p-1.5 text-rose-500 hover:bg-rose-50 rounded-lg transition-colors"
+                          title="Remove Ingredient"
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="p-4 bg-white/70 rounded-xl text-center text-xs text-purple-700 font-medium border border-dashed border-purple-200">
+                    No ingredients added to formula recipe yet. Click <strong>+ Add Ingredient</strong> to attach raw materials.
+                  </div>
+                )}
               </div>
             </div>
-          </div>
-
-          {/* ROW 4: UNIT OF MEASURE & MINIMUM STOCK LEVEL */}
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-1">
-              <label className="text-xs font-bold text-gray-600 uppercase tracking-wider block">Unit of Measure *</label>
-              <select 
-                required 
-                name="unitOfMeasure" 
-                value={formData.unitOfMeasure} 
-                onChange={handleInputChange} 
-                className="w-full bg-white border border-gray-200 rounded-xl px-4 py-2.5 text-gray-900 text-sm font-semibold shadow-xs focus:outline-none focus:ring-2 focus:ring-pink-500/20 focus:border-pink-600 transition-all cursor-pointer"
-              >
-                <option value="Kg">Kg</option>
-                <option value="Ltr">Ltr</option>
-                <option value="Pcs">Pcs</option>
-                <option value="Box">Box</option>
-                <option value="Gram">Gram</option>
-              </select>
-            </div>
-            <div className="space-y-1">
-              <label className="text-xs font-bold text-gray-600 uppercase tracking-wider block">Minimum Stock Level</label>
-              <input 
-                type="number" 
-                name="minimumStockLevel" 
-                value={formData.minimumStockLevel} 
-                onChange={handleInputChange} 
-                className="w-full bg-white border border-pink-200 rounded-xl px-3 py-2 text-gray-900 text-sm font-mono font-bold focus:outline-none focus:ring-1 focus:ring-pink-500" 
-                placeholder="0" 
-              />
-            </div>
-          </div>
-
-          {/* DYNAMIC SECTION: ITEM TYPE SPECIFIC PRICING & CONFIGURATION */}
-          {formData.itemType === 'Finished Goods' ? (
-            <div className="space-y-4 pt-2 border-t border-pink-100">
-              <h3 className="text-xs font-extrabold text-gray-800 uppercase tracking-wider">Finished Goods Pricing & Packaging Configuration</h3>
-              <div className="grid grid-cols-3 gap-4">
-                <div className="space-y-1">
-                  <label className="text-xs font-bold text-gray-600 uppercase tracking-wider block">Selling Price (₹) *</label>
+          ) : (
+            /* NON-MIX ITEM TYPES: FINISHED GOODS, RAW MATERIAL, PACKING MATERIAL */
+            <>
+              {/* SECTION 3: HSN CODE & GST % (Autofilled 5%) */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="space-y-1.5">
+                  <label className="text-[11px] font-bold text-gray-700 uppercase tracking-wider block">HSN Code</label>
                   <input 
-                    type="number" 
-                    step="0.01" 
-                    required
-                    name="wholesalePrice" 
-                    value={formData.wholesalePrice} 
+                    name="hsnCode" 
+                    value={formData.hsnCode} 
                     onChange={handleInputChange} 
-                    className="w-full bg-white border border-pink-200 rounded-xl px-3 py-2 text-gray-900 text-sm font-mono font-extrabold focus:outline-none focus:ring-1 focus:ring-pink-500" 
-                    placeholder="0.00" 
+                    className="w-full bg-white border border-gray-300 rounded-xl px-3.5 py-2.5 text-gray-900 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-pink-500/20 focus:border-[var(--color-primary)] transition-all placeholder:font-sans" 
+                    placeholder="e.g. 21050000" 
                   />
                 </div>
-                <div className="space-y-1">
-                  <label className="text-xs font-bold text-gray-600 uppercase tracking-wider block">Retail Price MRP (₹)</label>
-                  <input 
-                    type="number" 
-                    step="0.01" 
-                    name="mrp" 
-                    value={formData.mrp} 
-                    onChange={handleInputChange} 
-                    className="w-full bg-white border border-pink-200 rounded-xl px-3 py-2 text-gray-900 text-sm font-mono font-bold focus:outline-none focus:ring-1 focus:ring-pink-500" 
-                    placeholder="0.00" 
-                  />
+
+                <div className="space-y-1.5">
+                  <label className="text-[11px] font-bold text-gray-700 uppercase tracking-wider block">GST % (Autofilled 5%) *</label>
+                  <div className="relative flex items-center">
+                    <input 
+                      type="number"
+                      step="0.01"
+                      required
+                      name="gstPercent" 
+                      value={formData.gstPercent} 
+                      onChange={handleInputChange} 
+                      className="w-full bg-white border border-gray-300 rounded-xl px-3.5 py-2.5 text-gray-900 text-sm font-mono font-bold focus:outline-none focus:ring-2 focus:ring-pink-500/20 focus:border-[var(--color-primary)] transition-all pr-8" 
+                      placeholder="5" 
+                    />
+                    <span className="absolute right-3.5 text-xs font-bold text-gray-400 pointer-events-none">%</span>
+                  </div>
                 </div>
-                <div className="space-y-1">
-                  <label className="text-xs font-bold text-gray-600 uppercase tracking-wider block">Pcs Per Box</label>
+              </div>
+
+              {/* SECTION 4: UNIT OF MEASURE & PCS PER BOX */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="space-y-1.5">
+                  <label className="text-[11px] font-bold text-gray-700 uppercase tracking-wider block">Unit of Measure *</label>
+                  <select 
+                    required 
+                    name="unitOfMeasure" 
+                    value={formData.unitOfMeasure} 
+                    onChange={handleInputChange} 
+                    className="w-full bg-white border border-gray-300 rounded-xl px-3.5 py-2.5 text-gray-900 text-sm font-bold focus:outline-none focus:ring-2 focus:ring-pink-500/20 focus:border-[var(--color-primary)] transition-all cursor-pointer"
+                  >
+                    <option value="Kg">Kg</option>
+                    <option value="Ltr">Ltr</option>
+                    <option value="Pcs">Pcs</option>
+                    <option value="Box">Box</option>
+                    <option value="Gram">Gram</option>
+                    <option value="Units">Units</option>
+                  </select>
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-[11px] font-bold text-gray-700 uppercase tracking-wider block">Pcs Per Box</label>
                   <input 
                     type="number" 
                     name="piecesPerBox" 
                     value={formData.piecesPerBox} 
                     onChange={handleInputChange} 
-                    className="w-full bg-white border border-pink-200 rounded-xl px-3 py-2 text-gray-900 text-sm font-mono font-bold focus:outline-none focus:ring-1 focus:ring-pink-500" 
+                    className="w-full bg-white border border-gray-300 rounded-xl px-3.5 py-2.5 text-gray-900 text-sm font-mono font-bold focus:outline-none focus:ring-2 focus:ring-pink-500/20 focus:border-[var(--color-primary)] transition-all" 
                     placeholder="12" 
                   />
                 </div>
               </div>
-            </div>
-          ) : (
-            <div className="space-y-4 pt-2 border-t border-pink-100">
-              <h3 className="text-xs font-extrabold text-gray-800 uppercase tracking-wider">
-                {formData.itemType === 'Raw Material' ? 'Raw Material Costing' : `${formData.itemType} Pricing`}
-              </h3>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-1">
-                  <label className="text-xs font-bold text-gray-600 uppercase tracking-wider block">
-                    {formData.itemType === 'Raw Material' ? 'Purchase / Unit Price (₹) *' : 'Unit Price (₹) *'}
-                  </label>
-                  <input 
-                    type="number" 
-                    step="0.01" 
-                    required
-                    name="wholesalePrice" 
-                    value={formData.wholesalePrice} 
-                    onChange={handleInputChange} 
-                    className="w-full bg-white border border-pink-200 rounded-xl px-3 py-2 text-gray-900 text-sm font-mono font-extrabold focus:outline-none focus:ring-1 focus:ring-pink-500" 
-                    placeholder="0.00" 
-                  />
+
+              {/* SECTION 5: PRICING & COSTING CONFIGURATION */}
+              {itemTypeGroup === 'finished_goods' ? (
+                <div className="space-y-3 pt-3 border-t border-gray-100">
+                  <h3 className="text-[11px] font-extrabold text-gray-800 uppercase tracking-wider">Finished Goods Pricing</h3>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    {/* COST PRICE (AUTO SHOWS READ-ONLY) */}
+                    <div className="space-y-1.5">
+                      <div className="flex items-center justify-between">
+                        <label className="text-[11px] font-bold text-gray-700 uppercase tracking-wider block">Cost Price (₹)</label>
+                        <span className="text-[9px] font-extrabold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200">
+                          Auto Calculated
+                        </span>
+                      </div>
+                      <input 
+                        type="number" 
+                        disabled
+                        value={formData.costPrice || 0} 
+                        className="w-full bg-gray-100 border border-gray-300 rounded-xl px-3.5 py-2.5 text-gray-600 text-sm font-mono font-extrabold cursor-not-allowed" 
+                        placeholder="0.00" 
+                      />
+                    </div>
+
+                    {/* MRP */}
+                    <div className="space-y-1.5">
+                      <label className="text-[11px] font-bold text-gray-700 uppercase tracking-wider block">Retail Price MRP (₹) *</label>
+                      <input 
+                        type="number" 
+                        step="0.01" 
+                        required
+                        name="mrp" 
+                        value={formData.mrp} 
+                        onChange={handleInputChange} 
+                        className="w-full bg-white border border-gray-300 rounded-xl px-3.5 py-2.5 text-gray-900 text-sm font-mono font-extrabold focus:outline-none focus:ring-2 focus:ring-pink-500/20 focus:border-[var(--color-primary)] transition-all" 
+                        placeholder="0.00" 
+                      />
+                    </div>
+                  </div>
                 </div>
-                <div className="space-y-1">
-                  <label className="text-xs font-bold text-gray-600 uppercase tracking-wider block">MRP (₹)</label>
-                  <input 
-                    type="number" 
-                    step="0.01" 
-                    name="mrp" 
-                    value={formData.mrp} 
-                    onChange={handleInputChange} 
-                    className="w-full bg-white border border-pink-200 rounded-xl px-3 py-2 text-gray-900 text-sm font-mono font-bold focus:outline-none focus:ring-1 focus:ring-pink-500" 
-                    placeholder="0.00" 
-                  />
+              ) : (
+                /* RAW MATERIAL & PACKING MATERIAL: PURCHASE PRICE */
+                <div className="space-y-3 pt-3 border-t border-gray-100">
+                  <h3 className="text-[11px] font-extrabold text-gray-800 uppercase tracking-wider">
+                    {itemTypeGroup === 'packing_material' ? 'Packing Material Pricing' : 'Raw Material Costing'}
+                  </h3>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className="space-y-1.5">
+                      <label className="text-[11px] font-bold text-gray-700 uppercase tracking-wider block">Purchase Price (₹) *</label>
+                      <input 
+                        type="number" 
+                        step="0.01" 
+                        required
+                        name="wholesalePrice" 
+                        value={formData.wholesalePrice} 
+                        onChange={handleInputChange} 
+                        className="w-full bg-white border border-gray-300 rounded-xl px-3.5 py-2.5 text-gray-900 text-sm font-mono font-extrabold focus:outline-none focus:ring-2 focus:ring-pink-500/20 focus:border-[var(--color-primary)] transition-all" 
+                        placeholder="0.00" 
+                      />
+                    </div>
+                  </div>
                 </div>
-              </div>
-            </div>
+              )}
+            </>
           )}
 
-          <div className="pt-4 flex justify-end gap-3 border-t border-gray-100">
+          {/* FOOTER ACTIONS */}
+          <div className="pt-4 flex justify-end items-center gap-3 border-t border-gray-100">
             <button 
               type="button" 
               onClick={() => setIsModalOpen(false)} 
-              className="px-4 py-2 text-xs font-bold text-gray-600 hover:text-gray-900"
+              className="px-5 py-2.5 text-xs font-extrabold text-gray-600 hover:text-gray-900 rounded-xl hover:bg-gray-100 transition-all cursor-pointer"
             >
               Cancel
             </button>
             <button 
               type="submit" 
               disabled={submitting} 
-              className="bg-[var(--color-primary)] hover:bg-pink-700 text-white px-6 py-2 rounded-xl text-xs font-bold shadow-md disabled:opacity-50"
+              className="bg-[var(--color-primary)] hover:bg-pink-700 text-white px-7 py-2.5 rounded-xl text-xs font-extrabold shadow-md hover:shadow-lg transition-all disabled:opacity-50 cursor-pointer"
             >
               {submitting ? 'Saving...' : (editingProductId ? 'Update Product' : 'Save Product')}
             </button>

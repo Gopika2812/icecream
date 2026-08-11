@@ -1,36 +1,30 @@
-const mongoose = require('mongoose');
+const DynamoModel = require('./DynamoModel');
 const bcrypt = require('bcryptjs');
 
-const userSchema = new mongoose.Schema({
-    employeeId: { type: String, required: true, unique: true },
-    name: { type: String, required: true },
-    email: { type: String, required: true, unique: true },
-    mobile: { type: String },
-    username: { type: String, required: true, unique: true },
-    password: { type: String, required: true },
-    role: { type: mongoose.Schema.Types.ObjectId, ref: 'Role', required: true },
-    primaryBranch: { type: mongoose.Schema.Types.ObjectId, ref: 'Branch', required: true },
-    assignedBranches: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Branch' }],
-    department: { type: String },
-    designation: { type: String },
-    status: { type: String, enum: ['Pending', 'Active', 'Inactive', 'Suspended'], default: 'Pending' },
-    lastLogin: { type: Date },
-    createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
-    updatedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' }
-}, { timestamps: true });
-
-// Password hashing
-userSchema.pre('save', async function () {
-    if (!this.isModified('password')) {
-        return;
+class UserModel extends DynamoModel {
+    constructor() {
+        super('USERS_TABLE', 'icecream-erp-backend-users-dev');
     }
-    const salt = await bcrypt.genSalt(10);
-    this.password = await bcrypt.hash(this.password, salt);
-});
 
-// Match user password
-userSchema.methods.matchPassword = async function (enteredPassword) {
-    return await bcrypt.compare(enteredPassword, this.password);
-};
+    async create(userData) {
+        if (userData.password && !userData.password.startsWith('$2a$') && !userData.password.startsWith('$2b$')) {
+            const salt = await bcrypt.genSalt(10);
+            userData.password = await bcrypt.hash(userData.password, salt);
+        }
+        return super.create(userData);
+    }
 
-module.exports = mongoose.model('User', userSchema);
+    async findByIdAndUpdate(id, updates, options) {
+        if (updates.password && !updates.password.startsWith('$2a$') && !updates.password.startsWith('$2b$')) {
+            const salt = await bcrypt.genSalt(10);
+            updates.password = await bcrypt.hash(updates.password, salt);
+        }
+        return super.findByIdAndUpdate(id, updates, options);
+    }
+
+    async matchPassword(enteredPassword, hashedPassword) {
+        return await bcrypt.compare(enteredPassword, hashedPassword);
+    }
+}
+
+module.exports = new UserModel();

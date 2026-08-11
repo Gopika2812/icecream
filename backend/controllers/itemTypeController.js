@@ -2,8 +2,9 @@ const ItemType = require('../models/ItemType');
 
 // Default initial item types to seed if empty
 const DEFAULT_ITEM_TYPES = [
-    { name: 'Raw Material', description: 'Raw ingredients, packaging materials & consumable supplies', isMix: false },
+    { name: 'Raw Material', description: 'Raw ingredients & consumable supplies', isMix: false },
     { name: 'Finished Goods', description: 'Manufactured final ice cream products for sale', isMix: false },
+    { name: 'Packing Material', description: 'Cups, tubs, lids, cones, wrappers, boxes', isMix: false },
     { name: 'Mix', description: 'Composite formula mix combining raw materials for production', isMix: true }
 ];
 
@@ -12,7 +13,9 @@ exports.getItemTypes = async (req, res) => {
         let itemTypes = await ItemType.find().sort({ name: 1 });
         if (itemTypes.length === 0) {
             // Seed defaults
-            await ItemType.insertMany(DEFAULT_ITEM_TYPES);
+            for (const t of DEFAULT_ITEM_TYPES) {
+                await ItemType.create(t);
+            }
             itemTypes = await ItemType.find().sort({ name: 1 });
         }
         res.json({ success: true, data: itemTypes });
@@ -27,7 +30,8 @@ exports.createItemType = async (req, res) => {
         if (!name || !name.trim()) {
             return res.status(400).json({ success: false, message: 'Item Type name is required' });
         }
-        const existing = await ItemType.findOne({ name: { $regex: new RegExp(`^${name.trim()}$`, 'i') } });
+        const allTypes = await ItemType.find();
+        const existing = allTypes.find(t => t.name && t.name.toLowerCase() === name.trim().toLowerCase());
         if (existing) {
             return res.status(400).json({ success: false, message: 'Item Type with this name already exists' });
         }
@@ -51,10 +55,8 @@ exports.updateItemType = async (req, res) => {
             return res.status(404).json({ success: false, message: 'Item Type not found' });
         }
         if (name && name.trim() !== itemType.name) {
-            const existing = await ItemType.findOne({ 
-                name: { $regex: new RegExp(`^${name.trim()}$`, 'i') },
-                _id: { $ne: req.params.id }
-            });
+            const allTypes = await ItemType.find();
+            const existing = allTypes.find(t => t.name && t.name.toLowerCase() === name.trim().toLowerCase() && (t._id || t.id) !== req.params.id);
             if (existing) {
                 return res.status(400).json({ success: false, message: 'Another Item Type with this name already exists' });
             }

@@ -127,7 +127,7 @@ const PurchaseOrderList = () => {
               <p><strong>PO Reference:</strong> ${po.poNumber}</p>
               <p><strong>Destination Branch:</strong> ${branchObj.branchName || 'Main Branch'}</p>
               <p><strong>Branch Code:</strong> ${branchObj.branchCode || 'N/A'}</p>
-              <p><strong>Expected Delivery:</strong> ${po.expectedDeliveryDate ? new Date(po.expectedDeliveryDate).toLocaleDateString('en-IN') : 'Immediate'}</p>
+              <p><strong>Arrival Date:</strong> ${po.expectedDeliveryDate ? new Date(po.expectedDeliveryDate).toLocaleDateString('en-IN') : 'Immediate'}</p>
               <p><strong>PO Status:</strong> ${po.status}</p>
             </div>
           </div>
@@ -227,11 +227,14 @@ const PurchaseOrderList = () => {
         api.get('/products'),
         api.get('/branches')
       ]);
-      setVendors(vendorsRes.data.data);
-      // Filter for raw materials since POs are for purchasing inputs & packaging
-      const rawMaterials = productsRes.data.data.filter(p => p.itemType === 'Raw Material');
-      setProducts(rawMaterials);
-      setBranches(branchesRes.data.data);
+      setVendors(vendorsRes.data.data || []);
+      // Filter for raw materials & packing materials for PO purchasing
+      const purchasableItems = productsRes.data.data.filter(p => {
+        const type = (p.itemType || '').toLowerCase();
+        return type.includes('raw') || type.includes('pack') || type.includes('material') || type.includes('packaging');
+      });
+      setProducts(purchasableItems);
+      setBranches(branchesRes.data.data || []);
 
       // Default branch to user's primary branch if available
       if (currentUser.primaryBranch) {
@@ -291,6 +294,7 @@ const PurchaseOrderList = () => {
       const payload = {
         vendor: selectedVendor,
         branch: selectedBranch,
+        orderDate: new Date().toISOString(),
         expectedDeliveryDate: expectedDeliveryDate || undefined,
         items: validItems,
         totalAmount: getGrandTotal(),
@@ -352,7 +356,7 @@ const PurchaseOrderList = () => {
             </div>
 
             <div>
-              <label className="block text-xs font-bold text-gray-700 mb-2">Expected Delivery Date</label>
+              <label className="block text-xs font-bold text-gray-700 mb-2">Arrival Date</label>
               <input
                 type="date"
                 value={expectedDeliveryDate}
@@ -365,58 +369,79 @@ const PurchaseOrderList = () => {
           <div className="glass-panel p-6 relative z-30">
             <h3 className="font-bold text-gray-800 mb-4">Materials & Quantities</h3>
             <div className="space-y-4">
-              {items.map((item, index) => (
-                <div key={index} className="grid grid-cols-1 md:grid-cols-12 gap-4 items-end relative" style={{ zIndex: 40 - index }}>
-                  <div className="md:col-span-5">
-                    <label className="block text-xs font-bold text-gray-700 mb-1">Item Code / Name *</label>
-                    <SearchableSelect
-                      options={products.map(p => ({ value: p._id, label: p.name, code: p.itemCode, sublabel: p.unitOfMeasure }))}
-                      value={item.product}
-                      onChange={(val) => handleItemChange(index, 'product', val)}
-                      placeholder="Select Product / Raw Material..."
-                      required
-                    />
-                  </div>
-                  <div className="md:col-span-2">
-                    <label className="block text-xs font-bold text-gray-700 mb-1">Ordered Qty *</label>
-                    <input
-                      type="number"
-                      min="1"
-                      value={item.orderedQty}
-                      onChange={(e) => handleItemChange(index, 'orderedQty', e.target.value)}
-                      required
-                      className="w-full bg-white border border-gray-200 rounded-xl px-4 py-2.5 text-gray-900 text-sm font-semibold shadow-xs focus:outline-none focus:ring-2 focus:ring-pink-500/20 focus:border-pink-600 transition-all"
-                    />
-                  </div>
-                  <div className="md:col-span-2">
-                    <label className="block text-xs font-bold text-gray-700 mb-1">Unit Price (₹) *</label>
-                    <input
-                      type="number"
-                      step="0.01"
-                      min="0"
-                      value={item.unitPrice}
-                      onChange={(e) => handleItemChange(index, 'unitPrice', e.target.value)}
-                      required
-                      className="w-full bg-white border border-gray-200 rounded-xl px-4 py-2.5 text-gray-900 text-sm font-semibold shadow-xs focus:outline-none focus:ring-2 focus:ring-pink-500/20 focus:border-pink-600 transition-all"
-                    />
-                  </div>
-                  <div className="md:col-span-2">
-                    <label className="block text-xs font-bold text-gray-700 mb-1">Total (₹)</label>
-                    <div className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-2.5 text-gray-900 text-sm font-extrabold font-mono">
-                      ₹{item.totalPrice.toFixed(2)}
+              {items.map((item, index) => {
+                const selectedProd = products.find(p => p._id === item.product || p.id === item.product);
+                const uom = selectedProd?.unitOfMeasure || '';
+
+                return (
+                  <div key={index} className="grid grid-cols-1 md:grid-cols-12 gap-4 items-end relative" style={{ zIndex: 40 - index }}>
+                    <div className="md:col-span-5">
+                      <label className="block text-xs font-bold text-gray-700 mb-1">Item Code / Name *</label>
+                      <SearchableSelect
+                        options={products.map(p => ({ 
+                          value: p._id, 
+                          label: `${p.name} (${p.unitOfMeasure || 'Pcs'})`, 
+                          code: p.itemCode, 
+                          sublabel: `Type: ${p.itemType || 'Material'} | UOM: ${p.unitOfMeasure || 'Pcs'}` 
+                        }))}
+                        value={item.product}
+                        onChange={(val) => handleItemChange(index, 'product', val)}
+                        placeholder="Select Raw Material or Packing Material..."
+                        required
+                      />
+                    </div>
+                    <div className="md:col-span-2">
+                      <label className="block text-xs font-bold text-gray-700 mb-1">
+                        Ordered Qty * {uom && <span className="text-[var(--color-primary)] font-extrabold ml-1">({uom})</span>}
+                      </label>
+                      <div className="relative flex items-center">
+                        <input
+                          type="number"
+                          min="1"
+                          value={item.orderedQty}
+                          onChange={(e) => handleItemChange(index, 'orderedQty', e.target.value)}
+                          required
+                          className="w-full bg-white border border-gray-200 rounded-xl pl-4 pr-16 py-2.5 text-gray-900 text-sm font-semibold shadow-xs focus:outline-none focus:ring-2 focus:ring-pink-500/20 focus:border-pink-600 transition-all"
+                        />
+                        {uom && (
+                          <span className="absolute right-2 text-[11px] font-extrabold text-pink-700 bg-pink-50 px-2 py-1 rounded-lg border border-pink-200 pointer-events-none uppercase tracking-wider">
+                            {uom}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                    <div className="md:col-span-2">
+                      <label className="block text-xs font-bold text-gray-700 mb-1">
+                        Unit Price (₹) * {uom && <span className="text-gray-400 font-normal">/ {uom}</span>}
+                      </label>
+                      <input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        value={item.unitPrice}
+                        onChange={(e) => handleItemChange(index, 'unitPrice', e.target.value)}
+                        required
+                        className="w-full bg-white border border-gray-200 rounded-xl px-4 py-2.5 text-gray-900 text-sm font-semibold shadow-xs focus:outline-none focus:ring-2 focus:ring-pink-500/20 focus:border-pink-600 transition-all"
+                      />
+                    </div>
+                    <div className="md:col-span-2">
+                      <label className="block text-xs font-bold text-gray-700 mb-1">Total (₹)</label>
+                      <div className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-2.5 text-gray-900 text-sm font-extrabold font-mono">
+                        ₹{item.totalPrice.toFixed(2)}
+                      </div>
+                    </div>
+                    <div className="md:col-span-1 text-center">
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveItem(index)}
+                        className="p-2 text-red-500 hover:text-red-700 hover:bg-red-50 rounded-lg transition-all cursor-pointer"
+                      >
+                        <Trash2 size={18} />
+                      </button>
                     </div>
                   </div>
-                  <div className="md:col-span-1 text-center">
-                    <button
-                      type="button"
-                      onClick={() => handleRemoveItem(index)}
-                      className="p-2 text-red-500 hover:text-red-700 hover:bg-red-50 rounded-lg transition-all"
-                    >
-                      <Trash2 size={18} />
-                    </button>
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
 
             <button

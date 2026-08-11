@@ -24,17 +24,43 @@ const CategoryItemTypeManagerModal = ({ isOpen, onClose, onRefreshData }) => {
     }
   }, [isOpen]);
 
+  const DEFAULT_CATEGORIES = [
+    { _id: 'c1', name: 'Dairy', description: 'Milk, Cream, Butter, Milk Powder' },
+    { _id: 'c2', name: 'Ice Cream', description: 'Finished Goods Ice Cream Products' },
+    { _id: 'c3', name: 'Packaging', description: 'Boxes, Tubs, Cups, Wrappers, Labels' },
+    { _id: 'c4', name: 'Flavors & Colors', description: 'Essences, Food Colors, Mix Ingredients' },
+    { _id: 'c5', name: 'Syrups', description: 'Toppings, Syrups, Sauces' }
+  ];
+
+  const DEFAULT_ITEM_TYPES = [
+    { _id: 't1', name: 'Raw Material', description: 'Raw ingredients & supplies', isMix: false },
+    { _id: 't2', name: 'Finished Goods', description: 'Manufactured final ice cream products', isMix: false },
+    { _id: 't3', name: 'Packing Material', description: 'Cups, tubs, lids, cones, wrappers, boxes', isMix: false },
+    { _id: 't4', name: 'Mix', description: 'Composite formula mix combining raw materials', isMix: true }
+  ];
+
   const fetchDirectories = async () => {
     try {
       setLoading(true);
-      const [catRes, typeRes] = await Promise.all([
+      const [catRes, typeRes] = await Promise.allSettled([
         api.get('/categories'),
         api.get('/item-types')
       ]);
-      setCategories(catRes.data.data || []);
-      setItemTypes(typeRes.data.data || []);
+
+      const cats = catRes.status === 'fulfilled' && catRes.value?.data?.data?.length > 0 
+        ? catRes.value.data.data 
+        : DEFAULT_CATEGORIES;
+
+      const types = typeRes.status === 'fulfilled' && typeRes.value?.data?.data?.length > 0 
+        ? typeRes.value.data.data 
+        : DEFAULT_ITEM_TYPES;
+
+      setCategories(cats);
+      setItemTypes(types);
     } catch (error) {
       console.error('Failed to load directories', error);
+      setCategories(DEFAULT_CATEGORIES);
+      setItemTypes(DEFAULT_ITEM_TYPES);
     } finally {
       setLoading(false);
     }

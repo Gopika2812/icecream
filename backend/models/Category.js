@@ -1,11 +1,9 @@
-const mongoose = require('mongoose');
+const DynamoModel = require('./DynamoModel');
 
-const categorySchema = new mongoose.Schema({
-    name: { type: String, required: true, unique: true, trim: true },
-    description: { type: String, default: '' },
-    status: { type: String, enum: ['Active', 'Inactive'], default: 'Active' },
-    createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
-    updatedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' }
-}, { timestamps: true });
+class CategoryModel extends DynamoModel {
+    constructor() {
+        super('CATEGORIES_TABLE', 'icecream-erp-backend-categories-dev');
+    }
+}
 
-module.exports = mongoose.model('Category', categorySchema);
+module.exports = new CategoryModel();

@@ -10,10 +10,22 @@ const jwt = require('jsonwebtoken');
 const loginUser = async (req, res) => {
     try {
         const { username, password } = req.body;
+        console.log('Login attempt:', { username, passwordReceived: Boolean(password) });
 
-        const user = await User.findOne({ username }).populate('role');
+        const allUsers = await User.find();
+        console.log('Users scanned count:', allUsers.length);
 
-        if (user && (await user.matchPassword(password))) {
+        const user = allUsers.find(u => u.username && u.username.toLowerCase() === (username || '').trim().toLowerCase());
+        console.log('Found user:', user ? user.username : 'NONE');
+
+        if (!user) {
+            return res.status(401).json({ success: false, message: 'Invalid username or password' });
+        }
+
+        const isMatch = await User.matchPassword(password, user.password);
+        console.log('Match result:', isMatch);
+
+        if (user && isMatch) {
             if (user.status === 'Pending') {
                 return res.status(401).json({ success: false, message: 'Your account is pending admin approval' });
             }
@@ -21,20 +33,32 @@ const loginUser = async (req, res) => {
                 return res.status(401).json({ success: false, message: 'User account is not active' });
             }
 
-            const accessToken = generateTokens(res, user._id);
+            let roleName = 'Employee';
+            if (user.role) {
+                if (typeof user.role === 'object' && user.role.name) {
+                    roleName = user.role.name;
+                } else {
+                    const roleObj = await Role.findById(user.role);
+                    if (roleObj) roleName = roleObj.name;
+                }
+            }
+
+            const accessToken = generateTokens(res, user._id || user.id);
 
             res.json({
                 success: true,
-                _id: user._id,
+                _id: user._id || user.id,
+                id: user.id || user._id,
                 name: user.name,
                 username: user.username,
-                role: user.role.name,
+                role: roleName,
                 accessToken,
             });
         } else {
             res.status(401).json({ success: false, message: 'Invalid username or password' });
         }
     } catch (error) {
+        console.error('Error in loginUser:', error);
         res.status(500).json({ success: false, message: error.message });
     }
 };
@@ -46,10 +70,12 @@ const registerUser = async (req, res) => {
     try {
         const { name, username, email, password, branchCode } = req.body;
 
-        // Check if user exists
-        const userExists = await User.findOne({ $or: [{ email }, { username }] });
-        if (userExists) {
-            return res.status(400).json({ success: false, message: 'User already exists' });
+        // Check if user exists by email or username
+        const existingEmail = await User.findOne({ email });
+        const existingUsername = await User.findOne({ username });
+
+        if (existingEmail || existingUsername) {
+            return res.status(400).json({ success: false, message: 'User with this email or username already exists' });
         }
 
         // Verify Branch Code
@@ -59,7 +85,7 @@ const registerUser = async (req, res) => {
             if (!branch) {
                 return res.status(400).json({ success: false, message: 'Invalid Branch Code' });
             }
-            primaryBranch = branch._id;
+            primaryBranch = branch._id || branch.id;
         } else {
             return res.status(400).json({ success: false, message: 'Branch Code is required for registration' });
         }
@@ -70,7 +96,7 @@ const registerUser = async (req, res) => {
             role = await Role.create({
                 name: 'Employee',
                 description: 'Default role for registered users',
-                permissions: [] // Default empty permissions array
+                permissions: []
             });
         }
 
@@ -84,8 +110,8 @@ const registerUser = async (req, res) => {
             email,
             password,
             primaryBranch,
-            role: role._id,
-            status: 'Pending' // Explicitly set to Pending for admin approval
+            role: role._id || role.id,
+            status: 'Pending'
         });
 
         res.status(201).json({
@@ -93,6 +119,7 @@ const registerUser = async (req, res) => {
             message: 'Registration successful. Please wait for an administrator to approve your account.'
         });
     } catch (error) {
+        console.error('Error in registerUser:', error);
         res.status(500).json({ success: false, message: error.message });
     }
 };
@@ -101,21 +128,22 @@ const registerUser = async (req, res) => {
 // @route   POST /api/v1/auth/refresh
 // @access  Public
 const refreshToken = async (req, res) => {
-    const refreshToken = req.cookies.jwt;
+    const refreshToken = req.cookies?.jwt;
 
     if (!refreshToken) {
         return res.status(401).json({ success: false, message: 'Not authorized, no refresh token' });
     }
 
     try {
-        const decoded = jwt.verify(refreshToken, process.env.JWT_REFRESH_SECRET);
+        const refreshSecret = process.env.JWT_REFRESH_SECRET || process.env.JWT_SECRET || 'icecream_erp_super_secret_jwt_key_2026';
+        const decoded = jwt.verify(refreshToken, refreshSecret);
         
-        const user = await User.findById(decoded.userId).populate('role');
+        const user = await User.findById(decoded.userId || decoded.id);
         if (!user || user.status !== 'Active') {
             return res.status(401).json({ success: false, message: 'User not found or inactive' });
         }
 
-        const accessToken = generateTokens(res, user._id); // This also sets a new refresh token
+        const accessToken = generateTokens(res, user._id || user.id);
 
         res.json({ success: true, accessToken });
     } catch (error) {
@@ -139,9 +167,16 @@ const logoutUser = (req, res) => {
 // @access  Private
 const getUserProfile = async (req, res) => {
     try {
-        const user = await User.findById(req.user._id).populate('role').populate('primaryBranch').populate('assignedBranches');
+        const user = await User.findById(req.user._id || req.user.id);
 
         if (user) {
+            if (user.role && typeof user.role === 'string') {
+                user.role = await Role.findById(user.role);
+            }
+            if (user.primaryBranch && typeof user.primaryBranch === 'string') {
+                user.primaryBranch = await Branch.findById(user.primaryBranch);
+            }
+            delete user.password;
             res.json({ success: true, user });
         } else {
             res.status(404).json({ success: false, message: 'User not found' });

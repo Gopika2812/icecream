@@ -74,9 +74,20 @@ const SalesInvoice = () => {
     return (c.customerType || '').toLowerCase() === invoiceType.toLowerCase();
   });
 
-  // Helper to calculate price with customer owner margin
-  const getCustomerMarginPrice = (basePrice, custId) => {
-    const cust = customers.find(c => c._id === (custId || selectedCustomerId));
+  // Helper to calculate price with customer product margins / custom pricing
+  const getCustomerMarginPrice = (basePrice, custId, prodId) => {
+    const cust = customers.find(c => (c._id || c.id) === (custId || selectedCustomerId));
+    if (!cust) return basePrice;
+
+    // 1. Check custom product margin / price saved for this customer
+    if (cust.productMargins && prodId) {
+      const match = cust.productMargins.find(m => (m.product === prodId || m.product?._id === prodId || m.productId === prodId));
+      if (match && match.customPrice > 0) {
+        return parseFloat(match.customPrice.toFixed(2));
+      }
+    }
+
+    // 2. Fallback to owner margin percentage if configured
     const marginPercent = cust?.ownerMarginPercentage || 0;
     if (!marginPercent) return basePrice;
     const finalPrice = basePrice * (1 + (marginPercent / 100));
@@ -86,7 +97,7 @@ const SalesInvoice = () => {
   // Handle Customer Selection -> Auto Select Sales Owner & Apply Owner Margin!
   const handleCustomerChange = (customerId) => {
     setSelectedCustomerId(customerId);
-    const cust = customers.find(c => c._id === customerId);
+    const cust = customers.find(c => (c._id || c.id) === customerId);
     if (cust && cust.salesOwner) {
       const ownerId = typeof cust.salesOwner === 'object' ? cust.salesOwner._id : cust.salesOwner;
       setSelectedSalesOwnerId(ownerId);
@@ -100,8 +111,8 @@ const SalesInvoice = () => {
         if (!item.productId) return item;
         const availableBatches = inventory.filter(i => i.product?._id === item.productId);
         const batchObj = availableBatches.length > 0 ? availableBatches[0] : null;
-        const basePrice = batchObj ? (batchObj.purchasePrice || batchObj.product?.wholesalePrice || 20) : item.unitPrice;
-        const newUnitPrice = getCustomerMarginPrice(basePrice, customerId);
+        const basePrice = batchObj ? (batchObj.product?.mrp || batchObj.purchasePrice || batchObj.product?.wholesalePrice || 20) : item.unitPrice;
+        const newUnitPrice = getCustomerMarginPrice(basePrice, customerId, item.productId);
         const pcs = parseInt(item.quantityPcs) || 0;
         return {
           ...item,
@@ -124,8 +135,8 @@ const SalesInvoice = () => {
       if (availableBatches.length > 0) {
         const batchObj = availableBatches[0];
         updated[index].batchNumber = batchObj.batchNumber;
-        const basePrice = batchObj.purchasePrice || batchObj.product?.wholesalePrice || 20;
-        const calculatedPrice = getCustomerMarginPrice(basePrice, selectedCustomerId);
+        const basePrice = batchObj.product?.mrp || batchObj.purchasePrice || batchObj.product?.wholesalePrice || 20;
+        const calculatedPrice = getCustomerMarginPrice(basePrice, selectedCustomerId, value);
         updated[index].unitPrice = calculatedPrice;
         const pPerBox = batchObj.product?.piecesPerBox || 12;
         updated[index].quantityBoxes = 1;
@@ -821,7 +832,7 @@ const SalesInvoice = () => {
                           value: inv.product?._id,
                           label: inv.product?.name,
                           code: `Batch: ${inv.batchNumber}`,
-                          sublabel: `Available: ${inv.quantity} Pcs`
+                          sublabel: `Available: ${inv.quantity} ${inv.product?.unitOfMeasure || 'Pcs'}`
                         }))}
                         value={item.productId}
                         onChange={(val) => handleLineItemChange(idx, 'productId', val)}

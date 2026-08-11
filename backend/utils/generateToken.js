@@ -1,11 +1,14 @@
 const jwt = require('jsonwebtoken');
 
 const generateTokens = (res, userId) => {
-    const accessToken = jwt.sign({ userId }, process.env.JWT_SECRET, {
+    const secret = process.env.JWT_SECRET || 'super_secret_jwt_key_for_erp_2026';
+    const refreshSecret = process.env.JWT_REFRESH_SECRET || 'super_secret_refresh_key_for_erp_2026';
+
+    const accessToken = jwt.sign({ userId }, secret, {
         expiresIn: process.env.JWT_EXPIRES_IN || '1d',
     });
 
-    const refreshToken = jwt.sign({ userId }, process.env.JWT_REFRESH_SECRET, {
+    const refreshToken = jwt.sign({ userId }, refreshSecret, {
         expiresIn: process.env.JWT_REFRESH_EXPIRES_IN || '7d',
     });
 

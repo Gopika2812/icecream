@@ -1,7 +1,19 @@
-import React from 'react';
+import React, { useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { X } from 'lucide-react';
 
 const Modal = ({ isOpen, onClose, title, children, size = 'lg', maxWidth = '' }) => {
+  useEffect(() => {
+    if (isOpen) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = '';
+    }
+    return () => {
+      document.body.style.overflow = '';
+    };
+  }, [isOpen]);
+
   if (!isOpen) return null;
 
   const sizeClasses = {
@@ -15,32 +27,41 @@ const Modal = ({ isOpen, onClose, title, children, size = 'lg', maxWidth = '' })
 
   const chosenWidth = maxWidth || sizeClasses[size] || 'max-w-3xl';
 
-  return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+  const modalContent = (
+    <div className="fixed inset-0 z-[9999] flex items-center justify-center p-3 sm:p-6 overflow-y-auto">
       {/* Backdrop */}
       <div 
-        className="fixed inset-0 bg-black/50 backdrop-blur-sm transition-opacity"
+        className="fixed inset-0 bg-slate-900/60 backdrop-blur-md transition-opacity animate-in fade-in duration-200"
         onClick={onClose}
       ></div>
 
       {/* Modal Content */}
-      <div className={`relative glass-panel w-full ${chosenWidth} mx-auto overflow-hidden shadow-2xl rounded-2xl z-10 animate-in fade-in zoom-in duration-200 border border-white/80 bg-white/95`}>
-        <div className="flex justify-between items-center px-6 py-4 border-b border-gray-100 bg-gray-50/50">
-          <h2 className="text-xl font-bold text-gray-900">{title}</h2>
+      <div className={`relative glass-panel w-full ${chosenWidth} mx-auto max-h-[calc(100vh-3.5rem)] flex flex-col shadow-2xl rounded-3xl z-10 animate-in fade-in zoom-in-95 duration-200 border border-white/90 bg-white/95 my-auto overflow-hidden ring-1 ring-black/5`}>
+        {/* Modal Header */}
+        <div className="flex justify-between items-center px-6 py-4 border-b border-gray-100 bg-gradient-to-r from-gray-50/90 via-white to-pink-50/40 shrink-0">
+          <div className="flex items-center gap-2.5">
+            <div className="w-2.5 h-6 bg-[var(--color-primary)] rounded-full"></div>
+            <h2 className="text-lg sm:text-xl font-extrabold text-gray-900 font-display tracking-tight">{title}</h2>
+          </div>
           <button 
             onClick={onClose}
-            className="text-gray-500 hover:text-gray-800 p-1.5 rounded-xl hover:bg-gray-200/60 transition-colors"
+            type="button"
+            className="text-gray-400 hover:text-gray-700 p-2 rounded-xl hover:bg-gray-100 transition-all cursor-pointer"
+            title="Close"
           >
             <X size={20} />
           </button>
         </div>
         
-        <div className="p-6 max-h-[85vh] overflow-y-auto custom-scrollbar">
+        {/* Modal Scrollable Body */}
+        <div className="p-6 sm:p-7 overflow-y-auto custom-scrollbar flex-1 space-y-5">
           {children}
         </div>
       </div>
     </div>
   );
+
+  return createPortal(modalContent, document.body);
 };
 
 export default Modal;

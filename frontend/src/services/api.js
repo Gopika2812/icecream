@@ -1,9 +1,6 @@
 import axios from 'axios';
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 
-  (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
-    ? 'http://localhost:5001/api/v1' 
-    : 'https://icecream-b4lp.onrender.com/api/v1');
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://k5icageghf.execute-api.ap-south-1.amazonaws.com/api/v1';
 
 const api = axios.create({
   baseURL: API_BASE_URL,
