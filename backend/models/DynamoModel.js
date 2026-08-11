@@ -37,16 +37,19 @@ class DynamoModel {
 
     async findById(id) {
         if (!id) return null;
-        const targetId = typeof id === 'object' && id._id ? id._id.toString() : id.toString();
+        const targetId = typeof id === 'object' && (id._id || id.id) ? (id._id || id.id).toString() : id.toString();
         try {
             const result = await docClient.send(new GetCommand({
                 TableName: this.tableName,
                 Key: { id: targetId }
             }));
-            return this._formatDoc(result.Item);
+            if (result.Item) {
+                return this._formatDoc(result.Item);
+            }
+            return await this.findOne({ id: targetId });
         } catch (error) {
             console.error(`Error in findById on ${this.tableName}:`, error);
-            return null;
+            return await this.findOne({ id: targetId });
         }
     }
 

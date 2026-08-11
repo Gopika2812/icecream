@@ -348,9 +348,7 @@ exports.createVendorPayment = async (req, res) => {
             createdBy: req.user?._id || '6a5ec376b44299bf18d9e800'
         });
 
-        const populated = await VendorPayment.findById(payment._id);
-
-        res.status(201).json({ success: true, data: populated });
+        res.status(201).json({ success: true, data: payment });
     } catch (error) {
         console.error('Error creating vendor payment:', error);
         res.status(400).json({ success: false, message: error.message });
