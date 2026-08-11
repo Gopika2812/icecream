@@ -791,9 +791,6 @@ const RawMaterialStock = () => {
                                     <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-purple-50 text-purple-700 border border-purple-200">
                                       QC: {qcNo}
                                     </span>
-                                    <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-slate-100 text-slate-700 border border-slate-200">
-                                      GRN: {grnNo}
-                                    </span>
                                   </>
                                 )}
                                 {!isIN && isReturn && (
@@ -933,9 +930,6 @@ const RawMaterialStock = () => {
                                     </span>
                                     <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-purple-50 text-purple-700 border border-purple-200">
                                       QC: {qcNo}
-                                    </span>
-                                    <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-slate-100 text-slate-700 border border-slate-200">
-                                      GRN: {grnNo}
                                     </span>
                                   </>
                                 )}
