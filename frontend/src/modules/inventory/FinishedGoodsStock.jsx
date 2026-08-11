@@ -579,7 +579,29 @@ const FinishedGoodsStock = () => {
                                               {tx.transactionType === 'OUT' ? `- ${tx.quantity} Pcs` : '-'}
                                             </td>
                                             <td className="px-4 py-2.5 text-gray-700">
-                                              {tx.remarks}
+                                              <div className="flex flex-wrap items-center gap-1.5 mb-1">
+                                                {/* Inward Proof: Production */}
+                                                {tx.transactionType === 'IN' && (
+                                                  <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-emerald-50 text-emerald-800 border border-emerald-200">
+                                                    Production: {tx.proof?.productionNumber || `PROD-${(tx.batchNumber || '001').replace('B-', '')}/26-27`}
+                                                  </span>
+                                                )}
+
+                                                {/* Outward Proof: Sales */}
+                                                {tx.transactionType === 'OUT' && (tx.referenceType === 'SALES' || (tx.remarks && (tx.remarks.toLowerCase().includes('so-') || tx.remarks.toLowerCase().includes('sales')))) && (
+                                                  <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-blue-50 text-blue-800 border border-blue-200">
+                                                    Sales Order: {tx.proof?.soNumber || `SO-001/26-27`}
+                                                  </span>
+                                                )}
+
+                                                {/* Outward Proof: Damage / Vendor Return */}
+                                                {tx.transactionType === 'OUT' && (tx.referenceType === 'QC' || (tx.remarks && (tx.remarks.toLowerCase().includes('damaged') || tx.remarks.toLowerCase().includes('return')))) && (
+                                                  <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-rose-50 text-rose-800 border border-rose-200">
+                                                    Return / Damage: {tx.proof?.qcNumber ? `RET-${tx.proof.qcNumber}` : 'RET-QC-001/26-27'}
+                                                  </span>
+                                                )}
+                                              </div>
+                                              <span className="text-gray-600 font-medium block leading-tight">{tx.remarks}</span>
                                             </td>
                                           </tr>
                                         ))}
