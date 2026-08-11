@@ -245,6 +245,14 @@ const VendorLedgers = () => {
     }
   };
 
+  const getNetPOPayable = (po, vendorId) => {
+    if (!po) return 0;
+    const grossAmt = po.totalAmount || po.grandTotal || 0;
+    const vendorSummary = vendorBalances[vendorId] || {};
+    const returnDebit = vendorSummary.totalDebit || 0;
+    return Math.max(0, grossAmt - returnDebit);
+  };
+
   const handleOpenPaymentModal = async (vendor) => {
     setPaymentVendor(vendor);
     setPaymentType('AGAINST_INVOICE');
@@ -272,10 +280,10 @@ const VendorLedgers = () => {
       if (filteredPOs.length > 0) {
         const firstPO = filteredPOs[0];
         setSelectedPOId(firstPO._id);
-        const poAmt = firstPO.totalAmount || firstPO.grandTotal || 0;
+        const netAmt = getNetPOPayable(firstPO, vendor._id);
         setPaymentForm(prev => ({
           ...prev,
-          amount: poAmt > 0 ? poAmt.toString() : '',
+          amount: netAmt > 0 ? netAmt.toFixed(2) : (firstPO.totalAmount || firstPO.grandTotal || 0).toString(),
           remarks: `Payment against bill ${firstPO.poNumber}`
         }));
       } else {
@@ -291,11 +299,11 @@ const VendorLedgers = () => {
   const handlePOSelectChange = (poId) => {
     setSelectedPOId(poId);
     const selectedPO = vendorPOs.find(p => p._id === poId);
-    if (selectedPO) {
-      const poAmt = selectedPO.totalAmount || selectedPO.grandTotal || 0;
+    if (selectedPO && paymentVendor) {
+      const netAmt = getNetPOPayable(selectedPO, paymentVendor._id);
       setPaymentForm(prev => ({
         ...prev,
-        amount: poAmt > 0 ? poAmt.toString() : prev.amount,
+        amount: netAmt > 0 ? netAmt.toFixed(2) : (selectedPO.totalAmount || selectedPO.grandTotal || 0).toString(),
         remarks: `Payment against bill ${selectedPO.poNumber}`
       }));
     }
@@ -1095,27 +1103,63 @@ const VendorLedgers = () => {
 
             {/* IF AGAINST INVOICE: SELECT SPECIFIC PURCHASE BILL */}
             {paymentType === 'AGAINST_INVOICE' && (
-              <div className="space-y-1">
-                <label className="text-xs font-bold text-slate-700 uppercase tracking-wider block">Select Purchase Invoice / PO Bill *</label>
-                {loadingVendorPOs ? (
-                  <div className="p-2 text-xs text-slate-500 flex items-center gap-2">
-                    <Loader2 size={14} className="animate-spin text-slate-700" /> Loading purchase bills...
-                  </div>
-                ) : vendorPOs.length > 0 ? (
-                  <select
-                    value={selectedPOId}
-                    onChange={(e) => handlePOSelectChange(e.target.value)}
-                    className="w-full bg-white border border-purple-300 rounded-xl px-3 py-2 text-slate-900 text-xs font-bold"
-                  >
-                    {vendorPOs.map(po => (
-                      <option key={po._id} value={po._id}>
-                        {po.poNumber} — Inward Bill (Total: ₹{(po.totalAmount || po.grandTotal || 0).toFixed(2)})
-                      </option>
-                    ))}
-                  </select>
-                ) : (
-                  <div className="p-2.5 bg-amber-50 border border-amber-200 rounded-xl text-xs text-amber-900 font-medium">
-                    No specific purchase bills found for this vendor. Proceeding as General Payment.
+              <div className="space-y-2">
+                <div className="space-y-1">
+                  <label className="text-xs font-bold text-slate-700 uppercase tracking-wider block">Select Purchase Invoice / PO Bill *</label>
+                  {loadingVendorPOs ? (
+                    <div className="p-2 text-xs text-slate-500 flex items-center gap-2">
+                      <Loader2 size={14} className="animate-spin text-slate-700" /> Loading purchase bills...
+                    </div>
+                  ) : vendorPOs.length > 0 ? (
+                    <select
+                      value={selectedPOId}
+                      onChange={(e) => handlePOSelectChange(e.target.value)}
+                      className="w-full bg-white border border-purple-300 rounded-xl px-3 py-2 text-slate-900 text-xs font-bold"
+                    >
+                      {vendorPOs.map(po => {
+                        const netPayable = getNetPOPayable(po, paymentVendor._id);
+                        const returnDebit = (vendorBalances[paymentVendor._id]?.totalDebit || 0);
+                        return (
+                          <option key={po._id} value={po._id}>
+                            {po.poNumber} — Inward Bill (Net Payable: ₹{netPayable.toFixed(2)}{returnDebit > 0 ? ` | Return Adj: ₹${returnDebit.toFixed(2)}` : ''})
+                          </option>
+                        );
+                      })}
+                    </select>
+                  ) : (
+                    <div className="p-2.5 bg-amber-50 border border-amber-200 rounded-xl text-xs text-amber-900 font-medium">
+                      No specific purchase bills found for this vendor. Proceeding as General Payment.
+                    </div>
+                  )}
+                </div>
+
+                {/* NET OUTSTANDING DUE BREAKDOWN CARD */}
+                {selectedPOId && (
+                  <div className="p-3 bg-gradient-to-r from-purple-50/80 to-pink-50/50 border border-purple-200/80 rounded-xl text-xs space-y-1 shadow-2xs">
+                    {(() => {
+                      const selPO = vendorPOs.find(p => p._id === selectedPOId);
+                      const gross = selPO?.totalAmount || selPO?.grandTotal || 0;
+                      const returnDebit = (vendorBalances[paymentVendor._id]?.totalDebit || 0);
+                      const netPayable = Math.max(0, gross - returnDebit);
+                      return (
+                        <>
+                          <div className="flex justify-between text-slate-600 font-medium">
+                            <span>Original Purchase Inward Bill Gross:</span>
+                            <span className="font-mono font-bold text-slate-800">₹{gross.toFixed(2)}</span>
+                          </div>
+                          {returnDebit > 0 && (
+                            <div className="flex justify-between text-rose-700 font-medium">
+                              <span>Vendor Damaged Goods Returns Adjustment:</span>
+                              <span className="font-mono font-bold">- ₹{returnDebit.toFixed(2)}</span>
+                            </div>
+                          )}
+                          <div className="flex justify-between pt-1 border-t border-purple-200 text-purple-950 font-bold text-xs">
+                            <span>Net Outstanding Payable Balance:</span>
+                            <span className="font-mono font-black text-emerald-700 text-sm">₹{netPayable.toFixed(2)}</span>
+                          </div>
+                        </>
+                      );
+                    })()}
                   </div>
                 )}
               </div>
