@@ -319,11 +319,11 @@ exports.getAllVendorSummaries = async (req, res) => {
     }
 };
 
-// @desc    Create Vendor Payment Entry
+// @desc    Create Vendor Payment Entry (Against Invoice or General)
 // @route   POST /api/v1/vendor-ledger/payment
 exports.createVendorPayment = async (req, res) => {
     try {
-        const { vendorId, paymentDate, amount, paymentMode, referenceNo, remarks } = req.body;
+        const { vendorId, paymentDate, amount, paymentMode, referenceNo, remarks, paymentType, poReference, invoiceNumber } = req.body;
 
         if (!vendorId || !amount) {
             return res.status(400).json({ success: false, message: 'Vendor and Amount are required.' });
@@ -332,6 +332,8 @@ exports.createVendorPayment = async (req, res) => {
         const count = await VendorPayment.countDocuments();
         const paymentNo = `VPAY-${new Date().getFullYear()}${(new Date().getMonth() + 1).toString().padStart(2, '0')}-${(count + 1001).toString()}`;
 
+        let finalRemarks = remarks || (paymentType === 'AGAINST_INVOICE' ? `Payment against bill ${invoiceNumber || poReference || ''}` : 'General Vendor Bill Payment');
+
         const payment = await VendorPayment.create({
             paymentNo,
             paymentDate: paymentDate ? new Date(paymentDate) : new Date(),
@@ -339,7 +341,10 @@ exports.createVendorPayment = async (req, res) => {
             amount: parseFloat(amount),
             paymentMode: paymentMode || 'Bank Transfer',
             referenceNo: referenceNo || '',
-            remarks: remarks || 'Vendor Bill Payment Paid',
+            remarks: finalRemarks,
+            paymentType: paymentType || 'GENERAL',
+            poReference: poReference || null,
+            invoiceNumber: invoiceNumber || null,
             createdBy: req.user?._id || '6a5ec376b44299bf18d9e800'
         });
 
@@ -351,4 +356,62 @@ exports.createVendorPayment = async (req, res) => {
         res.status(400).json({ success: false, message: error.message });
     }
 };
+
+// @desc    Get All Vendor Payment Disbursement Records (with filters)
+// @route   GET /api/v1/vendor-ledger/payments
+exports.getAllVendorPayments = async (req, res) => {
+    try {
+        const { vendorId, paymentMode, startDate, endDate } = req.query;
+
+        let query = {};
+        if (vendorId) query.vendor = vendorId;
+        if (paymentMode && paymentMode !== 'ALL') query.paymentMode = paymentMode;
+
+        if (startDate || endDate) {
+            query.paymentDate = {};
+            if (startDate) query.paymentDate.$gte = new Date(startDate);
+            if (endDate) {
+                const end = new Date(endDate);
+                end.setHours(23, 59, 59, 999);
+                query.paymentDate.$lte = end;
+            }
+        }
+
+        const payments = await VendorPayment.find(query);
+        const [allVendors, allPOs] = await Promise.all([
+            Vendor.find(),
+            PurchaseOrder.find()
+        ]);
+
+        const vendorMap = {};
+        (allVendors || []).forEach(v => { if (v._id) vendorMap[v._id.toString()] = v; });
+
+        const poMap = {};
+        (allPOs || []).forEach(p => { if (p._id) poMap[p._id.toString()] = p; });
+
+        const enrichedPayments = (payments || []).map(p => {
+            const pObj = typeof p.toObject === 'function' ? p.toObject() : { ...p };
+            const vId = pObj.vendor?._id ? pObj.vendor._id.toString() : (typeof pObj.vendor === 'string' ? pObj.vendor : null);
+            const vendor = (vId && vendorMap[vId]) ? vendorMap[vId] : (typeof pObj.vendor === 'object' ? pObj.vendor : null);
+
+            const poId = pObj.poReference?._id ? pObj.poReference._id.toString() : (typeof pObj.poReference === 'string' ? pObj.poReference : null);
+            const po = (poId && poMap[poId]) ? poMap[poId] : null;
+
+            return {
+                ...pObj,
+                vendor,
+                poNumber: pObj.invoiceNumber || po?.poNumber || (pObj.paymentType === 'AGAINST_INVOICE' ? 'PO-001/26-27' : 'General')
+            };
+        });
+
+        // Sort descending by date
+        enrichedPayments.sort((a, b) => new Date(b.paymentDate || b.createdAt) - new Date(a.paymentDate || a.createdAt));
+
+        res.json({ success: true, count: enrichedPayments.length, data: enrichedPayments });
+    } catch (error) {
+        console.error('Error fetching all vendor payments:', error);
+        res.status(500).json({ success: false, message: error.message });
+    }
+};
+
 

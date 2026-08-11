@@ -2,11 +2,15 @@ import React, { useState, useEffect } from 'react';
 import api from '../../services/api';
 import { 
   Building2, Search, Calendar, FileText, ArrowUpRight, ArrowDownLeft, 
-  CreditCard, Plus, Printer, Loader2, CheckCircle2, Phone, MapPin, Tag, RefreshCw, Eye, ChevronRight
+  CreditCard, Plus, Printer, Loader2, CheckCircle2, Phone, MapPin, Tag, RefreshCw, Eye, ChevronRight,
+  Download, FileSpreadsheet, Layers, DollarSign, Receipt, CheckSquare, Square, Filter
 } from 'lucide-react';
 import Modal from '../../components/Modal';
 
 const VendorLedgers = () => {
+  // Main Tab State: 'SUMMARIES' | 'PAYMENT_RECORDS'
+  const [activeTab, setActiveTab] = useState('SUMMARIES');
+
   const [vendors, setVendors] = useState([]);
   const [searchQuery, setSearchQuery] = useState('');
   
@@ -24,20 +28,33 @@ const VendorLedgers = () => {
   // Vendor Financial Summaries Map (for main table overview)
   const [vendorBalances, setVendorBalances] = useState({});
 
-  // Payment Modal State
+  // --- Payment Modal State ---
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
   const [paymentVendor, setPaymentVendor] = useState(null);
+  const [vendorPOs, setVendorPOs] = useState([]);
+  const [loadingVendorPOs, setLoadingVendorPOs] = useState(false);
+  const [paymentType, setPaymentType] = useState('AGAINST_INVOICE'); // 'AGAINST_INVOICE' | 'GENERAL'
+  const [selectedPOId, setSelectedPOId] = useState('');
+
   const [paymentForm, setPaymentForm] = useState({
     paymentDate: new Date().toISOString().split('T')[0],
     amount: '',
     paymentMode: 'Bank Transfer',
     referenceNo: '',
-    remarks: 'Vendor Bill Payment'
+    remarks: ''
   });
   const [submittingPayment, setSubmittingPayment] = useState(false);
 
+  // --- Payment Records Tab State ---
+  const [paymentRecords, setPaymentRecords] = useState([]);
+  const [loadingPaymentRecords, setLoadingPaymentRecords] = useState(false);
+  const [recordsPaymentModeFilter, setRecordsPaymentModeFilter] = useState('ALL');
+  const [recordsVendorFilter, setRecordsVendorFilter] = useState('ALL');
+  const [recordsSearchQuery, setRecordsSearchQuery] = useState('');
+
   useEffect(() => {
     fetchVendorsAndBalances();
+    fetchPaymentRecords();
   }, [startDate, endDate]);
 
   const fetchVendorsAndBalances = async () => {
@@ -107,6 +124,24 @@ const VendorLedgers = () => {
     }
   };
 
+  const fetchPaymentRecords = async () => {
+    try {
+      setLoadingPaymentRecords(true);
+      let url = '/vendor-ledger/payments';
+      const params = [];
+      if (startDate) params.push(`startDate=${startDate}`);
+      if (endDate) params.push(`endDate=${endDate}`);
+      if (params.length) url += `?${params.join('&')}`;
+
+      const res = await api.get(url).catch(() => ({ data: { data: [] } }));
+      setPaymentRecords(res.data?.data || []);
+    } catch (e) {
+      console.error('Failed to fetch payment records', e);
+    } finally {
+      setLoadingPaymentRecords(false);
+    }
+  };
+
   const handleOpenLedgerModal = async (vendor) => {
     setActiveLedgerVendor(vendor);
     try {
@@ -132,7 +167,6 @@ const VendorLedgers = () => {
       let rawData = Array.isArray(res.data?.data) ? [...res.data.data] : [];
       const allQcs = Array.isArray(qcRes.data?.data) ? qcRes.data.data : [];
 
-      // Ensure Vendor Returns from QC are present in rawData
       const hasReturnInLedger = rawData.some(tx => tx.type === 'Vendor Return');
 
       if (!hasReturnInLedger) {
@@ -176,7 +210,6 @@ const VendorLedgers = () => {
           }
         });
 
-        // Sort chronologically and calculate running balance
         rawData.sort((a, b) => new Date(a.date) - new Date(b.date));
 
         let openingBalance = summary?.openingBalance || vendor.openingBalance || 0;
@@ -212,16 +245,60 @@ const VendorLedgers = () => {
     }
   };
 
-  const handleOpenPaymentModal = (vendor) => {
+  const handleOpenPaymentModal = async (vendor) => {
     setPaymentVendor(vendor);
+    setPaymentType('AGAINST_INVOICE');
+    setSelectedPOId('');
     setPaymentForm({
       paymentDate: new Date().toISOString().split('T')[0],
       amount: '',
       paymentMode: 'Bank Transfer',
       referenceNo: '',
-      remarks: 'Vendor Bill Payment'
+      remarks: ''
     });
     setIsPaymentModalOpen(true);
+
+    // Fetch PO bills for this vendor to populate dropdown
+    try {
+      setLoadingVendorPOs(true);
+      const res = await api.get('/purchase-orders').catch(() => ({ data: { data: [] } }));
+      const allPOs = res.data?.data || [];
+      const filteredPOs = allPOs.filter(po => {
+        const vId = po.vendor?._id ? po.vendor._id.toString() : (typeof po.vendor === 'string' ? po.vendor : null);
+        return vId === vendor._id.toString() || (vendor.name && po.vendor?.name === vendor.name);
+      });
+      setVendorPOs(filteredPOs);
+
+      if (filteredPOs.length > 0) {
+        const firstPO = filteredPOs[0];
+        setSelectedPOId(firstPO._id);
+        const poAmt = firstPO.totalAmount || firstPO.grandTotal || 0;
+        setPaymentForm(prev => ({
+          ...prev,
+          amount: poAmt > 0 ? poAmt.toString() : '',
+          remarks: `Payment against bill ${firstPO.poNumber}`
+        }));
+      } else {
+        setPaymentType('GENERAL');
+      }
+    } catch (e) {
+      console.error('Failed to fetch POs for vendor', e);
+    } finally {
+      setLoadingVendorPOs(false);
+    }
+  };
+
+  const handlePOSelectChange = (poId) => {
+    setSelectedPOId(poId);
+    const selectedPO = vendorPOs.find(p => p._id === poId);
+    if (selectedPO) {
+      const poAmt = selectedPO.totalAmount || selectedPO.grandTotal || 0;
+      setPaymentForm(prev => ({
+        ...prev,
+        amount: poAmt > 0 ? poAmt.toString() : prev.amount,
+        remarks: `Payment against bill ${selectedPO.poNumber}`
+      }));
+    }
   };
 
   const handleSubmitPayment = async (e) => {
@@ -230,14 +307,20 @@ const VendorLedgers = () => {
 
     try {
       setSubmittingPayment(true);
+      const selectedPO = vendorPOs.find(p => p._id === selectedPOId);
+
       await api.post('/vendor-ledger/payment', {
         vendorId: paymentVendor._id,
+        paymentType,
+        poReference: selectedPOId || null,
+        invoiceNumber: selectedPO ? selectedPO.poNumber : null,
         ...paymentForm
       });
 
-      alert('Vendor payment recorded successfully!');
+      alert('Vendor payment entry recorded successfully!');
       setIsPaymentModalOpen(false);
       fetchVendorsAndBalances();
+      fetchPaymentRecords();
 
       if (activeLedgerVendor && activeLedgerVendor._id === paymentVendor._id) {
         handleOpenLedgerModal(activeLedgerVendor);
@@ -261,381 +344,589 @@ const VendorLedgers = () => {
   const totalDebitSum = Object.values(vendorBalances).reduce((acc, curr) => acc + (curr.totalDebit || 0), 0);
   const totalClosingBalanceSum = Object.values(vendorBalances).reduce((acc, curr) => acc + (curr.closingBalance || 0), 0);
 
-  // Print Professional Vendor Financial Statement PDF
+  // Filtered Payment Disbursement Records
+  const filteredPaymentRecords = paymentRecords.filter(rec => {
+    const matchesMode = recordsPaymentModeFilter === 'ALL' || rec.paymentMode === recordsPaymentModeFilter;
+    const matchesVendor = recordsVendorFilter === 'ALL' || 
+      (rec.vendor?._id && rec.vendor._id.toString() === recordsVendorFilter) ||
+      (rec.vendor && typeof rec.vendor === 'string' && rec.vendor === recordsVendorFilter);
+
+    const searchLower = recordsSearchQuery.toLowerCase();
+    const matchesSearch = !recordsSearchQuery ||
+      rec.paymentNo?.toLowerCase().includes(searchLower) ||
+      rec.referenceNo?.toLowerCase().includes(searchLower) ||
+      rec.remarks?.toLowerCase().includes(searchLower) ||
+      rec.vendor?.name?.toLowerCase().includes(searchLower) ||
+      rec.poNumber?.toLowerCase().includes(searchLower);
+
+    return matchesMode && matchesVendor && matchesSearch;
+  });
+
+  // --- Export CSV Handler ---
+  const exportPaymentRecordsCSV = () => {
+    if (!filteredPaymentRecords.length) {
+      alert('No payment records to export.');
+      return;
+    }
+
+    const headers = ['Voucher No', 'Payment Date', 'Vendor Code', 'Vendor Name', 'Payment Type', 'Bill / PO Ref', 'Payment Mode', 'Reference / UTR No', 'Amount Paid (INR)', 'Remarks'];
+    const rows = filteredPaymentRecords.map(rec => [
+      rec.paymentNo || 'N/A',
+      new Date(rec.paymentDate || rec.createdAt).toLocaleDateString('en-IN'),
+      rec.vendor?.vendorCode || 'N/A',
+      rec.vendor?.name || 'Vendor',
+      rec.paymentType === 'AGAINST_INVOICE' ? 'Against Invoice' : 'General / Advance',
+      rec.poNumber || 'General',
+      rec.paymentMode || 'Bank Transfer',
+      rec.referenceNo || 'N/A',
+      (rec.amount || 0).toFixed(2),
+      `"${(rec.remarks || '').replace(/"/g, '""')}"`
+    ]);
+
+    const csvContent = [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.setAttribute('href', url);
+    link.setAttribute('download', `Vendor_Payment_Disbursements_${new Date().toISOString().split('T')[0]}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  // --- Print Statement Handler ---
   const handlePrintStatement = () => {
-    if (!activeLedgerVendor) return;
+    if (!activeLedgerVendor || !ledgerSummary) return;
+
     const printWindow = window.open('', '_blank');
-    if (!printWindow) return alert('Please allow popups in your browser to print the vendor statement.');
-
-    const companyName = "SRI SARAVANASS ICE CREAM & DAIRY PRODUCTS";
-    const companyAddress = "Head Office & Factory: 66, Nataraja Theatre Road, Sattur, Virudhunagar - 626203, Tamil Nadu";
-    const companyContact = "Phone: +91 99420 27197 | Email: accounts@saravanass.com | GSTIN: 33AAAFS1234A1Z1";
-
-    const periodStr = startDate || endDate 
-      ? `${startDate || 'Beginning'} to ${endDate || 'Today'}` 
-      : 'All Time Statement';
-
-    const htmlContent = `
-      <!DOCTYPE html>
+    printWindow.document.write(`
       <html>
         <head>
           <title>Vendor Financial Statement - ${activeLedgerVendor.name}</title>
           <style>
-            * { box-sizing: border-box; margin: 0; padding: 0; }
-            body { font-family: 'Segoe UI', Arial, sans-serif; color: #1e293b; padding: 25px; background: #fff; line-height: 1.4; }
-            
-            /* Letterhead Header */
-            .header-table { width: 100%; border-collapse: collapse; margin-bottom: 15px; border-bottom: 3px double #d81b60; pb: 12px; }
-            .header-logo { width: 64px; height: 64px; object-fit: cover; border-radius: 10px; }
-            .company-title { font-size: 18px; font-weight: 800; color: #881337; text-transform: uppercase; letter-spacing: 0.5px; }
-            .company-sub { font-size: 11px; color: #475569; font-weight: 600; margin-top: 2px; }
-            .company-contact { font-size: 10px; color: #64748b; margin-top: 4px; font-family: monospace; }
-            
-            /* Document Banner */
-            .doc-title-bar { background: linear-gradient(135deg, #881337 0%, #ad1457 100%); color: white; padding: 8px 14px; border-radius: 6px; margin-bottom: 16px; display: flex; justify-between: space-between; align-items: center; }
-            .doc-title { font-size: 13px; font-weight: 800; text-transform: uppercase; letter-spacing: 1px; }
-            .doc-date { font-size: 10px; opacity: 0.95; font-family: monospace; }
-
-            /* Information Grid */
-            .info-grid { display: flex; justify-between: space-between; gap: 15px; margin-bottom: 16px; }
-            .info-box { flex: 1; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; padding: 12px; font-size: 11px; }
-            .info-box h4 { font-size: 10px; font-weight: 800; text-transform: uppercase; color: #881337; border-bottom: 1px solid #cbd5e1; padding-bottom: 4px; margin-bottom: 6px; letter-spacing: 0.5px; }
-            .info-box p { margin: 2px 0; color: #334155; }
-            .info-box strong { color: #0f172a; }
-
-            /* Summary Grid */
-            .summary-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-bottom: 16px; }
-            .summary-card { padding: 8px; border-radius: 6px; text-align: center; border: 1px solid #e2e8f0; }
-            .summary-lbl { font-size: 9px; font-weight: 800; text-transform: uppercase; color: #64748b; display: block; margin-bottom: 2px; }
-            .summary-val { font-size: 13px; font-weight: 800; font-family: monospace; }
-
-            /* Table Styles */
-            .table-container { border: 1px solid #cbd5e1; border-radius: 6px; overflow: hidden; margin-bottom: 20px; }
-            .ledger-table { width: 100%; border-collapse: collapse; font-size: 10.5px; }
-            .ledger-table th { background: #f1f5f9; text-align: left; padding: 7px 9px; border-bottom: 2px solid #cbd5e1; font-weight: 800; color: #334155; text-transform: uppercase; font-size: 8.5px; letter-spacing: 0.5px; }
-            .ledger-table td { padding: 7px 9px; border-bottom: 1px solid #e2e8f0; vertical-align: middle; }
+            body { font-family: 'Segoe UI', Arial, sans-serif; padding: 24px; color: #1e293b; }
+            .header { display: flex; justify-content: space-between; border-bottom: 2px solid #be185d; padding-bottom: 12px; margin-bottom: 20px; }
+            .company { font-size: 18px; font-weight: 800; color: #881337; }
+            .vendor-info { background: #fdf2f8; padding: 12px 16px; border-radius: 8px; margin-bottom: 20px; border: 1px solid #fbcfe8; }
+            table { w-full; width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 12px; }
+            th, td { border: 1px solid #cbd5e1; padding: 8px 12px; text-align: left; }
+            th { background: #475569; color: white; text-transform: uppercase; font-size: 11px; }
             .text-right { text-align: right; }
-            .text-center { text-align: center; }
-            .font-mono { font-family: monospace; }
-            .credit-val { color: #047857; font-weight: 700; }
-            .debit-val { color: #be123c; font-weight: 700; }
-            .type-badge { display: inline-block; padding: 2px 6px; border-radius: 4px; font-size: 8.5px; font-weight: 800; text-transform: uppercase; }
-            .type-po { background: #ecfdf5; color: #047857; border: 1px solid #a7f3d0; }
-            .type-ret { background: #fff1f2; color: #be123c; border: 1px solid #fecdd3; }
-            .type-pay { background: #eff6ff; color: #1d4ed8; border: 1px solid #bfdbfe; }
-
-            /* Footer & Signatures */
-            .footer-section { margin-top: 30px; }
-            .sig-grid { display: flex; justify-between: space-between; margin-top: 40px; padding-top: 8px; }
-            .sig-box { text-align: center; width: 170px; border-top: 1px dashed #94a3b8; padding-top: 4px; font-size: 9.5px; font-weight: 700; color: #475569; }
-            .disclaimer { margin-top: 25px; text-align: center; font-size: 8.5px; color: #94a3b8; border-top: 1px solid #e2e8f0; padding-top: 8px; }
-
-            @media print {
-              body { padding: 10px; }
-              @page { size: auto; margin: 8mm; }
-            }
+            .summary-box { display: flex; gap: 12px; margin-bottom: 16px; }
+            .sum-card { flex: 1; padding: 10px; border-radius: 6px; text-align: center; border: 1px solid #e2e8f0; font-size: 11px; }
           </style>
         </head>
         <body>
-          
-          <!-- LETTERHEAD HEADER -->
-          <table class="header-table">
-            <tr>
-              <td style="width: 72px; vertical-align: top;">
-                <img src="/logo.avif" alt="Logo" class="header-logo" />
-              </td>
-              <td style="vertical-align: top; padding-left: 8px;">
-                <div class="company-title">${companyName}</div>
-                <div class="company-sub">${companyAddress}</div>
-                <div class="company-contact">${companyContact}</div>
-              </td>
-            </tr>
-          </table>
-
-          <!-- DOCUMENT TITLE BAR -->
-          <div class="doc-title-bar">
-            <span class="doc-title">VENDOR STATEMENT OF ACCOUNT</span>
-            <span class="doc-date">Period: ${periodStr} | Date: ${new Date().toLocaleDateString('en-IN')}</span>
-          </div>
-
-          <!-- INFORMATION BOXES -->
-          <div class="info-grid">
-            <div class="info-box">
-              <h4>Vendor / Supplier Details</h4>
-              <p><strong>Vendor Name:</strong> ${activeLedgerVendor.name}</p>
-              <p><strong>Vendor Code:</strong> ${activeLedgerVendor.vendorCode}</p>
-              <p><strong>GSTIN Number:</strong> ${activeLedgerVendor.gstinNumber || 'URD (Unregistered)'}</p>
-              <p><strong>Contact Person:</strong> ${activeLedgerVendor.contactPerson || 'N/A'}</p>
-              <p><strong>Phone:</strong> ${activeLedgerVendor.phone || 'N/A'}</p>
+          <div class="header">
+            <div>
+              <div class="company">SRI SARAVANASS ICE CREAM & DAIRY</div>
+              <div style="font-size: 11px; color: #64748b;">Head Office: 66, Nataraja Theatre Road, Sattur, Virudhunagar - 626203</div>
+              <div style="font-size: 11px; color: #64748b;">GSTIN: 33AAAFS1234A1Z1 | Phone: +91 99420 27197</div>
             </div>
-
-            <div class="info-box">
-              <h4>Statement Details</h4>
-              <p><strong>Statement Ref:</strong> STMT-${activeLedgerVendor.vendorCode}-${new Date().getFullYear()}</p>
-              <p><strong>Statement Period:</strong> ${periodStr}</p>
-              <p><strong>Total Transactions:</strong> ${ledgerData.length}</p>
-              <p><strong>Current Status:</strong> ${ledgerSummary?.closingBalance > 0 ? 'Payable Balance Outstanding' : 'Account Clear'}</p>
+            <div style="text-align: right;">
+              <h3 style="margin: 0; color: #be185d;">VENDOR FINANCIAL STATEMENT</h3>
+              <div style="font-size: 11px; color: #64748b; margin-top: 4px;">Date: ${new Date().toLocaleDateString('en-IN')}</div>
             </div>
           </div>
 
-          <!-- SUMMARY CARDS -->
-          ${ledgerSummary ? `
-            <div class="summary-grid">
-              <div class="summary-card" style="background: #fffbeb; border-color: #fde68a;">
-                <span class="summary-lbl" style="color: #b45309;">Opening Balance</span>
-                <span class="summary-val" style="color: #92400e;">₹${ledgerSummary.openingBalance?.toFixed(2)}</span>
-              </div>
-              <div class="summary-card" style="background: #ecfdf5; border-color: #a7f3d0;">
-                <span class="summary-lbl" style="color: #047857;">Purchases Buy (Credit)</span>
-                <span class="summary-val" style="color: #065f46;">+ ₹${ledgerSummary.totalCredit?.toFixed(2)}</span>
-              </div>
-              <div class="summary-card" style="background: #fff1f2; border-color: #fecdd3;">
-                <span class="summary-lbl" style="color: #be123c;">Payments & Returns (Debit)</span>
-                <span class="summary-val" style="color: #9f1239;">- ₹${ledgerSummary.totalDebit?.toFixed(2)}</span>
-              </div>
-              <div class="summary-card" style="background: #f3e8ff; border-color: #e9d5ff;">
-                <span class="summary-lbl" style="color: #6b21a8;">Net Closing Payable</span>
-                <span class="summary-val" style="color: #581c87;">₹${ledgerSummary.closingBalance?.toFixed(2)}</span>
-              </div>
-            </div>
-          ` : ''}
+          <div class="vendor-info">
+            <strong>Vendor Name:</strong> ${activeLedgerVendor.name} (${activeLedgerVendor.vendorCode})<br/>
+            <strong>GSTIN:</strong> ${activeLedgerVendor.gstinNumber || 'URD'} | <strong>Contact:</strong> ${activeLedgerVendor.contactPerson || 'N/A'} (${activeLedgerVendor.phone || '-'})
+          </div>
 
-          <!-- TRANSACTION TABLE -->
-          <div class="table-container">
-            <table class="ledger-table">
-              <thead>
+          <div class="summary-box">
+            <div class="sum-card" style="background: #fffbeb;"><strong>Opening:</strong> ₹${ledgerSummary.openingBalance?.toFixed(2)}</div>
+            <div class="sum-card" style="background: #ecfdf5;"><strong>Purchases (Credit):</strong> ₹${ledgerSummary.totalCredit?.toFixed(2)}</div>
+            <div class="sum-card" style="background: #fff1f2;"><strong>Payments & Returns (Debit):</strong> ₹${ledgerSummary.totalDebit?.toFixed(2)}</div>
+            <div class="sum-card" style="background: #faf5ff;"><strong>Closing Payable:</strong> ₹${ledgerSummary.closingBalance?.toFixed(2)}</div>
+          </div>
+
+          <table>
+            <thead>
+              <tr>
+                <th>Date</th>
+                <th>Voucher #</th>
+                <th>Type</th>
+                <th>Particulars</th>
+                <th class="text-right">Credit (Buy ₹)</th>
+                <th class="text-right">Debit (Payment/Return ₹)</th>
+                <th class="text-right">Payable Balance (₹)</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${ledgerData.map(tx => `
                 <tr>
-                  <th style="width: 10%;">Date</th>
-                  <th style="width: 14%;">Voucher #</th>
-                  <th style="width: 14%; text-align: center;">Type</th>
-                  <th>Particulars / Material Description</th>
-                  <th class="text-right" style="width: 14%;">Credit (Buy ₹)</th>
-                  <th class="text-right" style="width: 14%;">Debit (Return/Pay ₹)</th>
-                  <th class="text-right" style="width: 14%;">Balance (₹)</th>
+                  <td>${new Date(tx.date).toLocaleDateString('en-IN')}</td>
+                  <td><strong>${tx.voucherNo}</strong></td>
+                  <td>${tx.type}</td>
+                  <td>${tx.particulars}</td>
+                  <td class="text-right">${tx.credit > 0 ? '+ ₹' + tx.credit.toFixed(2) : '-'}</td>
+                  <td class="text-right">${tx.debit > 0 ? '- ₹' + tx.debit.toFixed(2) : '-'}</td>
+                  <td class="text-right"><strong>₹${tx.runningBalance?.toFixed(2)}</strong></td>
                 </tr>
-              </thead>
-              <tbody>
-                ${ledgerData.map(tx => `
-                  <tr>
-                    <td class="font-mono">${new Date(tx.date).toLocaleDateString('en-IN')}</td>
-                    <td class="font-mono" style="font-weight: 800; color: #0f172a;">${tx.voucherNo}</td>
-                    <td class="text-center">
-                      <span class="type-badge ${
-                        tx.type === 'Purchase Order' ? 'type-po' :
-                        tx.type === 'Vendor Return' ? 'type-ret' :
-                        'type-pay'
-                      }">
-                        ${tx.type}
-                      </span>
-                    </td>
-                    <td>${tx.particulars}</td>
-                    <td class="text-right font-mono credit-val">${tx.credit > 0 ? '+ ₹' + tx.credit.toFixed(2) : '-'}</td>
-                    <td class="text-right font-mono debit-val">${tx.debit > 0 ? '- ₹' + tx.debit.toFixed(2) : '-'}</td>
-                    <td class="text-right font-mono" style="font-weight: 800; color: #0f172a; background: #f8fafc;">₹${tx.runningBalance?.toFixed(2)}</td>
-                  </tr>
-                `).join('')}
-                ${ledgerData.length === 0 ? '<tr><td colSpan="7" class="text-center" style="padding: 20px; color: #94a3b8;">No transactions found for this vendor.</td></tr>' : ''}
-              </tbody>
-            </table>
-          </div>
-
-          <!-- FOOTER & SIGNATURES -->
-          <div class="footer-section">
-            <div class="sig-grid">
-              <div class="sig-box">Prepared By (Accounts)</div>
-              <div class="sig-box">Verified By (Auditor)</div>
-              <div class="sig-box">Authorized Signatory<br /><strong style="font-size: 8.5px;">Sri Saravanaa ERP</strong></div>
-            </div>
-            <div class="disclaimer">
-              This financial statement is computer-generated by Sri Saravanaa ERP System.
-            </div>
-          </div>
-
-          <script>
-            window.onload = function() {
-              setTimeout(function() {
-                window.print();
-              }, 300);
-            }
-          </script>
+              `).join('')}
+            </tbody>
+          </table>
+          <script>window.print();</script>
         </body>
       </html>
-    `;
+    `);
+    printWindow.document.close();
+  };
 
-    printWindow.document.write(htmlContent);
+  // --- Print Payment Register Handler ---
+  const printPaymentRegister = () => {
+    const printWindow = window.open('', '_blank');
+    const totalDisbursed = filteredPaymentRecords.reduce((sum, r) => sum + (r.amount || 0), 0);
+
+    printWindow.document.write(`
+      <html>
+        <head>
+          <title>Vendor Payment Disbursement Register</title>
+          <style>
+            body { font-family: 'Segoe UI', Arial, sans-serif; padding: 24px; color: #1e293b; }
+            .header { display: flex; justify-content: space-between; border-bottom: 2px solid #059669; padding-bottom: 12px; margin-bottom: 20px; }
+            .company { font-size: 18px; font-weight: 800; color: #065f46; }
+            table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 11px; }
+            th, td { border: 1px solid #cbd5e1; padding: 8px 10px; text-align: left; }
+            th { background: #1e293b; color: white; text-transform: uppercase; font-size: 10px; }
+            .text-right { text-align: right; }
+          </style>
+        </head>
+        <body>
+          <div class="header">
+            <div>
+              <div class="company">SRI SARAVANASS ICE CREAM & DAIRY</div>
+              <div style="font-size: 11px; color: #64748b;">Vendor Payment Disbursement Register</div>
+            </div>
+            <div style="text-align: right;">
+              <h3 style="margin: 0; color: #059669;">PAYMENT REGISTER</h3>
+              <div style="font-size: 11px; color: #64748b;">Printed on: ${new Date().toLocaleDateString('en-IN')}</div>
+            </div>
+          </div>
+
+          <div style="background: #ecfdf5; padding: 10px 16px; border-radius: 8px; margin-bottom: 16px; border: 1px solid #a7f3d0; font-size: 12px;">
+            <strong>Total Disbursed Amount:</strong> ₹${totalDisbursed.toFixed(2)} | <strong>Total Payments:</strong> ${filteredPaymentRecords.length}
+          </div>
+
+          <table>
+            <thead>
+              <tr>
+                <th>Voucher No</th>
+                <th>Date</th>
+                <th>Vendor Name</th>
+                <th>Payment Type</th>
+                <th>Bill / PO Ref</th>
+                <th>Payment Mode</th>
+                <th>Reference / UTR #</th>
+                <th class="text-right">Amount Paid (₹)</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${filteredPaymentRecords.map(r => `
+                <tr>
+                  <td><strong>${r.paymentNo || 'VPAY-001'}</strong></td>
+                  <td>${new Date(r.paymentDate || r.createdAt).toLocaleDateString('en-IN')}</td>
+                  <td>${r.vendor?.name || 'Vendor'}</td>
+                  <td>${r.paymentType === 'AGAINST_INVOICE' ? 'Against Invoice' : 'General'}</td>
+                  <td>${r.poNumber || 'General'}</td>
+                  <td>${r.paymentMode}</td>
+                  <td>${r.referenceNo || '-'}</td>
+                  <td class="text-right"><strong>₹${(r.amount || 0).toFixed(2)}</strong></td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+          <script>window.print();</script>
+        </body>
+      </html>
+    `);
     printWindow.document.close();
   };
 
   return (
     <div className="space-y-6">
       
-      {/* PAGE TITLE & TOP ACTION BAR */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      {/* PAGE HEADER */}
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900 font-display">Vendor Ledgers & Payable Hub</h1>
-          <p className="text-xs text-gray-500 mt-0.5">
+          <h1 className="text-2xl font-black text-gray-900 tracking-tight flex items-center gap-2">
+            <Building2 className="text-[var(--color-primary)]" size={26} />
+            Vendor Ledgers & Payment Hub
+          </h1>
+          <p className="text-xs text-gray-500 font-medium">
             Raw material supplier ledgers, purchase bills, vendor stock returns & bill payment disbursements
           </p>
         </div>
 
-        {/* DATE RANGE FILTRATION */}
-        <div className="flex items-center gap-2 bg-white p-2 rounded-xl border border-gray-200 shadow-sm text-xs">
-          <Calendar size={14} className="text-gray-400" />
-          <span className="font-bold text-gray-700 font-mono uppercase text-[11px]">Period:</span>
+        {/* TOP TAB SWITCHER */}
+        <div className="flex items-center gap-1.5 bg-slate-100/90 p-1.5 rounded-2xl border border-slate-200 shadow-xs">
+          <button
+            onClick={() => setActiveTab('SUMMARIES')}
+            className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+              activeTab === 'SUMMARIES'
+                ? 'bg-white text-slate-900 shadow-xs font-extrabold'
+                : 'text-slate-600 hover:text-slate-900'
+            }`}
+          >
+            <Layers size={14} className="text-pink-600" />
+            Vendor Ledgers & Payable Hub
+          </button>
+
+          <button
+            onClick={() => setActiveTab('PAYMENT_RECORDS')}
+            className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+              activeTab === 'PAYMENT_RECORDS'
+                ? 'bg-white text-slate-900 shadow-xs font-extrabold'
+                : 'text-slate-600 hover:text-slate-900'
+            }`}
+          >
+            <Receipt size={14} className="text-emerald-600" />
+            Payment Disbursement History ({paymentRecords.length})
+          </button>
+        </div>
+      </div>
+
+      {/* GLOBAL DATE FILTER BAR */}
+      <div className="flex flex-wrap items-center justify-between gap-3 bg-white p-3 rounded-2xl border border-slate-200/80 shadow-xs">
+        <div className="flex items-center gap-2">
+          <Calendar size={16} className="text-slate-500" />
+          <span className="text-xs font-bold text-slate-700 uppercase tracking-wider">Date Period Filter:</span>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2 text-xs">
           <input
             type="date"
             value={startDate}
             onChange={(e) => setStartDate(e.target.value)}
-            className="bg-gray-50 border border-gray-300 rounded px-2 py-1 font-mono font-bold text-gray-900 text-xs"
+            className="bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-1.5 font-mono font-bold text-slate-900 focus:outline-none"
           />
-          <span className="text-gray-400">to</span>
+          <span className="text-slate-400 font-bold text-xs">to</span>
           <input
             type="date"
             value={endDate}
             onChange={(e) => setEndDate(e.target.value)}
-            className="bg-gray-50 border border-gray-300 rounded px-2 py-1 font-mono font-bold text-gray-900 text-xs"
+            className="bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-1.5 font-mono font-bold text-slate-900 focus:outline-none"
           />
           {(startDate || endDate) && (
             <button
               onClick={() => { setStartDate(''); setEndDate(''); }}
-              className="text-pink-600 font-bold hover:underline text-[11px] ml-1"
+              className="text-pink-600 font-bold hover:underline text-xs ml-1"
             >
-              Clear
+              Clear Filter
             </button>
           )}
         </div>
       </div>
 
-      {/* PORTFOLIO SUMMARY CARDS */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <div className="p-4 bg-gradient-to-r from-emerald-50 to-emerald-100/50 border border-emerald-200 rounded-2xl shadow-sm">
-          <span className="text-xs font-bold uppercase tracking-wider text-emerald-700 block">Total Purchases Buy (Credit)</span>
-          <span className="text-2xl font-mono font-black text-emerald-950 mt-1 block">₹{totalCreditSum.toFixed(2)}</span>
-        </div>
+      {/* --- TAB 1: VENDOR LEDGERS & PAYABLE HUB --- */}
+      {activeTab === 'SUMMARIES' && (
+        <div className="space-y-6">
+          
+          {/* PORTFOLIO SUMMARY CARDS */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div className="p-4 bg-white border border-slate-200/80 rounded-2xl shadow-xs">
+              <span className="text-[11px] font-bold uppercase tracking-wider text-emerald-800 block">Total Purchases Buy (Credit)</span>
+              <span className="text-2xl font-mono font-black text-emerald-700 mt-1 block">₹{totalCreditSum.toFixed(2)}</span>
+            </div>
 
-        <div className="p-4 bg-gradient-to-r from-rose-50 to-rose-100/50 border border-rose-200 rounded-2xl shadow-sm">
-          <span className="text-xs font-bold uppercase tracking-wider text-rose-700 block">Vendor Payments & Returns (Debit)</span>
-          <span className="text-2xl font-mono font-black text-rose-950 mt-1 block">₹{totalDebitSum.toFixed(2)}</span>
-        </div>
+            <div className="p-4 bg-white border border-slate-200/80 rounded-2xl shadow-xs">
+              <span className="text-[11px] font-bold uppercase tracking-wider text-rose-800 block">Vendor Payments & Returns (Debit)</span>
+              <span className="text-2xl font-mono font-black text-rose-700 mt-1 block">₹{totalDebitSum.toFixed(2)}</span>
+            </div>
 
-        <div className="p-4 bg-gradient-to-r from-purple-50 to-purple-100/50 border border-purple-200 rounded-2xl shadow-sm">
-          <span className="text-xs font-bold uppercase tracking-wider text-purple-700 block">Net Payable Closing Balance</span>
-          <span className="text-2xl font-mono font-black text-purple-950 mt-1 block">₹{totalClosingBalanceSum.toFixed(2)}</span>
-        </div>
-      </div>
-
-      {/* SEARCH BAR */}
-      <div className="glass-panel p-4 flex justify-between items-center gap-4">
-        <span className="text-xs font-bold text-gray-700 uppercase tracking-wider">
-          Registered Vendors: <strong className="text-[var(--color-primary)] font-mono">{filteredVendors.length}</strong>
-        </span>
-
-        <div className="relative w-full sm:w-72">
-          <Search className="absolute left-3 top-2.5 text-gray-400" size={14} />
-          <input
-            type="text"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Search vendor name / code..."
-            className="w-full bg-white border border-gray-200 rounded-xl pl-9 pr-3 py-1.5 text-xs text-gray-900 focus:outline-none focus:ring-1 focus:ring-pink-500 font-medium"
-          />
-        </div>
-      </div>
-
-      {/* FULL-WIDTH MASTER VENDOR LEDGER TABLE */}
-      <div className="glass-panel overflow-hidden">
-        {loadingVendors ? (
-          <div className="p-12 text-center text-gray-500 font-medium flex items-center justify-center gap-2">
-            <Loader2 className="animate-spin text-pink-600" size={18} /> Loading vendor financial ledgers...
+            <div className="p-4 bg-white border border-slate-200/80 rounded-2xl shadow-xs">
+              <span className="text-[11px] font-bold uppercase tracking-wider text-purple-800 block">Net Payable Closing Balance</span>
+              <span className="text-2xl font-mono font-black text-purple-950 mt-1 block">₹{totalClosingBalanceSum.toFixed(2)}</span>
+            </div>
           </div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs font-medium text-gray-700">
-              <thead className="bg-gradient-to-r from-purple-800 to-indigo-900 text-white uppercase tracking-wider text-[11px] font-black">
-                <tr>
-                  <th className="px-4 py-3.5">Vendor Code</th>
-                  <th className="px-4 py-3.5">Vendor Name</th>
-                  <th className="px-4 py-3.5">Contact & Phone</th>
-                  <th className="px-4 py-3.5 text-right bg-amber-800/80">Opening (₹)</th>
-                  <th className="px-4 py-3.5 text-right bg-emerald-800/80">Purchases Buy (Credit ₹)</th>
-                  <th className="px-4 py-3.5 text-right bg-rose-900/80">Payments & Returns (Debit ₹)</th>
-                  <th className="px-4 py-3.5 text-right bg-purple-950">Closing Payable (₹)</th>
-                  <th className="px-4 py-3.5 text-center">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-200">
-                {filteredVendors.map((ven) => {
-                  const summary = vendorBalances[ven._id] || { openingBalance: 0, totalCredit: 0, totalDebit: 0, closingBalance: 0 };
 
-                  return (
-                    <tr key={ven._id} className="hover:bg-purple-50/30 transition-colors">
-                      <td className="px-4 py-3.5 font-mono text-xs font-bold text-gray-800">
-                        <span className="px-2 py-0.5 bg-gray-100 rounded border border-gray-200">
-                          {ven.vendorCode}
-                        </span>
-                      </td>
+          {/* SEARCH BAR */}
+          <div className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-xs flex justify-between items-center gap-4">
+            <span className="text-xs font-bold text-slate-700 uppercase tracking-wider">
+              Registered Vendors: <strong className="text-slate-900 font-mono">{filteredVendors.length}</strong>
+            </span>
 
-                      <td className="px-4 py-3.5 font-extrabold text-gray-900 text-sm">
-                        {ven.name}
-                        <span className="block text-[11px] text-gray-400 font-normal">GSTIN: {ven.gstinNumber || 'N/A'}</span>
-                      </td>
+            <div className="relative w-full sm:w-72">
+              <Search className="absolute left-3 top-2.5 text-slate-400" size={14} />
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Search vendor name / code..."
+                className="w-full bg-white border border-slate-200 rounded-xl pl-9 pr-3 py-1.5 text-xs text-slate-900 font-medium focus:outline-none"
+              />
+            </div>
+          </div>
 
-                      <td className="px-4 py-3.5 text-xs text-gray-700">
-                        <span className="font-semibold text-gray-900 block">{ven.contactPerson || 'N/A'}</span>
-                        <span className="font-mono text-gray-500">{ven.phone || '-'}</span>
-                      </td>
-
-                      <td className="px-4 py-3.5 text-right font-mono font-bold text-amber-900 bg-amber-50/30">
-                        ₹{summary.openingBalance?.toFixed(2)}
-                      </td>
-
-                      <td className="px-4 py-3.5 text-right font-mono font-extrabold text-emerald-800 bg-emerald-50/30">
-                        ₹{summary.totalCredit?.toFixed(2)}
-                      </td>
-
-                      <td className="px-4 py-3.5 text-right font-mono font-extrabold text-rose-800 bg-rose-50/30">
-                        ₹{summary.totalDebit?.toFixed(2)}
-                      </td>
-
-                      <td className="px-4 py-3.5 text-right font-mono font-black text-purple-950 text-sm bg-purple-50/40">
-                        ₹{summary.closingBalance?.toFixed(2)}
-                      </td>
-
-                      <td className="px-4 py-3.5 text-center">
-                        <div className="flex items-center justify-center gap-1.5">
-                          <button
-                            onClick={() => handleOpenLedgerModal(ven)}
-                            className="px-2.5 py-1.5 rounded-lg bg-purple-50 hover:bg-purple-100 text-purple-900 text-xs font-bold transition-all border border-purple-200 flex items-center gap-1 shadow-sm"
-                            title="View Detailed Vendor Ledger Statement"
-                          >
-                            <Eye size={13} /> View Ledger
-                          </button>
-
-                          <button
-                            onClick={() => handleOpenPaymentModal(ven)}
-                            className="px-2.5 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition-all flex items-center gap-1 shadow-sm"
-                            title="Log Payment to Vendor"
-                          >
-                            <Plus size={13} /> Make Payment
-                          </button>
-                        </div>
-                      </td>
+          {/* MASTER VENDOR LEDGER TABLE */}
+          <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden">
+            {loadingVendors ? (
+              <div className="p-12 text-center text-slate-500 font-medium flex items-center justify-center gap-2">
+                <Loader2 className="animate-spin text-slate-800" size={18} /> Loading vendor financial ledgers...
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs font-medium text-slate-700">
+                  <thead className="bg-slate-100/70 border-b border-slate-200 text-slate-700 uppercase tracking-wider text-[11px] font-bold">
+                    <tr>
+                      <th className="px-4 py-3.5">Vendor Code</th>
+                      <th className="px-4 py-3.5">Vendor Name</th>
+                      <th className="px-4 py-3.5">Contact & Phone</th>
+                      <th className="px-4 py-3.5 text-right">Opening (₹)</th>
+                      <th className="px-4 py-3.5 text-right text-emerald-800">Purchases (Credit ₹)</th>
+                      <th className="px-4 py-3.5 text-right text-rose-800">Payments & Returns (Debit ₹)</th>
+                      <th className="px-4 py-3.5 text-right font-bold text-slate-900">Closing Payable (₹)</th>
+                      <th className="px-4 py-3.5 text-center">Actions</th>
                     </tr>
-                  );
-                })}
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {filteredVendors.map((ven) => {
+                      const summary = vendorBalances[ven._id] || { openingBalance: 0, totalCredit: 0, totalDebit: 0, closingBalance: 0 };
 
-                {filteredVendors.length === 0 && (
-                  <tr>
-                    <td colSpan="8" className="px-6 py-12 text-center text-gray-400 font-medium">
-                      No vendor ledgers found matching your search.
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
+                      return (
+                        <tr key={ven._id} className="hover:bg-slate-50/80 transition-colors">
+                          <td className="px-4 py-3.5 font-mono text-xs font-bold text-slate-800">
+                            <span className="px-2 py-0.5 bg-slate-100 rounded border border-slate-200">
+                              {ven.vendorCode}
+                            </span>
+                          </td>
+
+                          <td className="px-4 py-3.5 font-bold text-slate-900 text-sm">
+                            {ven.name}
+                            <span className="block text-[11px] text-slate-400 font-normal">GSTIN: {ven.gstinNumber || 'N/A'}</span>
+                          </td>
+
+                          <td className="px-4 py-3.5 text-xs text-slate-700">
+                            <span className="font-semibold text-slate-900 block">{ven.contactPerson || 'N/A'}</span>
+                            <span className="font-mono text-slate-500">{ven.phone || '-'}</span>
+                          </td>
+
+                          <td className="px-4 py-3.5 text-right font-mono font-bold text-slate-700">
+                            ₹{summary.openingBalance?.toFixed(2)}
+                          </td>
+
+                          <td className="px-4 py-3.5 text-right font-mono font-bold text-emerald-600">
+                            + ₹{summary.totalCredit?.toFixed(2)}
+                          </td>
+
+                          <td className="px-4 py-3.5 text-right font-mono font-bold text-rose-600">
+                            - ₹{summary.totalDebit?.toFixed(2)}
+                          </td>
+
+                          <td className="px-4 py-3.5 text-right font-mono font-extrabold text-slate-900 text-sm">
+                            ₹{summary.closingBalance?.toFixed(2)}
+                          </td>
+
+                          <td className="px-4 py-3.5 text-center">
+                            <div className="flex items-center justify-center gap-1.5">
+                              <button
+                                onClick={() => handleOpenLedgerModal(ven)}
+                                className="px-2.5 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-bold transition-all border border-slate-200 flex items-center gap-1 shadow-xs cursor-pointer"
+                                title="View Detailed Vendor Ledger Statement"
+                              >
+                                <Eye size={13} /> View Ledger
+                              </button>
+
+                              <button
+                                onClick={() => handleOpenPaymentModal(ven)}
+                                className="px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition-all flex items-center gap-1 shadow-xs cursor-pointer"
+                                title="Log Payment to Vendor"
+                              >
+                                <Plus size={13} /> Make Payment
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+
+                    {filteredVendors.length === 0 && (
+                      <tr>
+                        <td colSpan="8" className="px-6 py-12 text-center text-slate-400 font-medium">
+                          No vendor ledgers found matching your search.
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </div>
-        )}
-      </div>
+        </div>
+      )}
+
+      {/* --- TAB 2: VENDOR PAYMENT DISBURSEMENT RECORDS (HISTORY) --- */}
+      {activeTab === 'PAYMENT_RECORDS' && (
+        <div className="space-y-6">
+          
+          {/* CONTROLS BAR: FILTERS, EXPORT & PRINT */}
+          <div className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-xs space-y-4">
+            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+              
+              {/* Left Filters */}
+              <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
+                
+                {/* Payment Mode Filter */}
+                <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 rounded-xl px-3 py-1.5 text-xs">
+                  <Filter size={14} className="text-slate-500" />
+                  <span className="font-bold text-slate-600 uppercase text-[11px]">Mode:</span>
+                  <select
+                    value={recordsPaymentModeFilter}
+                    onChange={(e) => setRecordsPaymentModeFilter(e.target.value)}
+                    className="bg-transparent font-bold text-slate-900 focus:outline-none cursor-pointer"
+                  >
+                    <option value="ALL">All Payment Modes</option>
+                    <option value="Bank Transfer">Bank Transfer / NEFT</option>
+                    <option value="UPI">UPI / GPay / PhonePe</option>
+                    <option value="Cheque">Cheque</option>
+                    <option value="Cash">Cash</option>
+                  </select>
+                </div>
+
+                {/* Vendor Filter */}
+                <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 rounded-xl px-3 py-1.5 text-xs">
+                  <Building2 size={14} className="text-slate-500" />
+                  <span className="font-bold text-slate-600 uppercase text-[11px]">Vendor:</span>
+                  <select
+                    value={recordsVendorFilter}
+                    onChange={(e) => setRecordsVendorFilter(e.target.value)}
+                    className="bg-transparent font-bold text-slate-900 focus:outline-none cursor-pointer max-w-[180px] truncate"
+                  >
+                    <option value="ALL">All Vendors</option>
+                    {vendors.map(v => (
+                      <option key={v._id} value={v._id}>{v.name}</option>
+                    ))}
+                  </select>
+                </div>
+
+              </div>
+
+              {/* Right Search & Action Buttons */}
+              <div className="flex flex-wrap items-center gap-3 w-full md:w-auto justify-end">
+                <div className="relative w-full md:w-64">
+                  <Search size={14} className="absolute left-3 top-2.5 text-slate-400" />
+                  <input
+                    type="text"
+                    value={recordsSearchQuery}
+                    onChange={(e) => setRecordsSearchQuery(e.target.value)}
+                    placeholder="Search voucher, UTR, remarks..."
+                    className="w-full bg-white border border-slate-200 rounded-xl pl-9 pr-3 py-1.5 text-xs text-slate-900 font-semibold focus:outline-none"
+                  />
+                </div>
+
+                <button
+                  onClick={exportPaymentRecordsCSV}
+                  className="flex items-center gap-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all shadow-xs cursor-pointer"
+                >
+                  <FileSpreadsheet size={15} className="text-emerald-600" />
+                  Export CSV
+                </button>
+
+                <button
+                  onClick={printPaymentRegister}
+                  className="flex items-center gap-1.5 bg-slate-900 hover:bg-slate-800 text-white px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all shadow-xs cursor-pointer"
+                >
+                  <Printer size={15} />
+                  Print Register
+                </button>
+              </div>
+
+            </div>
+          </div>
+
+          {/* PAYMENT DISBURSEMENT RECORDS TABLE */}
+          <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden">
+            {loadingPaymentRecords ? (
+              <div className="p-12 text-center text-slate-500 font-medium flex items-center justify-center gap-2">
+                <Loader2 className="animate-spin text-slate-800" size={18} /> Loading payment records...
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs font-medium text-slate-700">
+                  <thead className="bg-slate-100/70 border-b border-slate-200 text-slate-700 uppercase tracking-wider text-[11px] font-bold">
+                    <tr>
+                      <th className="px-4 py-3.5">Voucher #</th>
+                      <th className="px-4 py-3.5">Payment Date</th>
+                      <th className="px-4 py-3.5">Vendor Name</th>
+                      <th className="px-4 py-3.5 text-center">Payment Type</th>
+                      <th className="px-4 py-3.5 text-center">Bill / PO Ref</th>
+                      <th className="px-4 py-3.5 text-center">Payment Mode</th>
+                      <th className="px-4 py-3.5">Reference / UTR #</th>
+                      <th className="px-4 py-3.5 text-right font-bold text-slate-900">Amount Paid (₹)</th>
+                      <th className="px-4 py-3.5">Remarks</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {filteredPaymentRecords.map((rec, idx) => (
+                      <tr key={rec._id || idx} className="hover:bg-slate-50/80 transition-colors">
+                        <td className="px-4 py-3.5 font-mono text-xs font-bold text-slate-900 whitespace-nowrap">
+                          {rec.paymentNo || `VPAY-2026-${1000 + idx}`}
+                        </td>
+
+                        <td className="px-4 py-3.5 font-mono text-xs text-slate-600 whitespace-nowrap">
+                          {new Date(rec.paymentDate || rec.createdAt).toLocaleDateString('en-IN')}
+                        </td>
+
+                        <td className="px-4 py-3.5 font-bold text-slate-900">
+                          {rec.vendor?.name || 'Vendor'}
+                          <span className="block text-[11px] text-slate-400 font-normal font-mono">Code: {rec.vendor?.vendorCode || 'N/A'}</span>
+                        </td>
+
+                        <td className="px-4 py-3.5 text-center">
+                          <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                            rec.paymentType === 'AGAINST_INVOICE'
+                              ? 'bg-blue-50 text-blue-700 border border-blue-200'
+                              : 'bg-slate-100 text-slate-700 border border-slate-200'
+                          }`}>
+                            {rec.paymentType === 'AGAINST_INVOICE' ? 'Against Invoice' : 'General Payment'}
+                          </span>
+                        </td>
+
+                        <td className="px-4 py-3.5 text-center font-mono text-xs">
+                          {rec.poNumber ? (
+                            <span className="px-2 py-0.5 bg-blue-50 text-blue-700 rounded font-bold border border-blue-200">
+                              {rec.poNumber}
+                            </span>
+                          ) : (
+                            <span className="text-slate-400 font-semibold">-</span>
+                          )}
+                        </td>
+
+                        <td className="px-4 py-3.5 text-center">
+                          <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-purple-50 text-purple-700 border border-purple-200">
+                            {rec.paymentMode || 'Bank Transfer'}
+                          </span>
+                        </td>
+
+                        <td className="px-4 py-3.5 font-mono text-xs text-slate-800 font-semibold">
+                          {rec.referenceNo || '-'}
+                        </td>
+
+                        <td className="px-4 py-3.5 text-right font-mono font-extrabold text-emerald-600 text-sm whitespace-nowrap">
+                          ₹{(rec.amount || 0).toFixed(2)}
+                        </td>
+
+                        <td className="px-4 py-3.5 text-xs text-slate-600 font-medium">
+                          {rec.remarks}
+                        </td>
+                      </tr>
+                    ))}
+
+                    {filteredPaymentRecords.length === 0 && (
+                      <tr>
+                        <td colSpan="9" className="px-6 py-12 text-center text-slate-400 font-medium">
+                          No payment disbursement records found.
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* --- MODAL: DETAILED STATEMENT OF ACCOUNT FOR VENDOR --- */}
       {activeLedgerVendor && (
@@ -746,7 +1037,7 @@ const VendorLedgers = () => {
 
             <div className="pt-2 flex justify-between items-center border-t border-gray-100">
               <span className="text-[11px] text-gray-400 italic">Sri Saravanaa ERP System • Accounts Module</span>
-              <button onClick={() => setActiveLedgerVendor(null)} className="px-5 py-2 rounded-xl text-xs font-bold text-gray-600 hover:bg-gray-100">
+              <button onClick={() => setActiveLedgerVendor(null)} className="px-5 py-2 rounded-xl text-xs font-bold text-gray-600 hover:bg-gray-100 cursor-pointer">
                 Close
               </button>
             </div>
@@ -762,9 +1053,73 @@ const VendorLedgers = () => {
           title={`Log Vendor Payment — ${paymentVendor.name}`}
         >
           <form onSubmit={handleSubmitPayment} className="space-y-4">
+            
             <div className="p-3 bg-purple-50 border border-purple-200 rounded-xl text-xs text-purple-900">
               <p><strong>Vendor:</strong> {paymentVendor.name} ({paymentVendor.vendorCode})</p>
             </div>
+
+            {/* PAYMENT TYPE SEGMENT SELECTOR: Against Invoice vs General Payment */}
+            <div className="space-y-1.5">
+              <label className="text-xs font-bold text-slate-700 uppercase tracking-wider block">Payment Type *</label>
+              <div className="grid grid-cols-2 gap-2 bg-slate-100 p-1 rounded-xl">
+                <button
+                  type="button"
+                  onClick={() => setPaymentType('AGAINST_INVOICE')}
+                  className={`py-2 px-3 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+                    paymentType === 'AGAINST_INVOICE'
+                      ? 'bg-white text-slate-900 shadow-xs font-extrabold'
+                      : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  <Receipt size={14} className="text-blue-600" />
+                  Against Invoice / PO Bill
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setPaymentType('GENERAL');
+                    setSelectedPOId('');
+                  }}
+                  className={`py-2 px-3 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+                    paymentType === 'GENERAL'
+                      ? 'bg-white text-slate-900 shadow-xs font-extrabold'
+                      : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  <DollarSign size={14} className="text-emerald-600" />
+                  General / Advance Payment
+                </button>
+              </div>
+            </div>
+
+            {/* IF AGAINST INVOICE: SELECT SPECIFIC PURCHASE BILL */}
+            {paymentType === 'AGAINST_INVOICE' && (
+              <div className="space-y-1">
+                <label className="text-xs font-bold text-slate-700 uppercase tracking-wider block">Select Purchase Invoice / PO Bill *</label>
+                {loadingVendorPOs ? (
+                  <div className="p-2 text-xs text-slate-500 flex items-center gap-2">
+                    <Loader2 size={14} className="animate-spin text-slate-700" /> Loading purchase bills...
+                  </div>
+                ) : vendorPOs.length > 0 ? (
+                  <select
+                    value={selectedPOId}
+                    onChange={(e) => handlePOSelectChange(e.target.value)}
+                    className="w-full bg-white border border-purple-300 rounded-xl px-3 py-2 text-slate-900 text-xs font-bold"
+                  >
+                    {vendorPOs.map(po => (
+                      <option key={po._id} value={po._id}>
+                        {po.poNumber} — Inward Bill (Total: ₹{(po.totalAmount || po.grandTotal || 0).toFixed(2)})
+                      </option>
+                    ))}
+                  </select>
+                ) : (
+                  <div className="p-2.5 bg-amber-50 border border-amber-200 rounded-xl text-xs text-amber-900 font-medium">
+                    No specific purchase bills found for this vendor. Proceeding as General Payment.
+                  </div>
+                )}
+              </div>
+            )}
 
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-1">
@@ -831,11 +1186,11 @@ const VendorLedgers = () => {
             </div>
 
             <div className="pt-4 flex justify-end gap-3 border-t border-gray-100">
-              <button type="button" onClick={() => setIsPaymentModalOpen(false)} className="px-4 py-2 text-xs font-bold text-gray-600">Cancel</button>
+              <button type="button" onClick={() => setIsPaymentModalOpen(false)} className="px-4 py-2 text-xs font-bold text-gray-600 cursor-pointer">Cancel</button>
               <button
                 type="submit"
                 disabled={submittingPayment}
-                className="bg-emerald-600 hover:bg-emerald-700 text-white px-6 py-2 rounded-xl text-xs font-bold shadow-md flex items-center gap-1 disabled:opacity-50"
+                className="bg-emerald-600 hover:bg-emerald-700 text-white px-6 py-2 rounded-xl text-xs font-bold shadow-md flex items-center gap-1 disabled:opacity-50 cursor-pointer"
               >
                 {submittingPayment ? <Loader2 size={14} className="animate-spin" /> : <CheckCircle2 size={14} />}
                 Save Payment Entry
