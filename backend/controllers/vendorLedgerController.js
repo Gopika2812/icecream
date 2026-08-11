@@ -327,6 +327,13 @@ exports.createVendorPayment = async (req, res) => {
             return res.status(400).json({ success: false, message: 'Vendor and Amount are required.' });
         }
 
+        if (referenceNo) {
+            const existingPayment = await VendorPayment.findOne({ referenceNo, vendor: vendorId });
+            if (existingPayment) {
+                return res.status(200).json({ success: true, data: existingPayment, message: 'Payment already recorded with this reference number.' });
+            }
+        }
+
         const count = await VendorPayment.countDocuments();
         const paymentNo = `VPAY-${new Date().getFullYear()}${(new Date().getMonth() + 1).toString().padStart(2, '0')}-${(count + 1001).toString()}`;
 
