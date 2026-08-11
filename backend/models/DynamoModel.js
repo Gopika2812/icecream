@@ -107,16 +107,30 @@ class DynamoModel {
         }
     }
 
+    _cleanUndefined(obj) {
+        if (!obj || typeof obj !== 'object') return obj;
+        if (Array.isArray(obj)) {
+            return obj.map(item => this._cleanUndefined(item));
+        }
+        const cleaned = {};
+        for (const [key, value] of Object.entries(obj)) {
+            if (value !== undefined) {
+                cleaned[key] = typeof value === 'object' && value !== null ? this._cleanUndefined(value) : value;
+            }
+        }
+        return cleaned;
+    }
+
     async create(docData) {
         const id = docData.id || docData._id || randomUUID();
         const now = new Date().toISOString();
-        const item = {
+        const item = this._cleanUndefined({
             ...docData,
             id: id.toString(),
             _id: id.toString(),
             createdAt: docData.createdAt || now,
             updatedAt: now
-        };
+        });
 
         await docClient.send(new PutCommand({
             TableName: this.tableName,
@@ -131,13 +145,13 @@ class DynamoModel {
         const existing = await this.findById(targetId);
         if (!existing) return null;
 
-        const updatedDoc = {
+        const updatedDoc = this._cleanUndefined({
             ...existing,
             ...updates,
             id: targetId,
             _id: targetId,
             updatedAt: new Date().toISOString()
-        };
+        });
 
         await docClient.send(new PutCommand({
             TableName: this.tableName,
@@ -145,6 +159,33 @@ class DynamoModel {
         }));
 
         return this._formatDoc(updatedDoc);
+    }
+
+    async findOneAndUpdate(query = {}, updates = {}, options = { new: true, upsert: false }) {
+        let existing = await this.findOne(query);
+        const $inc = updates.$inc || {};
+        const $set = updates.$set || {};
+
+        if (!existing && options.upsert) {
+            const createData = { ...query, ...$set };
+            for (const [k, v] of Object.entries($inc)) {
+                createData[k] = (createData[k] || 0) + v;
+            }
+            return await this.create(createData);
+        }
+
+        if (!existing) return null;
+
+        const updatedFields = { ...updates };
+        delete updatedFields.$inc;
+        delete updatedFields.$set;
+        Object.assign(updatedFields, $set);
+
+        for (const [k, v] of Object.entries($inc)) {
+            updatedFields[k] = (existing[k] || 0) + v;
+        }
+
+        return await this.findByIdAndUpdate(existing.id || existing._id, updatedFields, options);
     }
 
     async findByIdAndDelete(id) {
