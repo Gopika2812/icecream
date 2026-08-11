@@ -195,10 +195,6 @@ const QCList = () => {
     
     // Check constraints
     for (const item of items) {
-      const isPackingMaterial = (item.itemType || '').toLowerCase().includes('pack');
-      if (!isPackingMaterial && item.passedQty > 0 && !item.expiryDate) {
-        return alert(`Please set an Expiry Date for ${item.name}.`);
-      }
       if (item.damagedQty > 0 && !item.remarks.trim()) {
         return alert(`Please specify a return reason / remark for ${item.name} damages.`);
       }
@@ -798,11 +794,10 @@ const QCList = () => {
                     <div className={`grid grid-cols-1 ${isPackingMaterial ? 'md:grid-cols-1' : 'md:grid-cols-2'} gap-4`}>
                       {!isPackingMaterial && (
                         <div>
-                          <label className="block text-xs font-semibold text-gray-600 mb-1">Expiry Date *</label>
+                          <label className="block text-xs font-semibold text-gray-600 mb-1">Expiry Date</label>
                           <input
                             type="date"
                             value={item.expiryDate}
-                            required={item.passedQty > 0}
                             onChange={(e) => handleItemPropertyChange(index, 'expiryDate', e.target.value)}
                             className="w-full bg-white/50 border border-[var(--color-glass-border)] rounded px-3 py-1 text-sm focus:outline-none focus:border-[var(--color-primary)]"
                           />
