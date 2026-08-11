@@ -772,7 +772,7 @@ const ProductionList = () => {
                         value={selectedMixProduct}
                         options={mixProducts.map(m => ({
                           value: m._id,
-                          label: m.name,
+                          label: `${m.name} (${m.itemCode})`,
                           code: m.itemCode,
                           sublabel: `Contains ${m.rawMaterials?.length || 0} raw materials (per 1L)`
                         }))}
@@ -803,6 +803,18 @@ const ProductionList = () => {
                       </button>
                     </div>
                   </div>
+
+                  {selectedMixProduct && (
+                    <div className="mt-2.5 p-2.5 bg-purple-100/90 border border-purple-300 rounded-xl flex items-center justify-between text-xs font-extrabold text-purple-950 shadow-2xs">
+                      <div className="flex items-center gap-2">
+                        <Tag size={15} className="text-purple-700" />
+                        <span>Selected Mix Item Code:</span>
+                      </div>
+                      <span className="font-mono text-sm font-black text-purple-900 px-2.5 py-0.5 bg-white rounded-lg border border-purple-300 shadow-xs">
+                        {mixProducts.find(m => m._id === selectedMixProduct)?.itemCode || 'MIX-001'}
+                      </span>
+                    </div>
+                  )}
                 </div>
               ) : (
                 /* OPTION B: CREATE NEW MIX FORMULA (1ST TIME) */
@@ -821,19 +833,29 @@ const ProductionList = () => {
                         type="text"
                         required
                         value={newMixName}
-                        onChange={(e) => setNewMixName(e.target.value)}
-                        placeholder="e.g. Mango Kulfi Base Mix"
+                        onChange={(e) => {
+                          const nameVal = e.target.value;
+                          setNewMixName(nameVal);
+                          if (nameVal.trim()) {
+                            const codeGen = 'MIX-' + nameVal.toUpperCase().replace(/[^A-Z0-9]/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '').slice(0, 16);
+                            setNewMixCode(codeGen);
+                          } else {
+                            setNewMixCode('');
+                          }
+                        }}
+                        placeholder="e.g. Caramel Popcorn Ice Cream Base Mix"
                         className={`${customInputStyle} font-bold`}
                       />
                     </div>
                     <div className="space-y-1">
-                      <label className="text-[11px] font-bold text-gray-700 block">Item Code (Optional)</label>
+                      <label className="text-[11px] font-bold text-gray-700 block">Auto-Generated Item Code *</label>
                       <input
                         type="text"
+                        required
                         value={newMixCode}
                         onChange={(e) => setNewMixCode(e.target.value)}
-                        placeholder="e.g. MIX-005"
-                        className={`${customInputStyle} font-mono`}
+                        placeholder="e.g. MIX-POPCORN-001"
+                        className={`${customInputStyle} font-mono font-bold text-purple-950 bg-purple-50/50 border-purple-300`}
                       />
                     </div>
                     <div className="space-y-1">
