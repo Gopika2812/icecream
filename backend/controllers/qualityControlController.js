@@ -162,7 +162,8 @@ exports.createQualityControl = async (req, res) => {
             }
 
             // Auto-generate Batch Number
-            const existingBatches = await Inventory.find({ product: item.product }).distinct('batchNumber');
+            const existingInventories = await Inventory.find({ product: item.product });
+            const existingBatches = Array.from(new Set((existingInventories || []).map(i => i.batchNumber).filter(Boolean)));
             const nextBatchNum = existingBatches.length + 1;
             const batchNumber = `B-${nextBatchNum}`;
 
