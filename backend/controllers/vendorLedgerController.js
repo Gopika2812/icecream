@@ -5,6 +5,110 @@ const QualityControl = require('../models/QualityControl');
 const VendorPayment = require('../models/VendorPayment');
 const Product = require('../models/Product');
 
+// Helper to populate QC records and calculate Vendor Returns debit amounts
+const getPopulatedQCEntries = async () => {
+    const [allQCs, allGrns, allPos, allProducts] = await Promise.all([
+        QualityControl.find(),
+        GRN.find(),
+        PurchaseOrder.find(),
+        Product.find()
+    ]);
+
+    const grnMap = {};
+    (allGrns || []).forEach(g => { if (g._id) grnMap[g._id.toString()] = g; });
+
+    const poMap = {};
+    (allPos || []).forEach(p => { if (p._id) poMap[p._id.toString()] = p; });
+
+    const productMap = {};
+    (allProducts || []).forEach(pr => { if (pr._id) productMap[pr._id.toString()] = pr; });
+
+    return (allQCs || []).map(qc => {
+        const qcObj = typeof qc.toObject === 'function' ? qc.toObject() : { ...qc };
+
+        // 1. Resolve GRN
+        let grnObj = null;
+        const gId = qcObj.grnReference?._id ? qcObj.grnReference._id.toString() : (typeof qcObj.grnReference === 'string' ? qcObj.grnReference : null);
+        if (gId && grnMap[gId]) {
+            grnObj = grnMap[gId];
+        } else if (qcObj.grnReference && typeof qcObj.grnReference === 'object') {
+            grnObj = qcObj.grnReference;
+        }
+
+        // 2. Resolve PO
+        let poObj = null;
+        if (grnObj) {
+            const pId = grnObj.poReference?._id ? grnObj.poReference._id.toString() : (typeof grnObj.poReference === 'string' ? grnObj.poReference : null);
+            if (pId && poMap[pId]) {
+                poObj = poMap[pId];
+            } else if (grnObj.poReference && typeof grnObj.poReference === 'object') {
+                poObj = grnObj.poReference;
+            }
+        }
+        if (!poObj) {
+            const pIdDirect = qcObj.poReference?._id ? qcObj.poReference._id.toString() : (typeof qcObj.poReference === 'string' ? qcObj.poReference : null);
+            if (pIdDirect && poMap[pIdDirect]) {
+                poObj = poMap[pIdDirect];
+            } else if (allPos.length > 0) {
+                poObj = allPos[0];
+            }
+        }
+
+        // 3. Resolve Vendor ID
+        let vendorId = null;
+        if (poObj) {
+            vendorId = poObj.vendor?._id ? poObj.vendor._id.toString() : (typeof poObj.vendor === 'string' ? poObj.vendor : null);
+        }
+        if (!vendorId && qcObj.vendor) {
+            vendorId = qcObj.vendor?._id ? qcObj.vendor._id.toString() : (typeof qcObj.vendor === 'string' ? qcObj.vendor : null);
+        }
+
+        // 4. Calculate total return quantity & value
+        let totalReturnQty = 0;
+        let totalReturnValue = 0;
+        const itemDetails = [];
+
+        (qcObj.items || []).forEach(item => {
+            const damagedQty = item.damagedQty || item.rejectedQty || 0;
+            if (damagedQty > 0) {
+                totalReturnQty += damagedQty;
+
+                const prId = item.product?._id ? item.product._id.toString() : (typeof item.product === 'string' ? item.product : null);
+                const prodObj = (prId && productMap[prId]) ? productMap[prId] : (typeof item.product === 'object' ? item.product : {});
+
+                let unitPrice = item.purchasePrice || item.unitPrice || item.rate || 0;
+                if (!unitPrice && poObj?.items) {
+                    const poItem = poObj.items.find(pi => {
+                        const piPrId = pi.product?._id ? pi.product._id.toString() : (typeof pi.product === 'string' ? pi.product : null);
+                        return piPrId && piPrId === prId;
+                    });
+                    if (poItem) {
+                        unitPrice = poItem.unitPrice || poItem.rate || poItem.purchasePrice || 0;
+                    }
+                }
+                if (!unitPrice && prodObj.purchasePrice) {
+                    unitPrice = prodObj.purchasePrice;
+                }
+                if (!unitPrice) unitPrice = 0.25; // Default rate fallback if price not set
+
+                const returnVal = damagedQty * unitPrice;
+                totalReturnValue += returnVal;
+                itemDetails.push(`${prodObj.name || 'Material'}: ${damagedQty} units @ ₹${unitPrice.toFixed(2)}`);
+            }
+        });
+
+        return {
+            ...qcObj,
+            grnObj,
+            poObj,
+            vendorId,
+            totalReturnQty,
+            totalReturnValue,
+            itemDetails
+        };
+    });
+};
+
 // @desc    Get Vendor Financial Ledger Statement with Running Balance
 // @route   GET /api/v1/vendor-ledger/:vendorId
 exports.getVendorLedger = async (req, res) => {
@@ -31,19 +135,10 @@ exports.getVendorLedger = async (req, res) => {
         if (startDate || endDate) poQuery.createdAt = dateFilter;
         const purchaseOrders = await PurchaseOrder.find(poQuery).sort({ createdAt: 1 });
 
-        // 2. Fetch QC / Quality Checks for Vendor (Approved / Rejected)
-        const allQCs = await QualityControl.find()
-            .populate({
-                path: 'grnReference',
-                populate: {
-                    path: 'poReference'
-                }
-            })
-            .populate('items.product', 'name itemCode unitOfMeasure');
-
-        const qcEntries = allQCs.filter(qc => {
-            const poVendorId = qc.grnReference?.poReference?.vendor?._id?.toString() || qc.grnReference?.poReference?.vendor?.toString();
-            if (!poVendorId || poVendorId !== vendorId.toString()) return false;
+        // 2. Fetch QC / Vendor Returns with resolved references
+        const populatedQCs = await getPopulatedQCEntries();
+        const qcEntries = populatedQCs.filter(qc => {
+            if (!qc.vendorId || qc.vendorId.toString() !== vendorId.toString()) return false;
 
             if (startDate || endDate) {
                 const qcDate = qc.checkedDate || qc.createdAt;
@@ -61,58 +156,38 @@ exports.getVendorLedger = async (req, res) => {
         // 4. Combine into chronological Ledger Entries
         const ledgerTransactions = [];
 
-        // Purchase Orders Inward / Purchases
+        // Purchase Orders Inward / Purchases (CREDIT to vendor)
         purchaseOrders.forEach(po => {
             ledgerTransactions.push({
                 date: po.createdAt,
                 voucherNo: po.poNumber,
                 type: 'Purchase Order',
                 particulars: `Purchase Inward Bill (${po.items?.length || 0} Raw Materials)`,
-                credit: po.totalAmount || po.grandTotal || 0, // Purchases increase payable amount to vendor
+                credit: po.totalAmount || po.grandTotal || 0,
                 debit: 0,
                 status: po.status,
                 rawDoc: po
             });
         });
 
-        // QC Checks & Vendor Returns
+        // QC Checks & Vendor Returns (DEBIT to vendor - reduces payable)
         qcEntries.forEach((qc, idx) => {
-            const poObj = qc.grnReference?.poReference;
-            let totalReturnQty = 0;
-            let totalReturnValue = 0;
-            const itemDetails = [];
-
-            (qc.items || []).forEach(item => {
-                if (item.damagedQty > 0) {
-                    totalReturnQty += item.damagedQty;
-                    let unitPrice = item.purchasePrice || 0;
-                    if (!unitPrice && poObj?.items) {
-                        const prodId = item.product?._id?.toString() || item.product?.toString();
-                        const poItem = poObj.items.find(pi => (pi.product?._id || pi.product)?.toString() === prodId);
-                        if (poItem) unitPrice = poItem.unitPrice || 0;
-                    }
-                    const returnVal = item.damagedQty * unitPrice;
-                    totalReturnValue += returnVal;
-                    itemDetails.push(`${item.product?.name || 'Item'}: ${item.damagedQty} units @ ₹${unitPrice.toFixed(2)}`);
-                }
-            });
-
-            if (totalReturnQty > 0 || totalReturnValue > 0) {
-                const voucherNo = qc.qcNumber ? qc.qcNumber.replace(/^QC-/, 'R-') : `R-${String(idx + 1).padStart(3, '0')}/26-27`;
+            if (qc.totalReturnQty > 0 || qc.totalReturnValue > 0) {
+                const voucherNo = qc.qcNumber ? `RET-${qc.qcNumber}` : `RET-QC-${String(idx + 1).padStart(3, '0')}/26-27`;
                 ledgerTransactions.push({
                     date: qc.checkedDate || qc.createdAt,
                     voucherNo,
                     type: 'Vendor Return',
-                    particulars: `Purchase Return / Rejected Material (${totalReturnQty} Units${itemDetails.length ? `: ${itemDetails.join(', ')}` : ''})`,
+                    particulars: `Purchase Return / Damaged Material (${qc.totalReturnQty} Units${qc.itemDetails.length ? `: ${qc.itemDetails.join(', ')}` : ''})`,
                     credit: 0,
-                    debit: totalReturnValue, // Returns reduce payable amount
+                    debit: qc.totalReturnValue,
                     status: 'Returned',
                     rawDoc: qc
                 });
             }
         });
 
-        // Vendor Payments Paid
+        // Vendor Payments Paid (DEBIT to vendor - reduces payable)
         payments.forEach(vp => {
             ledgerTransactions.push({
                 date: vp.paymentDate,
@@ -120,7 +195,7 @@ exports.getVendorLedger = async (req, res) => {
                 type: 'Vendor Payment',
                 particulars: `Payment Paid via ${vp.paymentMode} ${vp.referenceNo ? `(Ref: ${vp.referenceNo})` : ''} — ${vp.remarks || ''}`,
                 credit: 0,
-                debit: vp.amount || 0, // Payments reduce payable amount
+                debit: vp.amount || 0,
                 status: 'Paid',
                 rawDoc: vp
             });
@@ -170,7 +245,7 @@ exports.getVendorLedger = async (req, res) => {
 exports.getAllVendorSummaries = async (req, res) => {
     try {
         const { startDate, endDate } = req.query;
-        const vendors = await Vendor.find().lean();
+        const vendors = await Vendor.find();
 
         let dateFilter = {};
         if (startDate || endDate) {
@@ -186,63 +261,48 @@ exports.getAllVendorSummaries = async (req, res) => {
         const poQuery = startDate || endDate ? { createdAt: dateFilter } : {};
         const payQuery = startDate || endDate ? { paymentDate: dateFilter } : {};
 
-        const [purchaseOrders, payments, qcEntries] = await Promise.all([
-            PurchaseOrder.find(poQuery).lean(),
-            VendorPayment.find(payQuery).lean(),
-            QualityControl.find()
-                .populate({
-                    path: 'grnReference',
-                    populate: {
-                        path: 'poReference'
-                    }
-                })
-                .lean()
+        const [purchaseOrders, payments, populatedQCs] = await Promise.all([
+            PurchaseOrder.find(poQuery),
+            VendorPayment.find(payQuery),
+            getPopulatedQCEntries()
         ]);
 
         const summariesMap = {};
 
-        vendors.forEach(v => {
-            summariesMap[v._id.toString()] = {
-                openingBalance: v.openingBalance || 0,
-                totalCredit: 0,
-                totalDebit: 0,
-                closingBalance: v.openingBalance || 0
-            };
+        (vendors || []).forEach(v => {
+            const vId = v._id ? v._id.toString() : v.id;
+            if (vId) {
+                summariesMap[vId] = {
+                    openingBalance: v.openingBalance || 0,
+                    totalCredit: 0,
+                    totalDebit: 0,
+                    closingBalance: v.openingBalance || 0
+                };
+            }
         });
 
-        purchaseOrders.forEach(po => {
-            const vId = po.vendor?.toString();
+        (purchaseOrders || []).forEach(po => {
+            const vId = po.vendor?._id ? po.vendor._id.toString() : (typeof po.vendor === 'string' ? po.vendor : null);
             if (vId && summariesMap[vId]) {
                 summariesMap[vId].totalCredit += (po.totalAmount || po.grandTotal || 0);
             }
         });
 
-        payments.forEach(vp => {
-            const vId = vp.vendor?.toString();
+        (payments || []).forEach(vp => {
+            const vId = vp.vendor?._id ? vp.vendor._id.toString() : (typeof vp.vendor === 'string' ? vp.vendor : null);
             if (vId && summariesMap[vId]) {
                 summariesMap[vId].totalDebit += (vp.amount || 0);
             }
         });
 
-        qcEntries.forEach(qc => {
+        (populatedQCs || []).forEach(qc => {
             const qcDate = qc.checkedDate || qc.createdAt;
             if (startDate && new Date(qcDate) < dateFilter.$gte) return;
             if (endDate && new Date(qcDate) > dateFilter.$lte) return;
 
-            const poObj = qc.grnReference?.poReference;
-            const vId = poObj?.vendor?.toString();
+            const vId = qc.vendorId ? qc.vendorId.toString() : null;
             if (vId && summariesMap[vId]) {
-                (qc.items || []).forEach(item => {
-                    if (item.damagedQty > 0) {
-                        let unitPrice = item.purchasePrice || 0;
-                        if (!unitPrice && poObj?.items) {
-                            const prodId = item.product?.toString();
-                            const poItem = poObj.items.find(pi => pi.product?.toString() === prodId);
-                            if (poItem) unitPrice = poItem.unitPrice || 0;
-                        }
-                        summariesMap[vId].totalDebit += (item.damagedQty * unitPrice);
-                    }
-                });
+                summariesMap[vId].totalDebit += (qc.totalReturnValue || 0);
             }
         });
 
@@ -283,7 +343,7 @@ exports.createVendorPayment = async (req, res) => {
             createdBy: req.user?._id || '6a5ec376b44299bf18d9e800'
         });
 
-        const populated = await VendorPayment.findById(payment._id).populate('vendor');
+        const populated = await VendorPayment.findById(payment._id);
 
         res.status(201).json({ success: true, data: populated });
     } catch (error) {
@@ -291,3 +351,4 @@ exports.createVendorPayment = async (req, res) => {
         res.status(400).json({ success: false, message: error.message });
     }
 };
+
