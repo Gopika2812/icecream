@@ -68,9 +68,10 @@ const PurchaseOrderList = () => {
 
   const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
 
-  const [datePreset, setDatePreset] = useState('ALL');
-  const [startDate, setStartDate] = useState('');
-  const [endDate, setEndDate] = useState('');
+  const initialToday = getLocalDateString();
+  const [datePreset, setDatePreset] = useState('Today');
+  const [startDate, setStartDate] = useState(initialToday);
+  const [endDate, setEndDate] = useState(initialToday);
 
   const handlePresetChange = (preset) => {
     setDatePreset(preset);
@@ -385,7 +386,7 @@ const PurchaseOrderList = () => {
           >
             <ArrowLeft size={18} />
           </button>
-          <h1 className="text-2xl font-bold text-gray-900">Create New Purchase Order</h1>
+          <h1 className="text-2xl font-bold text-gray-900">Create New Purchase Invoice</h1>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-6">
@@ -540,7 +541,7 @@ const PurchaseOrderList = () => {
               className="flex items-center gap-2 bg-[var(--color-primary)] hover:bg-[var(--color-primary-soft)] text-white px-6 py-2 rounded-lg transition-colors font-medium shadow-[0_0_15px_rgba(216,27,96,0.3)] disabled:opacity-50"
             >
               {submitting && <Loader2 size={16} className="animate-spin" />}
-              Save & Issue PO
+              Save & Issue PI
             </button>
           </div>
         </form>
@@ -600,7 +601,7 @@ const PurchaseOrderList = () => {
             onClick={() => setIsCreating(true)}
             className="flex items-center gap-2 bg-[var(--color-primary)] hover:bg-[var(--color-primary-soft)] text-white px-4 py-2 rounded-xl transition-colors shadow-[0_0_15px_rgba(216,27,96,0.3)] font-medium text-xs"
           >
-            <Plus size={16} /> Create PO
+            <Plus size={16} /> Create PI
           </button>
         </div>
       </div>
