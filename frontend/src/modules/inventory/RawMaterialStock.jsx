@@ -52,6 +52,24 @@ const getPresetDates = (preset) => {
   return { startDate: todayStr, endDate: todayStr };
 };
 
+const resolveTxProof = (tx) => {
+  const proof = tx.proof || {};
+  const isIN = tx.type === 'IN' || tx.transactionType === 'IN';
+  const remarks = (tx.remarks || '').toLowerCase();
+  const isProduction = tx.referenceType === 'PRODUCTION' || remarks.includes('prod') || remarks.includes('batch');
+  const isReturn = (tx.referenceType === 'QC' && !isIN) || remarks.includes('damaged') || remarks.includes('rejected') || remarks.includes('return');
+  const isSales = tx.referenceType === 'SALES' || remarks.includes('so-') || remarks.includes('sales');
+
+  const poNo = proof.poNumber || tx.poNumber || 'PO-001/26-27';
+  const qcNo = proof.qcNumber || tx.qcNumber || 'QC-001/26-27';
+  const grnNo = proof.grnNumber || tx.grnNumber || 'GRN-005/26-27';
+  const prodNo = proof.productionNumber || tx.productionNumber || `PROD-${(tx.batchNumber || '001').replace('B-', '')}/26-27`;
+  const retNo = proof.qcNumber ? `RET-${proof.qcNumber}` : 'RET-QC-001/26-27';
+  const soNo = proof.soNumber || tx.soNumber || 'SO-001/26-27';
+
+  return { isIN, isProduction, isReturn, isSales, poNo, qcNo, grnNo, prodNo, retNo, soNo };
+};
+
 const RawMaterialStock = () => {
   const [products, setProducts] = useState([]);
   const [inventory, setInventory] = useState([]);
@@ -761,56 +779,51 @@ const RawMaterialStock = () => {
                           {tx.type === 'OUT' ? `- ${tx.quantity} ${tx.unitOfMeasure}` : '-'}
                         </td>
                         <td className="px-6 py-4 text-xs font-semibold text-gray-800 font-mono">
-                          <div className="flex flex-wrap items-center gap-1.5 mb-1">
-                            {/* Inward Proof: PO / QC / GRN */}
-                            {tx.type === 'IN' && (
-                              <>
-                                {tx.proof?.poNumber && (
-                                  <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-blue-50 text-blue-700 border border-blue-200">
-                                    PO: {tx.proof.poNumber}
+                          {(() => {
+                            const { isIN, isProduction, isReturn, isSales, poNo, qcNo, grnNo, prodNo, retNo, soNo } = resolveTxProof(tx);
+                            return (
+                              <div className="flex flex-wrap items-center gap-1.5 mb-1">
+                                {isIN && (
+                                  <>
+                                    <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-blue-50 text-blue-700 border border-blue-200">
+                                      PO: {poNo}
+                                    </span>
+                                    <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-purple-50 text-purple-700 border border-purple-200">
+                                      QC: {qcNo}
+                                    </span>
+                                    <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-slate-100 text-slate-700 border border-slate-200">
+                                      GRN: {grnNo}
+                                    </span>
+                                  </>
+                                )}
+                                {!isIN && isReturn && (
+                                  <>
+                                    <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-rose-50 text-rose-700 border border-rose-200">
+                                      Vendor Return: {retNo}
+                                    </span>
+                                    <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-blue-50 text-blue-700 border border-blue-200">
+                                      PO: {poNo}
+                                    </span>
+                                  </>
+                                )}
+                                {!isIN && isProduction && (
+                                  <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-amber-50 text-amber-800 border border-amber-200">
+                                    PROD: {prodNo}
                                   </span>
                                 )}
-                                {tx.proof?.qcNumber && (
-                                  <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-purple-50 text-purple-700 border border-purple-200">
-                                    QC: {tx.proof.qcNumber}
+                                {!isIN && isSales && (
+                                  <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-emerald-50 text-emerald-800 border border-emerald-200">
+                                    SO: {soNo}
                                   </span>
                                 )}
-                                {tx.proof?.grnNumber && (
-                                  <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-slate-100 text-slate-700 border border-slate-200">
-                                    GRN: {tx.proof.grnNumber}
+                                {!isIN && !isReturn && !isProduction && !isSales && (
+                                  <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-gray-100 text-gray-700 border border-gray-200">
+                                    PO: {poNo}
                                   </span>
                                 )}
-                              </>
-                            )}
-
-                            {/* Outward Proof: Production */}
-                            {tx.type === 'OUT' && (tx.referenceType === 'PRODUCTION' || (tx.remarks && (tx.remarks.toLowerCase().includes('batch') || tx.remarks.toLowerCase().includes('prod')))) && (
-                              <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-amber-50 text-amber-800 border border-amber-200">
-                                Production: {tx.proof?.productionNumber || `PROD-${(tx.batchNumber || '001').replace('B-', '')}/26-27`}
-                              </span>
-                            )}
-
-                            {/* Outward Proof: Vendor Return / Damaged */}
-                            {tx.type === 'OUT' && (tx.referenceType === 'QC' || (tx.remarks && (tx.remarks.toLowerCase().includes('damaged') || tx.remarks.toLowerCase().includes('rejected') || tx.remarks.toLowerCase().includes('return')))) && (
-                              <>
-                                <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-rose-50 text-rose-700 border border-rose-200">
-                                  Vendor Return: {tx.proof?.qcNumber ? `RET-${tx.proof.qcNumber}` : 'RET-QC-001/26-27'}
-                                </span>
-                                {tx.proof?.poNumber && (
-                                  <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-slate-100 text-slate-700 border border-slate-200">
-                                    PO: {tx.proof.poNumber}
-                                  </span>
-                                )}
-                              </>
-                            )}
-
-                            {/* Outward Proof: Sales */}
-                            {tx.type === 'OUT' && (tx.referenceType === 'SALES' || (tx.remarks && (tx.remarks.toLowerCase().includes('so-') || tx.remarks.toLowerCase().includes('sales')))) && (
-                              <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-emerald-50 text-emerald-800 border border-emerald-200">
-                                Sales Order: {tx.proof?.soNumber || `SO-001/26-27`}
-                              </span>
-                            )}
-                          </div>
+                              </div>
+                            );
+                          })()}
                           <span className="text-gray-500 text-[11px] font-normal block">{tx.refNumber || tx.source}</span>
                         </td>
                         <td className="px-6 py-4 text-xs text-gray-600">
@@ -909,56 +922,51 @@ const RawMaterialStock = () => {
                         <td className="px-4 py-3 text-right font-mono font-bold text-emerald-600">{tx.type === 'IN' ? `+ ${tx.quantity}` : '-'}</td>
                         <td className="px-4 py-3 text-right font-mono font-bold text-rose-600">{tx.type === 'OUT' ? `- ${tx.quantity}` : '-'}</td>
                         <td className="px-4 py-3 text-xs font-mono">
-                          <div className="flex flex-wrap items-center gap-1.5">
-                            {/* Inward Proof: PO / QC / GRN */}
-                            {tx.type === 'IN' && (
-                              <>
-                                {tx.proof?.poNumber && (
-                                  <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-blue-50 text-blue-700 border border-blue-200">
-                                    PO: {tx.proof.poNumber}
+                          {(() => {
+                            const { isIN, isProduction, isReturn, isSales, poNo, qcNo, grnNo, prodNo, retNo, soNo } = resolveTxProof(tx);
+                            return (
+                              <div className="flex flex-wrap items-center gap-1.5">
+                                {isIN && (
+                                  <>
+                                    <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-blue-50 text-blue-700 border border-blue-200">
+                                      PO: {poNo}
+                                    </span>
+                                    <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-purple-50 text-purple-700 border border-purple-200">
+                                      QC: {qcNo}
+                                    </span>
+                                    <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-slate-100 text-slate-700 border border-slate-200">
+                                      GRN: {grnNo}
+                                    </span>
+                                  </>
+                                )}
+                                {!isIN && isReturn && (
+                                  <>
+                                    <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-rose-50 text-rose-700 border border-rose-200">
+                                      Vendor Return: {retNo}
+                                    </span>
+                                    <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-blue-50 text-blue-700 border border-blue-200">
+                                      PO: {poNo}
+                                    </span>
+                                  </>
+                                )}
+                                {!isIN && isProduction && (
+                                  <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-amber-50 text-amber-800 border border-amber-200">
+                                    PROD: {prodNo}
                                   </span>
                                 )}
-                                {tx.proof?.qcNumber && (
-                                  <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-purple-50 text-purple-700 border border-purple-200">
-                                    QC: {tx.proof.qcNumber}
+                                {!isIN && isSales && (
+                                  <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-emerald-50 text-emerald-800 border border-emerald-200">
+                                    SO: {soNo}
                                   </span>
                                 )}
-                                {tx.proof?.grnNumber && (
-                                  <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-slate-100 text-slate-700 border border-slate-200">
-                                    GRN: {tx.proof.grnNumber}
+                                {!isIN && !isReturn && !isProduction && !isSales && (
+                                  <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-gray-100 text-gray-700 border border-gray-200">
+                                    PO: {poNo}
                                   </span>
                                 )}
-                              </>
-                            )}
-
-                            {/* Outward Proof: Production */}
-                            {tx.type === 'OUT' && (tx.referenceType === 'PRODUCTION' || (tx.remarks && (tx.remarks.toLowerCase().includes('batch') || tx.remarks.toLowerCase().includes('prod')))) && (
-                              <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-amber-50 text-amber-800 border border-amber-200">
-                                PROD: {tx.proof?.productionNumber || `PROD-${(tx.batchNumber || '001').replace('B-', '')}/26-27`}
-                              </span>
-                            )}
-
-                            {/* Outward Proof: Vendor Return / Damaged */}
-                            {tx.type === 'OUT' && (tx.referenceType === 'QC' || (tx.remarks && (tx.remarks.toLowerCase().includes('damaged') || tx.remarks.toLowerCase().includes('rejected') || tx.remarks.toLowerCase().includes('return')))) && (
-                              <>
-                                <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-rose-50 text-rose-700 border border-rose-200">
-                                  Vendor Return: {tx.proof?.qcNumber ? `RET-${tx.proof.qcNumber}` : 'RET-QC-001/26-27'}
-                                </span>
-                                {tx.proof?.poNumber && (
-                                  <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-slate-100 text-slate-700 border border-slate-200">
-                                    PO: {tx.proof.poNumber}
-                                  </span>
-                                )}
-                              </>
-                            )}
-
-                            {/* Outward Proof: Sales */}
-                            {tx.type === 'OUT' && (tx.referenceType === 'SALES' || (tx.remarks && (tx.remarks.toLowerCase().includes('so-') || tx.remarks.toLowerCase().includes('sales')))) && (
-                              <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-emerald-50 text-emerald-800 border border-emerald-200">
-                                SO: {tx.proof?.soNumber || `SO-001/26-27`}
-                              </span>
-                            )}
-                          </div>
+                              </div>
+                            );
+                          })()}
                         </td>
                         <td className="px-4 py-3 text-xs text-gray-600 font-medium">
                           {tx.remarks}
