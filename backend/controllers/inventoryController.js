@@ -1,5 +1,35 @@
 const Inventory = require('../models/Inventory');
 const InventoryTransaction = require('../models/InventoryTransaction');
+const Product = require('../models/Product');
+const Branch = require('../models/Branch');
+
+const populateInventoryReferences = async (invList = []) => {
+    if (!Array.isArray(invList) || invList.length === 0) return [];
+
+    const [allProducts, allBranches] = await Promise.all([
+        Product.find({}),
+        Branch.find({})
+    ]);
+
+    const productMap = {};
+    (allProducts || []).forEach(p => { if (p._id) productMap[p._id.toString()] = p; });
+
+    const branchMap = {};
+    (allBranches || []).forEach(b => { if (b._id) branchMap[b._id.toString()] = b; });
+
+    return invList.map(inv => {
+        const invObj = { ...inv };
+        const pId = invObj.product?._id ? invObj.product._id.toString() : (typeof invObj.product === 'string' ? invObj.product : null);
+        if (pId && productMap[pId]) {
+            invObj.product = productMap[pId];
+        }
+        const bId = invObj.branch?._id ? invObj.branch._id.toString() : (typeof invObj.branch === 'string' ? invObj.branch : null);
+        if (bId && branchMap[bId]) {
+            invObj.branch = branchMap[bId];
+        }
+        return invObj;
+    });
+};
 
 // @desc    Get inventory levels for a branch (or all)
 // @route   GET /api/v1/inventory
@@ -10,12 +40,11 @@ exports.getInventory = async (req, res) => {
         let query = {};
         if (branchId) query.branch = branchId;
         
-        const inventory = await Inventory.find(query)
-            .populate('branch', 'branchName branchCode')
-            .populate('product', 'name itemCode category unitOfMeasure minimumStockLevel mrp wholesalePrice purchasePrice itemType piecesPerBox')
-            .sort({ lastUpdated: -1, updatedAt: -1, createdAt: -1 });
+        const rawInventory = await Inventory.find(query);
+        const sorted = (rawInventory || []).sort((a, b) => new Date(b.updatedAt || b.lastUpdated || 0) - new Date(a.updatedAt || a.lastUpdated || 0));
+        const populated = await populateInventoryReferences(sorted);
             
-        res.json({ success: true, data: inventory });
+        res.json({ success: true, data: populated });
     } catch (error) {
         res.status(500).json({ success: false, message: error.message });
     }
@@ -31,14 +60,11 @@ exports.getInventoryTransactions = async (req, res) => {
         if (branchId) query.branch = branchId;
         if (productId) query.product = productId;
 
-        const transactions = await InventoryTransaction.find(query)
-            .populate('branch', 'branchName')
-            .populate('product', 'name itemCode category unitOfMeasure itemType piecesPerBox')
-            .populate('performedBy', 'name')
-            .sort({ createdAt: -1 })
-            .limit(200);
+        const rawTransactions = await InventoryTransaction.find(query);
+        const sorted = (rawTransactions || []).sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0)).slice(0, 200);
+        const populated = await populateInventoryReferences(sorted);
             
-        res.json({ success: true, data: transactions });
+        res.json({ success: true, data: populated });
     } catch (error) {
         res.status(500).json({ success: false, message: error.message });
     }

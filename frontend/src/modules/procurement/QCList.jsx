@@ -990,46 +990,38 @@ const QCList = () => {
                       <th className="px-6 py-4 text-center">Batch No</th>
                       <th className="px-6 py-4 text-right">In-Stock Qty</th>
                       <th className="px-6 py-4 text-right">Unit Price</th>
-                      <th className="px-6 py-4 text-right">MRP</th>
                       <th className="px-6 py-4 text-center">Temp Log</th>
-                      <th className="px-6 py-4 text-center">Mfg Date</th>
-                      <th className="px-6 py-4 text-center">Expiry Date</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-[var(--color-glass-border)]">
                     {storeRoomStock.map((item) => (
                       <tr key={item._id} className="hover:bg-[rgba(255,255,255,0.02)] transition-colors">
-                        <td className="px-6 py-4 font-semibold text-gray-900">{item.product?.name}</td>
+                        <td className="px-6 py-4 font-semibold text-gray-900">
+                          {item.product?.name || item.productName || item.name || 'N/A'}
+                        </td>
                         <td className="px-6 py-4 font-medium text-gray-800">{getVendorForItem(item)}</td>
-                        <td className="px-6 py-4 font-mono text-xs">{item.product?.itemCode}</td>
+                        <td className="px-6 py-4 font-mono text-xs">
+                          {item.product?.itemCode || item.itemCode || 'N/A'}
+                        </td>
                         <td className="px-6 py-4 text-center">
                           <span className="px-2 py-0.5 rounded bg-blue-50 text-blue-700 border border-blue-200 font-mono text-xs font-semibold">
                             {item.batchNumber}
                           </span>
                         </td>
                         <td className="px-6 py-4 text-right font-bold text-green-600">
-                          {item.quantity} {item.product?.unitOfMeasure}
+                          {item.quantity} {item.product?.unitOfMeasure || ''}
                         </td>
                         <td className="px-6 py-4 text-right font-semibold">
-                          ₹{item.purchasePrice?.toFixed(2)}
-                        </td>
-                        <td className="px-6 py-4 text-right font-semibold text-gray-950">
-                          ₹{item.mrp?.toFixed(2)}
+                          ₹{item.purchasePrice ? Number(item.purchasePrice).toFixed(2) : '0.00'}
                         </td>
                         <td className="px-6 py-4 text-center font-mono text-xs font-semibold">
                           {item.temperature !== undefined && item.temperature !== null ? `${item.temperature} °C` : 'N/A'}
-                        </td>
-                        <td className="px-6 py-4 text-center text-xs">
-                          {item.manufacturingDate ? new Date(item.manufacturingDate).toLocaleDateString() : 'N/A'}
-                        </td>
-                        <td className="px-6 py-4 text-center text-xs font-semibold text-rose-600">
-                          {item.expiryDate ? new Date(item.expiryDate).toLocaleDateString() : 'N/A'}
                         </td>
                       </tr>
                     ))}
                     {storeRoomStock.length === 0 && (
                       <tr>
-                        <td colSpan="10" className="px-6 py-8 text-center text-gray-600">
+                        <td colSpan="7" className="px-6 py-8 text-center text-gray-600">
                           No items currently in Store Room inventory.
                         </td>
                       </tr>
