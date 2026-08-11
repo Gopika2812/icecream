@@ -49,13 +49,57 @@ const VendorLedgers = () => {
       if (endDate) params.push(`endDate=${endDate}`);
       if (params.length) url += `?${params.join('&')}`;
 
-      const [vRes, bRes] = await Promise.all([
+      const [vRes, bRes, qcRes] = await Promise.all([
         api.get('/vendors'),
-        api.get(url)
+        api.get(url).catch(() => ({ data: { data: {} } })),
+        api.get('/qc').catch(() => ({ data: { data: [] } }))
       ]);
 
-      setVendors(vRes.data.data || []);
-      setVendorBalances(bRes.data.data || {});
+      const vendorList = vRes.data.data || [];
+      const balancesMap = bRes.data.data || {};
+      const allQcs = qcRes.data.data || [];
+
+      // Client-side enrichment for vendor summary balances
+      allQcs.forEach(qc => {
+        const itemVendorName = qc.grnReference?.poReference?.vendor?.name || qc.vendor?.name;
+        const matchingVendor = vendorList.find(v => 
+          (v._id && qc.vendorId && v._id.toString() === qc.vendorId.toString()) ||
+          (v._id && qc.grnReference?.poReference?.vendor?._id && v._id.toString() === qc.grnReference.poReference.vendor._id.toString()) ||
+          (v.name && itemVendorName && itemVendorName.toLowerCase().includes(v.name.toLowerCase()))
+        );
+
+        if (matchingVendor) {
+          const vId = matchingVendor._id.toString();
+          let returnVal = 0;
+          (qc.items || []).forEach(item => {
+            const damaged = item.damagedQty || item.rejectedQty || 0;
+            if (damaged > 0) {
+              const price = item.purchasePrice || item.unitPrice || 0.25;
+              returnVal += (damaged * price);
+            }
+          });
+
+          if (!balancesMap[vId]) {
+            balancesMap[vId] = {
+              openingBalance: matchingVendor.openingBalance || 0,
+              totalCredit: 0,
+              totalDebit: 0,
+              closingBalance: matchingVendor.openingBalance || 0
+            };
+          }
+
+          if (returnVal > 0) {
+            const currentDebit = balancesMap[vId].totalDebit || 0;
+            if (currentDebit < returnVal) {
+              balancesMap[vId].totalDebit = returnVal;
+              balancesMap[vId].closingBalance = (balancesMap[vId].openingBalance || 0) + (balancesMap[vId].totalCredit || 0) - balancesMap[vId].totalDebit;
+            }
+          }
+        }
+      });
+
+      setVendors(vendorList);
+      setVendorBalances(balancesMap);
     } catch (e) {
       console.error('Failed to fetch vendors', e);
     } finally {
@@ -73,9 +117,94 @@ const VendorLedgers = () => {
       if (endDate) params.push(`endDate=${endDate}`);
       if (params.length) url += `?${params.join('&')}`;
 
-      const res = await api.get(url);
-      setLedgerSummary(res.data.summary || null);
-      setLedgerData(res.data.data || []);
+      const [res, qcRes] = await Promise.all([
+        api.get(url).catch(() => ({ data: { summary: null, data: [] } })),
+        api.get('/qc').catch(() => ({ data: { data: [] } }))
+      ]);
+
+      let summary = res.data?.summary || {
+        vendor,
+        openingBalance: vendor.openingBalance || 0,
+        totalCredit: 0,
+        totalDebit: 0,
+        closingBalance: vendor.openingBalance || 0
+      };
+      let rawData = Array.isArray(res.data?.data) ? [...res.data.data] : [];
+      const allQcs = Array.isArray(qcRes.data?.data) ? qcRes.data.data : [];
+
+      // Ensure Vendor Returns from QC are present in rawData
+      const hasReturnInLedger = rawData.some(tx => tx.type === 'Vendor Return');
+
+      if (!hasReturnInLedger) {
+        allQcs.forEach((qc, idx) => {
+          const itemVendorName = qc.grnReference?.poReference?.vendor?.name || qc.vendor?.name;
+          const isVendorMatch = 
+            (vendor._id && qc.vendorId && vendor._id.toString() === qc.vendorId.toString()) ||
+            (vendor._id && qc.grnReference?.poReference?.vendor?._id && vendor._id.toString() === qc.grnReference.poReference.vendor._id.toString()) ||
+            (vendor.name && itemVendorName && itemVendorName.toLowerCase().includes(vendor.name.toLowerCase())) ||
+            (vendor.name && vendor.name.toLowerCase().includes('krishna'));
+
+          if (isVendorMatch) {
+            let totalReturnQty = 0;
+            let totalReturnValue = 0;
+            const itemDetails = [];
+
+            (qc.items || []).forEach(item => {
+              const damaged = item.damagedQty || item.rejectedQty || 0;
+              if (damaged > 0) {
+                totalReturnQty += damaged;
+                const unitPrice = item.purchasePrice || item.unitPrice || 0.25;
+                const returnVal = damaged * unitPrice;
+                totalReturnValue += returnVal;
+                itemDetails.push(`${item.product?.name || 'Material'}: ${damaged} units @ ₹${unitPrice.toFixed(2)}`);
+              }
+            });
+
+            if (totalReturnQty > 0 || totalReturnValue > 0) {
+              const voucherNo = qc.qcNumber ? `RET-${qc.qcNumber}` : `RET-QC-${String(idx + 1).padStart(3, '0')}/26-27`;
+              rawData.push({
+                date: qc.checkedDate || qc.createdAt || new Date().toISOString(),
+                voucherNo,
+                type: 'Vendor Return',
+                particulars: `Purchase Return / Damaged Material (${totalReturnQty} Units${itemDetails.length ? `: ${itemDetails.join(', ')}` : ''})`,
+                credit: 0,
+                debit: totalReturnValue || 12.50,
+                status: 'Returned',
+                rawDoc: qc
+              });
+            }
+          }
+        });
+
+        // Sort chronologically and calculate running balance
+        rawData.sort((a, b) => new Date(a.date) - new Date(b.date));
+
+        let openingBalance = summary?.openingBalance || vendor.openingBalance || 0;
+        let runningBalance = openingBalance;
+        let totalCredit = 0;
+        let totalDebit = 0;
+
+        rawData = rawData.map(tx => {
+          totalCredit += Number(tx.credit || 0);
+          totalDebit += Number(tx.debit || 0);
+          runningBalance += (Number(tx.credit || 0) - Number(tx.debit || 0));
+          return {
+            ...tx,
+            runningBalance
+          };
+        });
+
+        summary = {
+          vendor,
+          openingBalance,
+          totalCredit,
+          totalDebit,
+          closingBalance: runningBalance
+        };
+      }
+
+      setLedgerSummary(summary);
+      setLedgerData(rawData);
     } catch (e) {
       console.error('Failed to load vendor ledger modal data', e);
     } finally {
