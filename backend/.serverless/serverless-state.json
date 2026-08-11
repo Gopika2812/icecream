@@ -222,7 +222,7 @@
                 "S3Bucket": {
                   "Ref": "ServerlessDeploymentBucket"
                 },
-                "S3Key": "serverless/icecream-erp-backend/dev/1786477663307-2026-08-11T19:47:43.307Z/icecream-erp-backend.zip"
+                "S3Key": "serverless/icecream-erp-backend/dev/1786479380678-2026-08-11T20:16:20.678Z/icecream-erp-backend.zip"
               },
               "Handler": "handler.handler",
               "Runtime": "nodejs20.x",
@@ -1304,7 +1304,7 @@
     "artifact": "E:\\icecream\\backend\\.serverless\\icecream-erp-backend.zip"
   },
   "package": {
-    "artifactDirectoryName": "serverless/icecream-erp-backend/dev/1786477663307-2026-08-11T19:47:43.307Z",
+    "artifactDirectoryName": "serverless/icecream-erp-backend/dev/1786479380678-2026-08-11T20:16:20.678Z",
     "artifact": "icecream-erp-backend.zip"
   }
 }

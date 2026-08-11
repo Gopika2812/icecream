@@ -80,20 +80,21 @@ const ProductionList = () => {
   const rawMaterials = products.filter(p => p.itemType !== 'Finished Goods');
   const mixProducts = products.filter(p => p.itemType?.toLowerCase().includes('mix') || (p.rawMaterials && p.rawMaterials.length > 0));
 
-  // Apply Mix Formula handler
+  // Apply Mix Formula handler (Scaled by Liters)
   const handleApplyMixFormula = () => {
     if (!selectedMixProduct) return alert('Please select a Mix formula.');
     const mixItem = products.find(p => p._id === selectedMixProduct);
     if (!mixItem || !mixItem.rawMaterials || mixItem.rawMaterials.length === 0) {
-      return alert('The selected Mix item does not have any raw materials configured in its recipe master.');
+      return alert('The selected Mix item does not have any raw materials configured in its recipe master. You can create/edit recipes in Products Master!');
     }
-    const count = parseFloat(mixCount) || 1;
+    const targetLiters = parseFloat(mixCount) || 1;
     const newRows = mixItem.rawMaterials.map(rm => {
       const pId = rm.product?._id || rm.product;
-      const qtyNeeded = (parseFloat(rm.quantity) || 0) * count;
+      const baseQty = parseFloat(rm.quantity) || 0;
+      const scaledQty = baseQty * targetLiters;
       return {
         product: pId,
-        quantityUsed: qtyNeeded.toString(),
+        quantityUsed: scaledQty.toString(),
         batchNumber: 'STORE-RM'
       };
     });
@@ -102,7 +103,7 @@ const ProductionList = () => {
       ...prev,
       rawMaterialsUsed: newRows
     }));
-    alert(`Applied "${mixItem.name}" recipe (${count} Count of Mix)! Auto-populated ${newRows.length} raw materials for batch requisition.`);
+    alert(`Applied "${mixItem.name}" formula recipe for ${targetLiters} Liters! Auto-populated ${newRows.length} raw materials for batch requisition.`);
   };
 
   // Handle Finished Good selection
@@ -717,36 +718,41 @@ const ProductionList = () => {
             <div className="space-y-4">
               {/* MIX FORMULA AUTO-FILL SECTION */}
               <div className="p-4 bg-purple-50/80 border border-purple-200 rounded-2xl space-y-3">
-                <div className="flex items-center gap-2 text-purple-950 font-extrabold text-xs uppercase tracking-wider">
-                  <Package size={16} className="text-purple-600" />
-                  <span>Select Mix Formula to Auto-Calculate Raw Materials</span>
+                <div className="flex justify-between items-center text-purple-950 font-extrabold text-xs uppercase tracking-wider">
+                  <span className="flex items-center gap-2">
+                    <Package size={16} className="text-purple-600" />
+                    Select Mix Formula to Auto-Calculate Raw Materials (Scaled by Liters)
+                  </span>
+                  <span className="text-[10px] text-purple-700 font-semibold lowercase">
+                    Recipes managed in Products Master
+                  </span>
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-12 gap-3 items-end">
                   <div className="sm:col-span-6 space-y-1">
-                    <label className="text-[11px] font-bold text-gray-700 block">Select Mix (e.g. Butterscotch Mix) *</label>
+                    <label className="text-[11px] font-bold text-gray-700 block">Select Mix Formula *</label>
                     <SearchableSelect
-                      placeholder="Select Mix item..."
+                      placeholder="Select Mix formula from Master..."
                       value={selectedMixProduct}
                       options={mixProducts.map(m => ({
                         value: m._id,
                         label: m.name,
                         code: m.itemCode,
-                        sublabel: `Contains ${m.rawMaterials?.length || 0} raw materials`
+                        sublabel: `Contains ${m.rawMaterials?.length || 0} raw materials (per 1L)`
                       }))}
                       onChange={(val) => setSelectedMixProduct(val)}
                     />
                   </div>
 
                   <div className="sm:col-span-3 space-y-1">
-                    <label className="text-[11px] font-bold text-gray-700 block">Count of Mix Needed *</label>
+                    <label className="text-[11px] font-bold text-gray-700 block">Target Mix Volume (Liters) *</label>
                     <input
                       type="number"
-                      min="1"
+                      min="0.1"
                       step="0.1"
                       value={mixCount}
                       onChange={(e) => setMixCount(e.target.value)}
-                      placeholder="Count e.g. 2"
-                      className={`${customInputStyle} font-mono font-bold`}
+                      placeholder="e.g. 250 L"
+                      className={`${customInputStyle} font-mono font-bold text-purple-900 border-purple-300`}
                     />
                   </div>
 
@@ -754,9 +760,9 @@ const ProductionList = () => {
                     <button
                       type="button"
                       onClick={handleApplyMixFormula}
-                      className="w-full bg-purple-600 hover:bg-purple-700 text-white py-2.5 px-3 rounded-xl text-xs font-extrabold shadow-sm transition-all flex items-center justify-center gap-1"
+                      className="w-full bg-purple-600 hover:bg-purple-700 text-white py-2.5 px-3 rounded-xl text-xs font-extrabold shadow-sm transition-all flex items-center justify-center gap-1 cursor-pointer"
                     >
-                      Apply Mix Recipe
+                      Scale & Apply Recipe
                     </button>
                   </div>
                 </div>

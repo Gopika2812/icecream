@@ -581,9 +581,9 @@ const ProductList = () => {
                 <div className="flex justify-between items-center mb-3">
                   <div>
                     <h3 className="text-xs font-extrabold text-purple-950 uppercase tracking-wider flex items-center gap-1.5">
-                      <FlaskConical size={15} className="text-purple-600" /> Mix Composition Formula (Raw Materials)
+                      <FlaskConical size={15} className="text-purple-600" /> Mix Recipe Master (Standard 1 Liter Base Recipe)
                     </h3>
-                    <p className="text-[10px] text-purple-700 mt-0.5">Attach raw material ingredients & recipe quantities for this mix formula</p>
+                    <p className="text-[10px] text-purple-700 mt-0.5 font-medium">Define raw material quantities required to prepare <strong>1 Liter of Mix</strong>. This formula automatically scales in production planning!</p>
                   </div>
                   <button
                     type="button"
