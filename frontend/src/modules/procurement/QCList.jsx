@@ -135,7 +135,9 @@ const QCList = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!selectedPO) return alert('Please select a Purchase Order.');
-    if (!supplierInvoiceNumber) return alert('Please enter the Supplier Invoice Number.');
+
+    const selectedPoObj = pendingPOs.find(p => p._id === selectedPO);
+    const invoiceNo = selectedPoObj?.supplierInvoiceNumber || supplierInvoiceNumber || 'N/A';
     
     // Check constraints
     for (const item of items) {
@@ -166,7 +168,7 @@ const QCList = () => {
       const payload = {
         poReference: selectedPO,
         branch: selectedBranch,
-        supplierInvoiceNumber,
+        supplierInvoiceNumber: invoiceNo,
         status,
         items: items.map(i => ({
           product: i.product,
@@ -629,7 +631,7 @@ const QCList = () => {
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-6">
-          <div className="glass-panel p-6 grid grid-cols-1 md:grid-cols-2 gap-6 relative z-20">
+          <div className="glass-panel p-6 grid grid-cols-1 gap-6 relative z-20">
             <div>
               <label className="block text-xs font-bold text-gray-700 mb-2">Select Pending Purchase Order *</label>
               <SearchableSelect
@@ -637,24 +639,12 @@ const QCList = () => {
                   value: p._id, 
                   label: p.poNumber, 
                   code: p.vendor?.name,
-                  sublabel: `Total: ₹${p.totalAmount}`
+                  sublabel: `Total: ₹${p.totalAmount}${p.supplierInvoiceNumber ? ` | Inv: ${p.supplierInvoiceNumber}` : ''}`
                 }))}
                 value={selectedPO}
                 onChange={(val) => handlePOChange(val)}
                 placeholder="Search & Select Issued PO..."
                 required
-              />
-            </div>
-
-            <div>
-              <label className="block text-xs font-bold text-gray-700 mb-2">Supplier Invoice Number *</label>
-              <input 
-                type="text" 
-                value={supplierInvoiceNumber} 
-                onChange={(e) => setSupplierInvoiceNumber(e.target.value)}
-                required
-                placeholder="e.g. INV-9876"
-                className="w-full bg-white border border-gray-200 rounded-xl px-4 py-2.5 text-gray-900 text-sm font-semibold shadow-xs focus:outline-none focus:ring-2 focus:ring-pink-500/20 focus:border-pink-600 transition-all"
               />
             </div>
           </div>
