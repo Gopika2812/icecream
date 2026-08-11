@@ -6,6 +6,52 @@ import {
 } from 'lucide-react';
 import Modal from '../../components/Modal';
 
+const getLocalDateString = (d = new Date()) => {
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
+const getPresetDates = (preset) => {
+  const now = new Date();
+  const todayStr = getLocalDateString(now);
+
+  if (preset === 'Today') {
+    return { startDate: todayStr, endDate: todayStr };
+  }
+  if (preset === 'Yesterday') {
+    const y = new Date();
+    y.setDate(y.getDate() - 1);
+    const yStr = getLocalDateString(y);
+    return { startDate: yStr, endDate: yStr };
+  }
+  if (preset === 'This Week') {
+    const d = new Date();
+    const day = d.getDay();
+    const diff = d.getDate() - day + (day === 0 ? -6 : 1);
+    const startOfWeek = new Date(d.setDate(diff));
+    return { startDate: getLocalDateString(startOfWeek), endDate: todayStr };
+  }
+  if (preset === 'This Month') {
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+    return { startDate: getLocalDateString(startOfMonth), endDate: todayStr };
+  }
+  if (preset === 'Quarterly') {
+    const currentQuarter = Math.floor(now.getMonth() / 3);
+    const startOfQuarter = new Date(now.getFullYear(), currentQuarter * 3, 1);
+    return { startDate: getLocalDateString(startOfQuarter), endDate: todayStr };
+  }
+  if (preset === 'Annual') {
+    const startOfYear = new Date(now.getFullYear(), 0, 1);
+    return { startDate: getLocalDateString(startOfYear), endDate: todayStr };
+  }
+  if (preset === 'ALL') {
+    return { startDate: '', endDate: '' };
+  }
+  return { startDate: todayStr, endDate: todayStr };
+};
+
 const RawMaterialStock = () => {
   const [products, setProducts] = useState([]);
   const [inventory, setInventory] = useState([]);
@@ -13,12 +59,25 @@ const RawMaterialStock = () => {
   const [qcs, setQcs] = useState([]);
   const [loading, setLoading] = useState(true);
 
+  // Date Range Filter States (Defaulting to Today)
+  const initialToday = getLocalDateString();
+  const [datePreset, setDatePreset] = useState('Today');
+  const [startDate, setStartDate] = useState(initialToday);
+  const [endDate, setEndDate] = useState(initialToday);
+
   // Filter & Search States
   const [materialTypeFilter, setMaterialTypeFilter] = useState('RAW'); // 'RAW' | 'PACKING' | 'ALL'
   const [activeTab, setActiveTab] = useState('Stock Balance'); // 'Stock Balance' | 'Movement Ledger'
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('ALL');
   const [txTypeFilter, setTxTypeFilter] = useState('ALL'); // 'ALL' | 'IN' | 'OUT'
+
+  const handlePresetChange = (preset) => {
+    setDatePreset(preset);
+    const { startDate: s, endDate: e } = getPresetDates(preset);
+    setStartDate(s);
+    setEndDate(e);
+  };
 
   // Modal States
   const [selectedProductModal, setSelectedProductModal] = useState(null);
@@ -101,6 +160,12 @@ const RawMaterialStock = () => {
     (transactions || []).forEach(tx => {
       const pId = tx.product?._id ? tx.product._id.toString() : (typeof tx.product === 'string' ? tx.product : null);
       if (pId && productMap[pId]) {
+        const txDateStr = getLocalDateString(new Date(tx.createdAt || Date.now()));
+
+        // Apply date range filter if specified
+        if (startDate && txDateStr < startDate) return;
+        if (endDate && txDateStr > endDate) return;
+
         const date = tx.createdAt || new Date();
         const qty = tx.quantity || 0;
         
@@ -352,7 +417,7 @@ const RawMaterialStock = () => {
         </div>
       </div>
 
-      {/* Material Type Selector Tabs (Raw Materials vs Packing Materials) */}
+      {/* Material Type Selector Tabs (Raw Materials vs Packing Materials) & Date Range Preset */}
       <div className="flex flex-wrap items-center justify-between gap-3 mb-6 bg-white/80 p-2.5 rounded-2xl border border-pink-200 shadow-sm backdrop-blur-md">
         <div className="flex items-center gap-2">
           <button
@@ -408,6 +473,50 @@ const RawMaterialStock = () => {
               {rawCount + packingCount}
             </span>
           </button>
+        </div>
+
+        {/* Date Range Preset Selector */}
+        <div className="flex flex-wrap items-center gap-2 bg-white/90 p-1.5 rounded-xl border border-pink-200 text-xs shadow-2xs">
+          <div className="flex items-center gap-1 text-pink-900 font-extrabold px-1">
+            <Calendar size={14} className="text-pink-600" />
+            <span className="text-[10px] uppercase tracking-wider">Period:</span>
+          </div>
+          <select
+            value={datePreset}
+            onChange={(e) => handlePresetChange(e.target.value)}
+            className="bg-pink-50 border border-pink-200 rounded-lg px-2.5 py-1 font-bold text-pink-900 text-xs focus:outline-none focus:ring-2 focus:ring-pink-500/20 cursor-pointer"
+          >
+            <option value="Today">Today</option>
+            <option value="Yesterday">Yesterday</option>
+            <option value="This Week">This Week</option>
+            <option value="This Month">This Month</option>
+            <option value="Quarterly">Quarterly</option>
+            <option value="Annual">Annual</option>
+            <option value="ALL">All Time</option>
+            <option value="Custom">Custom Range</option>
+          </select>
+
+          <input
+            type="date"
+            value={startDate}
+            onChange={(e) => { setStartDate(e.target.value); setDatePreset('Custom'); }}
+            className="bg-white border border-gray-200 rounded-lg px-2 py-1 font-mono font-bold text-gray-900 text-xs focus:outline-none focus:border-pink-500"
+          />
+          <span className="text-gray-400 font-bold text-[11px]">to</span>
+          <input
+            type="date"
+            value={endDate}
+            onChange={(e) => { setEndDate(e.target.value); setDatePreset('Custom'); }}
+            className="bg-white border border-gray-200 rounded-lg px-2 py-1 font-mono font-bold text-gray-900 text-xs focus:outline-none focus:border-pink-500"
+          />
+          {datePreset !== 'Today' && (
+            <button
+              onClick={() => handlePresetChange('Today')}
+              className="text-[11px] font-extrabold text-pink-700 hover:text-pink-900 px-2 py-0.5 bg-pink-50 rounded-lg border border-pink-200 transition-colors"
+            >
+              Reset Today
+            </button>
+          )}
         </div>
       </div>
 

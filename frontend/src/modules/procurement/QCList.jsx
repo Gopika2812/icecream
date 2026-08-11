@@ -7,6 +7,52 @@ import {
 import api from '../../services/api';
 import SearchableSelect from '../../components/SearchableSelect';
 
+const getLocalDateString = (d = new Date()) => {
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
+const getPresetDates = (preset) => {
+  const now = new Date();
+  const todayStr = getLocalDateString(now);
+
+  if (preset === 'Today') {
+    return { startDate: todayStr, endDate: todayStr };
+  }
+  if (preset === 'Yesterday') {
+    const y = new Date();
+    y.setDate(y.getDate() - 1);
+    const yStr = getLocalDateString(y);
+    return { startDate: yStr, endDate: yStr };
+  }
+  if (preset === 'This Week') {
+    const d = new Date();
+    const day = d.getDay();
+    const diff = d.getDate() - day + (day === 0 ? -6 : 1);
+    const startOfWeek = new Date(d.setDate(diff));
+    return { startDate: getLocalDateString(startOfWeek), endDate: todayStr };
+  }
+  if (preset === 'This Month') {
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+    return { startDate: getLocalDateString(startOfMonth), endDate: todayStr };
+  }
+  if (preset === 'Quarterly') {
+    const currentQuarter = Math.floor(now.getMonth() / 3);
+    const startOfQuarter = new Date(now.getFullYear(), currentQuarter * 3, 1);
+    return { startDate: getLocalDateString(startOfQuarter), endDate: todayStr };
+  }
+  if (preset === 'Annual') {
+    const startOfYear = new Date(now.getFullYear(), 0, 1);
+    return { startDate: getLocalDateString(startOfYear), endDate: todayStr };
+  }
+  if (preset === 'ALL') {
+    return { startDate: '', endDate: '' };
+  }
+  return { startDate: todayStr, endDate: todayStr };
+};
+
 const QCList = () => {
   const [activeTab, setActiveTab] = useState('QC Check');
   const [qcs, setQcs] = useState([]);
@@ -20,8 +66,16 @@ const QCList = () => {
   const [isCreating, setIsCreating] = useState(false);
 
   // Main Dashboard Date Filter State
+  const [datePreset, setDatePreset] = useState('ALL');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
+
+  const handlePresetChange = (preset) => {
+    setDatePreset(preset);
+    const { startDate: s, endDate: e } = getPresetDates(preset);
+    setStartDate(s);
+    setEndDate(e);
+  };
 
   // Vendor Ledger Modal & Date Filter State
   const [selectedLedgerVendorId, setSelectedLedgerVendorId] = useState(null);
@@ -792,25 +846,39 @@ const QCList = () => {
         </div>
 
         <div className="flex items-center gap-3">
-          <div className="flex items-center gap-2 bg-white p-2 rounded-xl border border-gray-200 shadow-sm text-xs">
+          <div className="flex flex-wrap items-center gap-2 bg-white p-2 rounded-xl border border-gray-200 shadow-sm text-xs">
             <Calendar size={14} className="text-gray-400" />
             <span className="font-bold text-gray-700 font-mono uppercase text-[11px]">Period:</span>
+            <select
+              value={datePreset}
+              onChange={(e) => handlePresetChange(e.target.value)}
+              className="bg-pink-50 border border-pink-200 rounded-lg px-2.5 py-1 font-bold text-pink-900 text-xs focus:outline-none focus:ring-2 focus:ring-pink-500/20 cursor-pointer"
+            >
+              <option value="ALL">All Time</option>
+              <option value="Today">Today</option>
+              <option value="Yesterday">Yesterday</option>
+              <option value="This Week">This Week</option>
+              <option value="This Month">This Month</option>
+              <option value="Quarterly">Quarterly</option>
+              <option value="Annual">Annual</option>
+              <option value="Custom">Custom Range</option>
+            </select>
             <input
               type="date"
               value={startDate}
-              onChange={(e) => setStartDate(e.target.value)}
+              onChange={(e) => { setStartDate(e.target.value); setDatePreset('Custom'); }}
               className="bg-gray-50 border border-gray-300 rounded px-2 py-1 font-mono font-bold text-gray-900 text-xs"
             />
             <span className="text-gray-400">to</span>
             <input
               type="date"
               value={endDate}
-              onChange={(e) => setEndDate(e.target.value)}
+              onChange={(e) => { setEndDate(e.target.value); setDatePreset('Custom'); }}
               className="bg-gray-50 border border-gray-300 rounded px-2 py-1 font-mono font-bold text-gray-900 text-xs"
             />
-            {(startDate || endDate) && (
+            {(startDate || endDate || datePreset !== 'ALL') && (
               <button
-                onClick={() => { setStartDate(''); setEndDate(''); }}
+                onClick={() => handlePresetChange('ALL')}
                 className="text-pink-600 font-bold hover:underline text-[11px] ml-1"
               >
                 Clear
