@@ -375,7 +375,8 @@ const VendorLedgers = () => {
 
   // Total Portfolio Summaries
   const totalCreditSum = Object.values(vendorBalances).reduce((acc, curr) => acc + (curr.totalCredit || 0), 0);
-  const totalDebitSum = Object.values(vendorBalances).reduce((acc, curr) => acc + (curr.totalDebit || 0), 0);
+  const totalPaymentsSum = Object.values(vendorBalances).reduce((acc, curr) => acc + (curr.totalPayments || (curr.totalDebit - (curr.totalReturns || 0))), 0);
+  const totalReturnsSum = Object.values(vendorBalances).reduce((acc, curr) => acc + (curr.totalReturns || 0), 0);
   const totalClosingBalanceSum = Object.values(vendorBalances).reduce((acc, curr) => acc + (curr.closingBalance || 0), 0);
 
   // Filtered Payment Disbursement Records
@@ -658,15 +659,20 @@ const VendorLedgers = () => {
         <div className="space-y-6">
           
           {/* PORTFOLIO SUMMARY CARDS */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
             <div className="p-4 bg-white border border-slate-200/80 rounded-2xl shadow-xs">
               <span className="text-[11px] font-bold uppercase tracking-wider text-emerald-800 block">Total Purchases Buy (Credit)</span>
               <span className="text-2xl font-mono font-black text-emerald-700 mt-1 block">₹{totalCreditSum.toFixed(2)}</span>
             </div>
 
             <div className="p-4 bg-white border border-slate-200/80 rounded-2xl shadow-xs">
-              <span className="text-[11px] font-bold uppercase tracking-wider text-rose-800 block">Vendor Payments & Returns (Debit)</span>
-              <span className="text-2xl font-mono font-black text-rose-700 mt-1 block">₹{totalDebitSum.toFixed(2)}</span>
+              <span className="text-[11px] font-bold uppercase tracking-wider text-blue-800 block">Bill Payments Paid (Debit)</span>
+              <span className="text-2xl font-mono font-black text-blue-700 mt-1 block">₹{totalPaymentsSum.toFixed(2)}</span>
+            </div>
+
+            <div className="p-4 bg-white border border-slate-200/80 rounded-2xl shadow-xs">
+              <span className="text-[11px] font-bold uppercase tracking-wider text-rose-800 block">Vendor Stock Returns (Debit)</span>
+              <span className="text-2xl font-mono font-black text-rose-700 mt-1 block">₹{totalReturnsSum.toFixed(2)}</span>
             </div>
 
             <div className="p-4 bg-white border border-slate-200/80 rounded-2xl shadow-xs">
@@ -709,14 +715,17 @@ const VendorLedgers = () => {
                       <th className="px-4 py-3.5">Contact & Phone</th>
                       <th className="px-4 py-3.5 text-right">Opening (₹)</th>
                       <th className="px-4 py-3.5 text-right text-emerald-800">Purchases (Credit ₹)</th>
-                      <th className="px-4 py-3.5 text-right text-rose-800">Payments & Returns (Debit ₹)</th>
+                      <th className="px-4 py-3.5 text-right text-blue-800">Payments Paid (₹)</th>
+                      <th className="px-4 py-3.5 text-right text-rose-800">Stock Returns (₹)</th>
                       <th className="px-4 py-3.5 text-right font-bold text-slate-900">Closing Payable (₹)</th>
                       <th className="px-4 py-3.5 text-center">Actions</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
                     {filteredVendors.map((ven) => {
-                      const summary = vendorBalances[ven._id] || { openingBalance: 0, totalCredit: 0, totalDebit: 0, closingBalance: 0 };
+                      const summary = vendorBalances[ven._id] || { openingBalance: 0, totalCredit: 0, totalPayments: 0, totalReturns: 0, totalDebit: 0, closingBalance: 0 };
+                      const vPayments = summary.totalPayments || (summary.totalDebit - (summary.totalReturns || 0));
+                      const vReturns = summary.totalReturns || (summary.totalDebit > 0 && vPayments === 0 ? summary.totalDebit : 0);
 
                       return (
                         <tr key={ven._id} className="hover:bg-slate-50/80 transition-colors">
@@ -744,8 +753,12 @@ const VendorLedgers = () => {
                             + ₹{summary.totalCredit?.toFixed(2)}
                           </td>
 
+                          <td className="px-4 py-3.5 text-right font-mono font-bold text-blue-600">
+                            {vPayments > 0 ? `- ₹${vPayments.toFixed(2)}` : '-'}
+                          </td>
+
                           <td className="px-4 py-3.5 text-right font-mono font-bold text-rose-600">
-                            - ₹{summary.totalDebit?.toFixed(2)}
+                            {vReturns > 0 ? `- ₹${vReturns.toFixed(2)}` : '-'}
                           </td>
 
                           <td className="px-4 py-3.5 text-right font-mono font-extrabold text-slate-900 text-sm">
@@ -1004,7 +1017,7 @@ const VendorLedgers = () => {
 
             {/* Summary Row */}
             {ledgerSummary && (
-              <div className="grid grid-cols-4 gap-2 text-center text-xs">
+              <div className="grid grid-cols-5 gap-2 text-center text-xs">
                 <div className="p-2 bg-amber-50 border border-amber-200 rounded-lg">
                   <span className="text-[10px] text-amber-700 font-bold uppercase block">Opening</span>
                   <span className="font-mono font-extrabold text-amber-900">₹{ledgerSummary.openingBalance?.toFixed(2)}</span>
@@ -1013,9 +1026,13 @@ const VendorLedgers = () => {
                   <span className="text-[10px] text-emerald-700 font-bold uppercase block">Purchases Buy</span>
                   <span className="font-mono font-extrabold text-emerald-900">₹{ledgerSummary.totalCredit?.toFixed(2)}</span>
                 </div>
+                <div className="p-2 bg-blue-50 border border-blue-200 rounded-lg">
+                  <span className="text-[10px] text-blue-700 font-bold uppercase block">Payments Paid</span>
+                  <span className="font-mono font-extrabold text-blue-900">₹{(ledgerSummary.totalPayments || (ledgerSummary.totalDebit - (ledgerSummary.totalReturns || 0)))?.toFixed(2)}</span>
+                </div>
                 <div className="p-2 bg-rose-50 border border-rose-200 rounded-lg">
-                  <span className="text-[10px] text-rose-700 font-bold uppercase block">Payments & Returns</span>
-                  <span className="font-mono font-extrabold text-rose-900">₹{ledgerSummary.totalDebit?.toFixed(2)}</span>
+                  <span className="text-[10px] text-rose-700 font-bold uppercase block">Stock Returns</span>
+                  <span className="font-mono font-extrabold text-rose-900">₹{(ledgerSummary.totalReturns || (ledgerSummary.totalDebit > 0 && !(ledgerSummary.totalPayments > 0) ? ledgerSummary.totalDebit : 0))?.toFixed(2)}</span>
                 </div>
                 <div className="p-2 bg-purple-50 border border-purple-200 rounded-lg">
                   <span className="text-[10px] text-purple-700 font-bold uppercase block">Closing Payable</span>

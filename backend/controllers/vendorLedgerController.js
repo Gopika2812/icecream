@@ -205,11 +205,18 @@ exports.getVendorLedger = async (req, res) => {
         // Calculate Running Payable Balance
         let openingBalance = vendor.openingBalance || 0;
         let runningBalance = openingBalance;
-        let totalCredit = 0; // Total Purchases
-        let totalDebit = 0;  // Total Payments & Returns
+        let totalCredit = 0;   // Total Purchases
+        let totalPayments = 0; // Total Payments Paid
+        let totalReturns = 0;  // Total Stock Returns
+        let totalDebit = 0;    // Total Payments & Returns Combined
 
         const ledgerWithBalance = ledgerTransactions.map(tx => {
             totalCredit += tx.credit;
+            if (tx.type === 'Vendor Payment') {
+                totalPayments += tx.debit;
+            } else if (tx.type === 'Vendor Return') {
+                totalReturns += tx.debit;
+            }
             totalDebit += tx.debit;
             runningBalance += (tx.credit - tx.debit);
             return {
@@ -222,6 +229,8 @@ exports.getVendorLedger = async (req, res) => {
             vendor,
             openingBalance,
             totalCredit,
+            totalPayments,
+            totalReturns,
             totalDebit,
             closingBalance: runningBalance
         };
@@ -273,6 +282,8 @@ exports.getAllVendorSummaries = async (req, res) => {
                 summariesMap[vId] = {
                     openingBalance: v.openingBalance || 0,
                     totalCredit: 0,
+                    totalPayments: 0,
+                    totalReturns: 0,
                     totalDebit: 0,
                     closingBalance: v.openingBalance || 0
                 };
@@ -289,6 +300,7 @@ exports.getAllVendorSummaries = async (req, res) => {
         (payments || []).forEach(vp => {
             const vId = vp.vendor?._id ? vp.vendor._id.toString() : (typeof vp.vendor === 'string' ? vp.vendor : null);
             if (vId && summariesMap[vId]) {
+                summariesMap[vId].totalPayments += (vp.amount || 0);
                 summariesMap[vId].totalDebit += (vp.amount || 0);
             }
         });
@@ -300,6 +312,7 @@ exports.getAllVendorSummaries = async (req, res) => {
 
             const vId = qc.vendorId ? qc.vendorId.toString() : null;
             if (vId && summariesMap[vId]) {
+                summariesMap[vId].totalReturns += (qc.totalReturnValue || 0);
                 summariesMap[vId].totalDebit += (qc.totalReturnValue || 0);
             }
         });
