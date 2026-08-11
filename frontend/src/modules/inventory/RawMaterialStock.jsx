@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import api from '../../services/api';
 import { 
   Package, ArrowDownLeft, ArrowUpRight, Search, Filter, Plus, Printer, 
-  Loader2, ShieldAlert, ArrowLeftRight, Calendar, Building2, X, CheckCircle2, History 
+  Loader2, ShieldAlert, ArrowLeftRight, Calendar, Building2, X, CheckCircle2, History, Milk, Box 
 } from 'lucide-react';
 import Modal from '../../components/Modal';
 
@@ -14,6 +14,7 @@ const RawMaterialStock = () => {
   const [loading, setLoading] = useState(true);
 
   // Filter & Search States
+  const [materialTypeFilter, setMaterialTypeFilter] = useState('RAW'); // 'RAW' | 'PACKING' | 'ALL'
   const [activeTab, setActiveTab] = useState('Stock Balance'); // 'Stock Balance' | 'Movement Ledger'
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('ALL');
@@ -59,18 +60,33 @@ const RawMaterialStock = () => {
     }
   };
 
-  // Compile Stock Movement & Balances for all products
-  // Compile Stock Movement & Balances for all products
+  // Compile Stock Movement & Balances for products based on selected Material Type
   const compileProductStock = () => {
     const productMap = {};
 
-    // Initialize all products
-    (products || []).forEach(p => {
+    // Filter out Finished Goods and apply materialTypeFilter
+    const targetProducts = (products || []).filter(p => {
+      if (p.itemType === 'Finished Goods' || p.itemType === 'Finished Good') return false;
+
+      const type = (p.itemType || '').toLowerCase();
+      const cat = (p.category || '').toLowerCase();
+
+      if (materialTypeFilter === 'RAW') {
+        return type.includes('raw') || (!type.includes('pack') && !cat.includes('packaging'));
+      }
+      if (materialTypeFilter === 'PACKING') {
+        return type.includes('pack') || cat.includes('packaging');
+      }
+      return true; // 'ALL' input materials
+    });
+
+    targetProducts.forEach(p => {
       const pId = p._id.toString();
       productMap[pId] = {
         id: pId,
         itemCode: p.itemCode || 'N/A',
         name: p.name,
+        itemType: p.itemType || 'Raw Material',
         category: p.category || 'Raw Material',
         unitOfMeasure: p.unitOfMeasure || 'Units',
         minimumStockLevel: p.minimumStockLevel || 0,
@@ -128,6 +144,21 @@ const RawMaterialStock = () => {
   };
 
   const compiledProducts = compileProductStock();
+
+  // Counts for tabs
+  const rawCount = (products || []).filter(p => {
+    if (p.itemType === 'Finished Goods' || p.itemType === 'Finished Good') return false;
+    const type = (p.itemType || '').toLowerCase();
+    const cat = (p.category || '').toLowerCase();
+    return type.includes('raw') || (!type.includes('pack') && !cat.includes('packaging'));
+  }).length;
+
+  const packingCount = (products || []).filter(p => {
+    if (p.itemType === 'Finished Goods' || p.itemType === 'Finished Good') return false;
+    const type = (p.itemType || '').toLowerCase();
+    const cat = (p.category || '').toLowerCase();
+    return type.includes('pack') || cat.includes('packaging');
+  }).length;
 
   // Categories list
   const categories = ['ALL', ...new Set(compiledProducts.map(p => p.category))];
@@ -321,6 +352,65 @@ const RawMaterialStock = () => {
         </div>
       </div>
 
+      {/* Material Type Selector Tabs (Raw Materials vs Packing Materials) */}
+      <div className="flex flex-wrap items-center justify-between gap-3 mb-6 bg-white/80 p-2.5 rounded-2xl border border-pink-200 shadow-sm backdrop-blur-md">
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => { setMaterialTypeFilter('RAW'); setSelectedCategory('ALL'); }}
+            className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-black transition-all cursor-pointer ${
+              materialTypeFilter === 'RAW'
+                ? 'bg-gradient-to-r from-pink-600 to-rose-600 text-white shadow-md shadow-pink-500/25 ring-2 ring-pink-500/20'
+                : 'bg-white text-gray-700 hover:bg-pink-50 border border-gray-200'
+            }`}
+          >
+            <Milk size={16} />
+            <span>Raw Materials</span>
+            <span className={`px-2 py-0.5 rounded-full text-[10px] font-extrabold ${
+              materialTypeFilter === 'RAW' ? 'bg-white/20 text-white' : 'bg-pink-100 text-pink-800'
+            }`}>
+              {rawCount} Items
+            </span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => { setMaterialTypeFilter('PACKING'); setSelectedCategory('ALL'); }}
+            className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-black transition-all cursor-pointer ${
+              materialTypeFilter === 'PACKING'
+                ? 'bg-gradient-to-r from-pink-600 to-rose-600 text-white shadow-md shadow-pink-500/25 ring-2 ring-pink-500/20'
+                : 'bg-white text-gray-700 hover:bg-pink-50 border border-gray-200'
+            }`}
+          >
+            <Box size={16} />
+            <span>Packing Materials</span>
+            <span className={`px-2 py-0.5 rounded-full text-[10px] font-extrabold ${
+              materialTypeFilter === 'PACKING' ? 'bg-white/20 text-white' : 'bg-pink-100 text-pink-800'
+            }`}>
+              {packingCount} Items
+            </span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => { setMaterialTypeFilter('ALL'); setSelectedCategory('ALL'); }}
+            className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-extrabold transition-all cursor-pointer ${
+              materialTypeFilter === 'ALL'
+                ? 'bg-gradient-to-r from-gray-800 to-gray-900 text-white shadow-md shadow-gray-500/20'
+                : 'bg-white text-gray-600 hover:bg-gray-100 border border-gray-200'
+            }`}
+          >
+            <Package size={15} />
+            <span>All Input Materials</span>
+            <span className={`px-2 py-0.5 rounded-full text-[10px] font-extrabold ${
+              materialTypeFilter === 'ALL' ? 'bg-white/20 text-white' : 'bg-gray-200 text-gray-700'
+            }`}>
+              {rawCount + packingCount}
+            </span>
+          </button>
+        </div>
+      </div>
+
       {/* Summary Stat Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-4 gap-4 mb-6">
         <div className="glass-panel p-4 flex items-center gap-4 border-l-4 border-l-blue-500">
@@ -328,7 +418,9 @@ const RawMaterialStock = () => {
             <Package size={24} />
           </div>
           <div>
-            <span className="text-xs text-gray-500 font-semibold uppercase tracking-wider">Raw Material Items</span>
+            <span className="text-xs text-gray-500 font-semibold uppercase tracking-wider">
+              {materialTypeFilter === 'RAW' ? 'Raw Material Items' : materialTypeFilter === 'PACKING' ? 'Packing Material Items' : 'Total Input Items'}
+            </span>
             <h3 className="text-xl font-bold text-gray-900 font-mono mt-0.5">{totalProductsCount} Products</h3>
           </div>
         </div>
@@ -446,7 +538,7 @@ const RawMaterialStock = () => {
                   <thead className="bg-gray-50/80 border-b border-[var(--color-glass-border)] text-gray-600 font-semibold text-xs uppercase tracking-wider">
                     <tr>
                       <th className="px-6 py-4">Item Code</th>
-                      <th className="px-6 py-4">Raw Material / Product Name</th>
+                      <th className="px-6 py-4">{materialTypeFilter === 'PACKING' ? 'Packing Material Name' : materialTypeFilter === 'RAW' ? 'Raw Material Name' : 'Material Description'}</th>
                       <th className="px-6 py-4">Category</th>
                       <th className="px-6 py-4 text-right text-emerald-700">Total Inward Qty</th>
                       <th className="px-6 py-4 text-right text-rose-700">Total Outward Qty</th>
@@ -464,7 +556,14 @@ const RawMaterialStock = () => {
                       return (
                         <tr key={p.id} className="hover:bg-white/40 transition-colors">
                           <td className="px-6 py-4 font-mono text-xs font-semibold text-gray-600">{p.itemCode}</td>
-                          <td className="px-6 py-4 font-bold text-gray-900">{p.name}</td>
+                          <td className="px-6 py-4 font-bold text-gray-900">
+                            <div>{p.name}</div>
+                            {materialTypeFilter === 'ALL' && (
+                              <span className="text-[10px] font-extrabold text-pink-700 bg-pink-50 px-1.5 py-0.5 rounded border border-pink-200 uppercase tracking-wider inline-block mt-0.5">
+                                {p.itemType || 'Input'}
+                              </span>
+                            )}
+                          </td>
                           <td className="px-6 py-4 font-medium text-gray-600">{p.category}</td>
                           <td className="px-6 py-4 text-right font-mono font-bold text-emerald-600">
                             + {p.inwardQty.toLocaleString()}
