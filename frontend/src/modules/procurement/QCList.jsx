@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { 
   Plus, ArrowLeft, Loader2, FileText, CheckCircle2, AlertTriangle, ShieldCheck, 
   Thermometer, Calendar, Package, CornerUpLeft, Building2, CreditCard, Search, 
-  ArrowUpRight, ArrowDownLeft, Wallet, Filter, DollarSign, Printer, X 
+  ArrowUpRight, ArrowDownLeft, Wallet, Filter, DollarSign, Printer, X, Eye 
 } from 'lucide-react';
 import api from '../../services/api';
 import SearchableSelect from '../../components/SearchableSelect';
@@ -82,6 +82,11 @@ const QCList = () => {
   const [isLedgerModalOpen, setIsLedgerModalOpen] = useState(false);
   const [modalFromDate, setModalFromDate] = useState('');
   const [modalToDate, setModalToDate] = useState('');
+
+  // Interactive Popup Detail Modals
+  const [selectedQcDetails, setSelectedQcDetails] = useState(null);
+  const [selectedStoreRoomGroup, setSelectedStoreRoomGroup] = useState(null);
+  const [selectedReturnGroup, setSelectedReturnGroup] = useState(null);
 
   // Form State
   const [selectedPO, setSelectedPO] = useState('');
@@ -280,6 +285,54 @@ const QCList = () => {
     }
     return 'N/A';
   };
+
+  // Group Inventory Items into single rows per receiving / QC / GRN / Vendor
+  const groupInventoryByQC = (invList = []) => {
+    const map = {};
+    invList.forEach((item) => {
+      const matchingQc = qcs.find(qc => 
+        qc.items?.some(i => (i.product?._id || i.product)?.toString() === (item.product?._id || item.product)?.toString() && i.batchNumber === item.batchNumber)
+      );
+      const vendorName = getVendorForItem(item);
+      const qcNumber = matchingQc?.qcNumber || 'QC-N/A';
+      const grnNumber = matchingQc?.grnReference?.grnNumber || (typeof matchingQc?.grnReference === 'string' ? matchingQc.grnReference : 'GRN-N/A');
+      const invoiceNumber = matchingQc?.supplierInvoiceNumber || matchingQc?.grnReference?.supplierInvoiceNumber || matchingQc?.grnReference?.poReference?.supplierInvoiceNumber || 'N/A';
+      const poNumber = matchingQc?.grnReference?.poReference?.poNumber || 'N/A';
+      const dateStr = matchingQc?.checkedDate || matchingQc?.createdAt || item.lastUpdated || item.createdAt;
+
+      const groupKey = matchingQc?._id || `${vendorName}_${item.batchNumber}_${new Date(dateStr).toDateString()}`;
+
+      if (!map[groupKey]) {
+        map[groupKey] = {
+          groupKey,
+          qcNumber,
+          grnNumber,
+          poNumber,
+          invoiceNumber,
+          vendorName,
+          branchName: matchingQc?.branch?.branchName || matchingQc?.branch?.name || item.branch?.branchName || 'Main Branch',
+          dateStr,
+          items: [],
+          totalQty: 0,
+          totalValue: 0
+        };
+      }
+
+      const itemQty = Number(item.quantity || 0);
+      const itemPrice = Number(item.purchasePrice || 0);
+      map[groupKey].items.push({
+        ...item,
+        matchingQc
+      });
+      map[groupKey].totalQty += itemQty;
+      map[groupKey].totalValue += (itemQty * itemPrice);
+    });
+
+    return Object.values(map).sort((a, b) => new Date(b.dateStr || 0) - new Date(a.dateStr || 0));
+  };
+
+  const groupedStoreRoom = groupInventoryByQC(storeRoomStock);
+  const groupedReturnVendor = groupInventoryByQC(rejectedStock);
 
   // --- Vendor Ledger & Transactions Compilation ---
   const compileVendorLedgers = () => {
@@ -939,13 +992,18 @@ const QCList = () => {
                       <th className="px-6 py-4">Branch</th>
                       <th className="px-6 py-4">Checked Date</th>
                       <th className="px-6 py-4">QC Status</th>
+                      <th className="px-6 py-4 text-center">Action</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-[var(--color-glass-border)]">
                     {qcs.map((qc) => (
-                      <tr key={qc._id} className="hover:bg-[rgba(255,255,255,0.02)] transition-colors">
-                        <td className="px-6 py-4 font-mono text-xs font-semibold text-gray-900 flex items-center gap-2">
-                          <FileText size={14} className="text-gray-400" />
+                      <tr 
+                        key={qc._id} 
+                        onClick={() => setSelectedQcDetails(qc)}
+                        className="hover:bg-pink-50/40 transition-colors cursor-pointer"
+                      >
+                        <td className="px-6 py-4 font-mono text-xs font-bold text-pink-700 flex items-center gap-2">
+                          <FileText size={14} className="text-pink-500" />
                           {qc.qcNumber}
                         </td>
                         <td className="px-6 py-4 font-medium text-gray-900">
@@ -965,11 +1023,19 @@ const QCList = () => {
                             {qc.status}
                           </span>
                         </td>
+                        <td className="px-6 py-4 text-center">
+                          <button
+                            onClick={(e) => { e.stopPropagation(); setSelectedQcDetails(qc); }}
+                            className="px-3 py-1 bg-pink-50 hover:bg-pink-100 text-pink-700 border border-pink-200 rounded-lg text-xs font-semibold transition-colors inline-flex items-center gap-1"
+                          >
+                            <Eye size={12} /> View Breakdown
+                          </button>
+                        </td>
                       </tr>
                     ))}
                     {qcs.length === 0 && (
                       <tr>
-                        <td colSpan="6" className="px-6 py-8 text-center text-gray-600">
+                        <td colSpan="7" className="px-6 py-8 text-center text-gray-600">
                           No QC logs found.
                         </td>
                       </tr>
@@ -984,44 +1050,58 @@ const QCList = () => {
                 <table className="w-full text-left text-sm text-gray-700">
                   <thead className="bg-[rgba(255,255,255,0.02)] border-b border-[var(--color-glass-border)] text-gray-600 font-semibold">
                     <tr>
-                      <th className="px-6 py-4">Product</th>
+                      <th className="px-6 py-4">QC / GRN Ref</th>
                       <th className="px-6 py-4">Vendor Name</th>
-                      <th className="px-6 py-4">Item Code</th>
-                      <th className="px-6 py-4 text-center">Batch No</th>
-                      <th className="px-6 py-4 text-right">In-Stock Qty</th>
-                      <th className="px-6 py-4 text-right">Unit Price</th>
-                      <th className="px-6 py-4 text-center">Temp Log</th>
+                      <th className="px-6 py-4">Invoice / PO Ref</th>
+                      <th className="px-6 py-4 text-center">Items Received</th>
+                      <th className="px-6 py-4 text-right">Total In-Stock Qty</th>
+                      <th className="px-6 py-4 text-right">Total Stock Value</th>
+                      <th className="px-6 py-4 text-center">Date Received</th>
+                      <th className="px-6 py-4 text-center">Action</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-[var(--color-glass-border)]">
-                    {storeRoomStock.map((item) => (
-                      <tr key={item._id} className="hover:bg-[rgba(255,255,255,0.02)] transition-colors">
-                        <td className="px-6 py-4 font-semibold text-gray-900">
-                          {item.product?.name || item.productName || item.name || 'N/A'}
+                    {groupedStoreRoom.map((group) => (
+                      <tr 
+                        key={group.groupKey} 
+                        onClick={() => setSelectedStoreRoomGroup(group)}
+                        className="hover:bg-blue-50/40 transition-colors cursor-pointer"
+                      >
+                        <td className="px-6 py-4 font-mono text-xs font-bold text-blue-700 flex items-center gap-2">
+                          <Package size={14} className="text-blue-500" />
+                          {group.qcNumber !== 'QC-N/A' ? group.qcNumber : group.grnNumber}
                         </td>
-                        <td className="px-6 py-4 font-medium text-gray-800">{getVendorForItem(item)}</td>
-                        <td className="px-6 py-4 font-mono text-xs">
-                          {item.product?.itemCode || item.itemCode || 'N/A'}
+                        <td className="px-6 py-4 font-semibold text-gray-900">{group.vendorName}</td>
+                        <td className="px-6 py-4 font-mono text-xs text-gray-600">
+                          {group.invoiceNumber !== 'N/A' ? `Inv: ${group.invoiceNumber}` : `PO: ${group.poNumber}`}
                         </td>
                         <td className="px-6 py-4 text-center">
-                          <span className="px-2 py-0.5 rounded bg-blue-50 text-blue-700 border border-blue-200 font-mono text-xs font-semibold">
-                            {item.batchNumber}
+                          <span className="px-2.5 py-1 rounded-full bg-blue-50 text-blue-700 border border-blue-200 text-xs font-semibold">
+                            {group.items.length} Product{group.items.length > 1 ? 's' : ''}
                           </span>
                         </td>
                         <td className="px-6 py-4 text-right font-bold text-green-600">
-                          {item.quantity} {item.product?.unitOfMeasure || ''}
+                          {group.totalQty} Units
                         </td>
-                        <td className="px-6 py-4 text-right font-semibold">
-                          ₹{item.purchasePrice ? Number(item.purchasePrice).toFixed(2) : '0.00'}
+                        <td className="px-6 py-4 text-right font-semibold text-gray-900">
+                          ₹{group.totalValue.toFixed(2)}
                         </td>
-                        <td className="px-6 py-4 text-center font-mono text-xs font-semibold">
-                          {item.temperature !== undefined && item.temperature !== null ? `${item.temperature} °C` : 'N/A'}
+                        <td className="px-6 py-4 text-center text-xs font-medium">
+                          {new Date(group.dateStr).toLocaleString()}
+                        </td>
+                        <td className="px-6 py-4 text-center">
+                          <button
+                            onClick={(e) => { e.stopPropagation(); setSelectedStoreRoomGroup(group); }}
+                            className="px-3 py-1 bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 rounded-lg text-xs font-semibold transition-colors inline-flex items-center gap-1"
+                          >
+                            <Eye size={12} /> View Breakdown
+                          </button>
                         </td>
                       </tr>
                     ))}
-                    {storeRoomStock.length === 0 && (
+                    {groupedStoreRoom.length === 0 && (
                       <tr>
-                        <td colSpan="7" className="px-6 py-8 text-center text-gray-600">
+                        <td colSpan="8" className="px-6 py-8 text-center text-gray-600">
                           No items currently in Store Room inventory.
                         </td>
                       </tr>
@@ -1036,45 +1116,56 @@ const QCList = () => {
                 <table className="w-full text-left text-sm text-gray-700">
                   <thead className="bg-[rgba(255,255,255,0.02)] border-b border-[var(--color-glass-border)] text-gray-600 font-semibold">
                     <tr>
-                      <th className="px-6 py-4">Item Name</th>
+                      <th className="px-6 py-4">QC / GRN Ref</th>
                       <th className="px-6 py-4">Vendor Name</th>
-                      <th className="px-6 py-4">Item Code</th>
-                      <th className="px-6 py-4 text-center">Batch No</th>
-                      <th className="px-6 py-4 text-right">Damaged Qty</th>
-                      <th className="px-6 py-4 text-right">Wholesale Price</th>
-                      <th className="px-6 py-4">Vendor Return Remarks</th>
+                      <th className="px-6 py-4">Invoice / PO Ref</th>
+                      <th className="px-6 py-4 text-center">Damaged Products</th>
+                      <th className="px-6 py-4 text-right">Return Qty</th>
+                      <th className="px-6 py-4 text-right">Return Value</th>
                       <th className="px-6 py-4 text-center">Date Logged</th>
+                      <th className="px-6 py-4 text-center">Action</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-[var(--color-glass-border)]">
-                    {rejectedStock.map((item) => (
-                      <tr key={item._id} className="hover:bg-[rgba(255,255,255,0.02)] transition-colors">
-                        <td className="px-6 py-4 font-semibold text-gray-900">{item.product?.name}</td>
-                        <td className="px-6 py-4 font-medium text-gray-800">{getVendorForItem(item)}</td>
-                        <td className="px-6 py-4 font-mono text-xs">{item.product?.itemCode}</td>
+                    {groupedReturnVendor.map((group) => (
+                      <tr 
+                        key={group.groupKey} 
+                        onClick={() => setSelectedReturnGroup(group)}
+                        className="hover:bg-red-50/40 transition-colors cursor-pointer"
+                      >
+                        <td className="px-6 py-4 font-mono text-xs font-bold text-red-700 flex items-center gap-2">
+                          <CornerUpLeft size={14} className="text-red-500" />
+                          {group.qcNumber !== 'QC-N/A' ? group.qcNumber : group.grnNumber}
+                        </td>
+                        <td className="px-6 py-4 font-semibold text-gray-900">{group.vendorName}</td>
+                        <td className="px-6 py-4 font-mono text-xs text-gray-600">
+                          {group.invoiceNumber !== 'N/A' ? `Inv: ${group.invoiceNumber}` : `PO: ${group.poNumber}`}
+                        </td>
                         <td className="px-6 py-4 text-center">
-                          <span className="px-2 py-0.5 rounded bg-red-50 text-red-700 border border-red-200 font-mono text-xs font-semibold">
-                            {item.batchNumber}
+                          <span className="px-2.5 py-1 rounded-full bg-red-50 text-red-700 border border-red-200 text-xs font-semibold">
+                            {group.items.length} Product{group.items.length > 1 ? 's' : ''}
                           </span>
                         </td>
-                        <td className="px-6 py-4 text-right font-bold text-red-500">
-                          {item.quantity} {item.product?.unitOfMeasure}
+                        <td className="px-6 py-4 text-right font-bold text-red-600">
+                          {group.totalQty} Pcs
                         </td>
-                        <td className="px-6 py-4 text-right font-semibold">
-                          ₹{item.purchasePrice?.toFixed(2)}
-                        </td>
-                        <td className="px-6 py-4 text-xs font-medium text-amber-700">
-                          <span className="flex items-center gap-1">
-                            <CornerUpLeft size={12} />
-                            QC Failed: Ready for return
-                          </span>
+                        <td className="px-6 py-4 text-right font-semibold text-gray-900">
+                          ₹{group.totalValue.toFixed(2)}
                         </td>
                         <td className="px-6 py-4 text-center text-xs font-medium">
-                          {new Date(item.lastUpdated).toLocaleDateString()}
+                          {new Date(group.dateStr).toLocaleString()}
+                        </td>
+                        <td className="px-6 py-4 text-center">
+                          <button
+                            onClick={(e) => { e.stopPropagation(); setSelectedReturnGroup(group); }}
+                            className="px-3 py-1 bg-red-50 hover:bg-red-100 text-red-700 border border-red-200 rounded-lg text-xs font-semibold transition-colors inline-flex items-center gap-1"
+                          >
+                            <Eye size={12} /> View Returns
+                          </button>
                         </td>
                       </tr>
                     ))}
-                    {rejectedStock.length === 0 && (
+                    {groupedReturnVendor.length === 0 && (
                       <tr>
                         <td colSpan="8" className="px-6 py-8 text-center text-gray-600">
                           No vendor returns logged.
@@ -1412,6 +1503,342 @@ const QCList = () => {
                   </tbody>
                 </table>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* 3. Detail Popup Modal for QC Check Report */}
+      {selectedQcDetails && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl max-w-4xl w-full max-h-[90vh] overflow-hidden shadow-2xl flex flex-col animate-in fade-in zoom-in-95 duration-150">
+            {/* Modal Header */}
+            <div className="p-6 bg-gradient-to-r from-pink-600 to-rose-600 text-white flex justify-between items-start">
+              <div>
+                <div className="flex items-center gap-3">
+                  <h2 className="text-xl font-bold font-mono tracking-wide">{selectedQcDetails.qcNumber}</h2>
+                  <span className={`px-3 py-0.5 rounded-full text-xs font-bold ${
+                    selectedQcDetails.status === 'Passed' ? 'bg-emerald-500 text-white' :
+                    selectedQcDetails.status === 'Partial' ? 'bg-amber-500 text-white' :
+                    'bg-rose-500 text-white'
+                  }`}>
+                    {selectedQcDetails.status} QC Report
+                  </span>
+                </div>
+                <p className="text-pink-100 text-xs mt-1">
+                  Vendor: <span className="font-semibold text-white">{selectedQcDetails.grnReference?.poReference?.vendor?.name || selectedQcDetails.vendor?.name || 'N/A'}</span> | GRN: <span className="font-mono text-white">{selectedQcDetails.grnReference?.grnNumber || 'N/A'}</span> | PO: <span className="font-mono text-white">{selectedQcDetails.grnReference?.poReference?.poNumber || 'N/A'}</span>
+                </p>
+                <p className="text-pink-200 text-xs mt-0.5">
+                  Checked Date: {selectedQcDetails.checkedDate || selectedQcDetails.createdAt ? new Date(selectedQcDetails.checkedDate || selectedQcDetails.createdAt).toLocaleString() : 'N/A'} | Branch: {selectedQcDetails.branch?.branchName || 'Main Branch'}
+                </p>
+              </div>
+              <button 
+                onClick={() => setSelectedQcDetails(null)}
+                className="p-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-white transition-colors"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            {/* Modal Content */}
+            <div className="p-6 overflow-y-auto space-y-6 flex-1">
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div className="p-3 bg-gray-50 rounded-xl border border-gray-200 text-center">
+                  <p className="text-[11px] font-bold text-gray-500 uppercase">Total Items Checked</p>
+                  <p className="text-lg font-bold text-gray-900 mt-0.5">{selectedQcDetails.items?.length || 0} Products</p>
+                </div>
+                <div className="p-3 bg-emerald-50 rounded-xl border border-emerald-200 text-center">
+                  <p className="text-[11px] font-bold text-emerald-700 uppercase">Passed Qty (Stock In)</p>
+                  <p className="text-lg font-bold text-emerald-800 mt-0.5">
+                    {selectedQcDetails.items?.reduce((acc, i) => acc + Number(i.passedQty || 0), 0)} Units
+                  </p>
+                </div>
+                <div className="p-3 bg-rose-50 rounded-xl border border-rose-200 text-center">
+                  <p className="text-[11px] font-bold text-rose-700 uppercase">Return / Damaged Qty</p>
+                  <p className="text-lg font-bold text-rose-800 mt-0.5">
+                    {selectedQcDetails.items?.reduce((acc, i) => acc + Number(i.damagedQty || 0), 0)} Pcs
+                  </p>
+                </div>
+                <div className="p-3 bg-indigo-50 rounded-xl border border-indigo-200 text-center">
+                  <p className="text-[11px] font-bold text-indigo-700 uppercase">Total Passed Value</p>
+                  <p className="text-lg font-bold text-indigo-900 mt-0.5 font-mono">
+                    ₹{selectedQcDetails.items?.reduce((acc, i) => acc + (Number(i.passedQty || 0) * Number(i.purchasePrice || 0)), 0).toFixed(2)}
+                  </p>
+                </div>
+              </div>
+
+              {/* Items Breakdown Table */}
+              <div className="rounded-xl border border-gray-200 overflow-hidden shadow-sm">
+                <table className="w-full text-left text-sm text-gray-700">
+                  <thead className="bg-gray-50 text-gray-600 font-semibold text-xs uppercase tracking-wider border-b border-gray-200">
+                    <tr>
+                      <th className="px-4 py-3">Product Name</th>
+                      <th className="px-4 py-3 text-center">Batch No</th>
+                      <th className="px-4 py-3 text-right">Passed Qty</th>
+                      <th className="px-4 py-3 text-right text-rose-600">Damaged Qty</th>
+                      <th className="px-4 py-3 text-right">Unit Price</th>
+                      <th className="px-4 py-3 text-center">Temp Log</th>
+                      <th className="px-4 py-3">Remarks / Reason</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-200">
+                    {selectedQcDetails.items?.map((item, idx) => (
+                      <tr key={idx} className="hover:bg-gray-50 transition-colors">
+                        <td className="px-4 py-3 font-semibold text-gray-900">
+                          {item.product?.name || item.productName || 'Product'}
+                          <span className="block font-mono text-[10px] text-gray-400 font-normal">Code: {item.product?.itemCode || 'N/A'}</span>
+                        </td>
+                        <td className="px-4 py-3 text-center font-mono text-xs font-semibold">
+                          <span className="px-2 py-0.5 rounded bg-blue-50 text-blue-700 border border-blue-200">
+                            {item.batchNumber}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 text-right font-bold text-emerald-600">
+                          {item.passedQty} {item.product?.unitOfMeasure || ''}
+                        </td>
+                        <td className="px-4 py-3 text-right font-bold text-rose-600">
+                          {item.damagedQty > 0 ? `${item.damagedQty} ${item.product?.unitOfMeasure || ''}` : '-'}
+                        </td>
+                        <td className="px-4 py-3 text-right font-mono font-semibold">
+                          ₹{Number(item.purchasePrice || 0).toFixed(2)}
+                        </td>
+                        <td className="px-4 py-3 text-center font-mono text-xs font-semibold">
+                          {item.temperature !== undefined && item.temperature !== null ? `${item.temperature} °C` : 'N/A'}
+                        </td>
+                        <td className="px-4 py-3 text-xs text-gray-600">
+                          {item.remarks || '-'}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <div className="p-4 border-t border-gray-200 bg-gray-50 flex justify-between items-center">
+              <button
+                onClick={() => window.print()}
+                className="px-4 py-2 bg-white border border-gray-300 hover:bg-gray-100 text-gray-700 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-colors"
+              >
+                <Printer size={14} /> Print QC Summary
+              </button>
+              <button
+                onClick={() => setSelectedQcDetails(null)}
+                className="px-5 py-2 bg-pink-600 hover:bg-pink-700 text-white rounded-xl text-xs font-bold transition-colors"
+              >
+                Close Breakdown
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 4. Detail Popup Modal for Store Room Grouped Receiving */}
+      {selectedStoreRoomGroup && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl max-w-4xl w-full max-h-[90vh] overflow-hidden shadow-2xl flex flex-col animate-in fade-in zoom-in-95 duration-150">
+            <div className="p-6 bg-gradient-to-r from-blue-600 to-indigo-600 text-white flex justify-between items-start">
+              <div>
+                <div className="flex items-center gap-3">
+                  <h2 className="text-xl font-bold font-mono tracking-wide">
+                    {selectedStoreRoomGroup.qcNumber !== 'QC-N/A' ? selectedStoreRoomGroup.qcNumber : selectedStoreRoomGroup.grnNumber}
+                  </h2>
+                  <span className="px-3 py-0.5 rounded-full text-xs font-bold bg-blue-400 text-blue-950">
+                    Store Room Receiving
+                  </span>
+                </div>
+                <p className="text-blue-100 text-xs mt-1">
+                  Vendor: <span className="font-semibold text-white">{selectedStoreRoomGroup.vendorName}</span> | Invoice Ref: <span className="font-mono text-white">{selectedStoreRoomGroup.invoiceNumber}</span>
+                </p>
+                <p className="text-blue-200 text-xs mt-0.5">
+                  Date Received: {new Date(selectedStoreRoomGroup.dateStr).toLocaleString()} | Branch: {selectedStoreRoomGroup.branchName}
+                </p>
+              </div>
+              <button 
+                onClick={() => setSelectedStoreRoomGroup(null)}
+                className="p-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-white transition-colors"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            <div className="p-6 overflow-y-auto space-y-6 flex-1">
+              <div className="grid grid-cols-3 gap-4">
+                <div className="p-3 bg-gray-50 rounded-xl border border-gray-200 text-center">
+                  <p className="text-[11px] font-bold text-gray-500 uppercase">Products Received</p>
+                  <p className="text-lg font-bold text-gray-900 mt-0.5">{selectedStoreRoomGroup.items.length} Products</p>
+                </div>
+                <div className="p-3 bg-emerald-50 rounded-xl border border-emerald-200 text-center">
+                  <p className="text-[11px] font-bold text-emerald-700 uppercase">Total In-Stock Qty</p>
+                  <p className="text-lg font-bold text-emerald-800 mt-0.5">{selectedStoreRoomGroup.totalQty} Units</p>
+                </div>
+                <div className="p-3 bg-indigo-50 rounded-xl border border-indigo-200 text-center">
+                  <p className="text-[11px] font-bold text-indigo-700 uppercase">Total Stock Valuation</p>
+                  <p className="text-lg font-bold text-indigo-900 mt-0.5 font-mono">
+                    ₹{selectedStoreRoomGroup.totalValue.toFixed(2)}
+                  </p>
+                </div>
+              </div>
+
+              <div className="rounded-xl border border-gray-200 overflow-hidden shadow-sm">
+                <table className="w-full text-left text-sm text-gray-700">
+                  <thead className="bg-gray-50 text-gray-600 font-semibold text-xs uppercase tracking-wider border-b border-gray-200">
+                    <tr>
+                      <th className="px-4 py-3">Product Name</th>
+                      <th className="px-4 py-3 text-center">Batch No</th>
+                      <th className="px-4 py-3 text-right">In-Stock Qty</th>
+                      <th className="px-4 py-3 text-right">Unit Price</th>
+                      <th className="px-4 py-3 text-right">Total Line Value</th>
+                      <th className="px-4 py-3 text-center">Temp Log</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-200">
+                    {selectedStoreRoomGroup.items.map((item, idx) => {
+                      const qty = Number(item.quantity || 0);
+                      const price = Number(item.purchasePrice || 0);
+                      return (
+                        <tr key={idx} className="hover:bg-gray-50 transition-colors">
+                          <td className="px-4 py-3 font-semibold text-gray-900">
+                            {item.product?.name || item.productName || item.name || 'Product'}
+                            <span className="block font-mono text-[10px] text-gray-400 font-normal">Code: {item.product?.itemCode || item.itemCode || 'N/A'}</span>
+                          </td>
+                          <td className="px-4 py-3 text-center font-mono text-xs font-semibold">
+                            <span className="px-2 py-0.5 rounded bg-blue-50 text-blue-700 border border-blue-200">
+                              {item.batchNumber}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3 text-right font-bold text-emerald-600">
+                            {qty} {item.product?.unitOfMeasure || ''}
+                          </td>
+                          <td className="px-4 py-3 text-right font-mono font-semibold">
+                            ₹{price.toFixed(2)}
+                          </td>
+                          <td className="px-4 py-3 text-right font-mono font-bold text-gray-900">
+                            ₹{(qty * price).toFixed(2)}
+                          </td>
+                          <td className="px-4 py-3 text-center font-mono text-xs font-semibold">
+                            {item.temperature !== undefined && item.temperature !== null ? `${item.temperature} °C` : 'N/A'}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <div className="p-4 border-t border-gray-200 bg-gray-50 flex justify-end">
+              <button
+                onClick={() => setSelectedStoreRoomGroup(null)}
+                className="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold transition-colors"
+              >
+                Close Store Room Items
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 5. Detail Popup Modal for Return to Vendor Group */}
+      {selectedReturnGroup && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl max-w-4xl w-full max-h-[90vh] overflow-hidden shadow-2xl flex flex-col animate-in fade-in zoom-in-95 duration-150">
+            <div className="p-6 bg-gradient-to-r from-red-600 to-rose-600 text-white flex justify-between items-start">
+              <div>
+                <div className="flex items-center gap-3">
+                  <h2 className="text-xl font-bold font-mono tracking-wide">
+                    {selectedReturnGroup.qcNumber !== 'QC-N/A' ? selectedReturnGroup.qcNumber : selectedReturnGroup.grnNumber}
+                  </h2>
+                  <span className="px-3 py-0.5 rounded-full text-xs font-bold bg-rose-400 text-rose-950">
+                    Vendor Return Log
+                  </span>
+                </div>
+                <p className="text-red-100 text-xs mt-1">
+                  Vendor: <span className="font-semibold text-white">{selectedReturnGroup.vendorName}</span> | Invoice Ref: <span className="font-mono text-white">{selectedReturnGroup.invoiceNumber}</span>
+                </p>
+                <p className="text-red-200 text-xs mt-0.5">
+                  Date Logged: {new Date(selectedReturnGroup.dateStr).toLocaleString()}
+                </p>
+              </div>
+              <button 
+                onClick={() => setSelectedReturnGroup(null)}
+                className="p-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-white transition-colors"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            <div className="p-6 overflow-y-auto space-y-6 flex-1">
+              <div className="grid grid-cols-3 gap-4">
+                <div className="p-3 bg-gray-50 rounded-xl border border-gray-200 text-center">
+                  <p className="text-[11px] font-bold text-gray-500 uppercase">Damaged Products</p>
+                  <p className="text-lg font-bold text-gray-900 mt-0.5">{selectedReturnGroup.items.length} Products</p>
+                </div>
+                <div className="p-3 bg-rose-50 rounded-xl border border-rose-200 text-center">
+                  <p className="text-[11px] font-bold text-rose-700 uppercase">Total Return Quantity</p>
+                  <p className="text-lg font-bold text-rose-800 mt-0.5">{selectedReturnGroup.totalQty} Pcs</p>
+                </div>
+                <div className="p-3 bg-rose-100/50 rounded-xl border border-rose-300 text-center">
+                  <p className="text-[11px] font-bold text-rose-800 uppercase">Total Return Debit Value</p>
+                  <p className="text-lg font-bold text-rose-900 mt-0.5 font-mono">
+                    ₹{selectedReturnGroup.totalValue.toFixed(2)}
+                  </p>
+                </div>
+              </div>
+
+              <div className="rounded-xl border border-gray-200 overflow-hidden shadow-sm">
+                <table className="w-full text-left text-sm text-gray-700">
+                  <thead className="bg-gray-50 text-gray-600 font-semibold text-xs uppercase tracking-wider border-b border-gray-200">
+                    <tr>
+                      <th className="px-4 py-3">Product Name</th>
+                      <th className="px-4 py-3 text-center">Batch No</th>
+                      <th className="px-4 py-3 text-right">Damaged Qty</th>
+                      <th className="px-4 py-3 text-right">Unit Rate</th>
+                      <th className="px-4 py-3 text-right">Total Debit Value</th>
+                      <th className="px-4 py-3">QC Failure Reason / Remarks</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-200">
+                    {selectedReturnGroup.items.map((item, idx) => {
+                      const qty = Number(item.quantity || 0);
+                      const price = Number(item.purchasePrice || 0);
+                      return (
+                        <tr key={idx} className="hover:bg-gray-50 transition-colors">
+                          <td className="px-4 py-3 font-semibold text-gray-900">
+                            {item.product?.name || item.productName || item.name || 'Product'}
+                            <span className="block font-mono text-[10px] text-gray-400 font-normal">Code: {item.product?.itemCode || item.itemCode || 'N/A'}</span>
+                          </td>
+                          <td className="px-4 py-3 text-center font-mono text-xs font-semibold">
+                            <span className="px-2 py-0.5 rounded bg-red-50 text-red-700 border border-red-200">
+                              {item.batchNumber}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3 text-right font-bold text-rose-600">
+                            {qty} {item.product?.unitOfMeasure || ''}
+                          </td>
+                          <td className="px-4 py-3 text-right font-mono font-semibold">
+                            ₹{price.toFixed(2)}
+                          </td>
+                          <td className="px-4 py-3 text-right font-mono font-bold text-rose-700">
+                            ₹{(qty * price).toFixed(2)}
+                          </td>
+                          <td className="px-4 py-3 text-xs font-medium text-amber-700">
+                            {item.remarks || 'QC Damaged / Ready for return'}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <div className="p-4 border-t border-gray-200 bg-gray-50 flex justify-end">
+              <button
+                onClick={() => setSelectedReturnGroup(null)}
+                className="px-5 py-2 bg-red-600 hover:bg-red-700 text-white rounded-xl text-xs font-bold transition-colors"
+              >
+                Close Vendor Returns
+              </button>
             </div>
           </div>
         </div>
