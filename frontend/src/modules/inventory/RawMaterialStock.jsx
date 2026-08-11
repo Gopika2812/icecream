@@ -444,102 +444,103 @@ const RawMaterialStock = () => {
         </div>
       </div>
 
-      {/* Material Type Selector Tabs (Raw Materials vs Packing Materials) & Date Range Preset */}
-      <div className="flex flex-wrap items-center justify-between gap-3 mb-6 bg-white/80 p-2.5 rounded-2xl border border-pink-200 shadow-sm backdrop-blur-md">
-        <div className="flex items-center gap-2">
+      {/* Streamlined Top Control Bar */}
+      <div className="bg-white rounded-2xl p-4 border border-slate-200/80 shadow-xs mb-6 flex flex-col md:flex-row justify-between items-center gap-4">
+        {/* Material Type Segment Pills */}
+        <div className="flex items-center gap-1.5 bg-slate-100/80 p-1.5 rounded-xl w-full md:w-auto">
           <button
             type="button"
             onClick={() => { setMaterialTypeFilter('RAW'); setSelectedCategory('ALL'); }}
-            className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-black transition-all cursor-pointer ${
+            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer ${
               materialTypeFilter === 'RAW'
-                ? 'bg-gradient-to-r from-pink-600 to-rose-600 text-white shadow-md shadow-pink-500/25 ring-2 ring-pink-500/20'
-                : 'bg-white text-gray-700 hover:bg-pink-50 border border-gray-200'
+                ? 'bg-white text-slate-900 shadow-xs font-extrabold'
+                : 'text-slate-600 hover:text-slate-900'
             }`}
           >
-            <Milk size={16} />
+            <Package size={15} className="text-pink-600" />
             <span>Raw Materials</span>
-            <span className={`px-2 py-0.5 rounded-full text-[10px] font-extrabold ${
-              materialTypeFilter === 'RAW' ? 'bg-white/20 text-white' : 'bg-pink-100 text-pink-800'
+            <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+              materialTypeFilter === 'RAW' ? 'bg-pink-50 text-pink-700 border border-pink-200' : 'bg-slate-200 text-slate-700'
             }`}>
-              {rawCount} Items
+              {rawCount}
             </span>
           </button>
 
           <button
             type="button"
             onClick={() => { setMaterialTypeFilter('PACKING'); setSelectedCategory('ALL'); }}
-            className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-black transition-all cursor-pointer ${
+            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer ${
               materialTypeFilter === 'PACKING'
-                ? 'bg-gradient-to-r from-pink-600 to-rose-600 text-white shadow-md shadow-pink-500/25 ring-2 ring-pink-500/20'
-                : 'bg-white text-gray-700 hover:bg-pink-50 border border-gray-200'
+                ? 'bg-white text-slate-900 shadow-xs font-extrabold'
+                : 'text-slate-600 hover:text-slate-900'
             }`}
           >
-            <Box size={16} />
+            <Box size={15} className="text-blue-600" />
             <span>Packing Materials</span>
-            <span className={`px-2 py-0.5 rounded-full text-[10px] font-extrabold ${
-              materialTypeFilter === 'PACKING' ? 'bg-white/20 text-white' : 'bg-pink-100 text-pink-800'
+            <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+              materialTypeFilter === 'PACKING' ? 'bg-blue-50 text-blue-700 border border-blue-200' : 'bg-slate-200 text-slate-700'
             }`}>
-              {packingCount} Items
+              {packingCount}
             </span>
           </button>
 
           <button
             type="button"
             onClick={() => { setMaterialTypeFilter('ALL'); setSelectedCategory('ALL'); }}
-            className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-extrabold transition-all cursor-pointer ${
+            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer ${
               materialTypeFilter === 'ALL'
-                ? 'bg-gradient-to-r from-gray-800 to-gray-900 text-white shadow-md shadow-gray-500/20'
-                : 'bg-white text-gray-600 hover:bg-gray-100 border border-gray-200'
+                ? 'bg-white text-slate-900 shadow-xs font-extrabold'
+                : 'text-slate-600 hover:text-slate-900'
             }`}
           >
-            <Package size={15} />
             <span>All Input Materials</span>
-            <span className={`px-2 py-0.5 rounded-full text-[10px] font-extrabold ${
-              materialTypeFilter === 'ALL' ? 'bg-white/20 text-white' : 'bg-gray-200 text-gray-700'
-            }`}>
+            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-200 text-slate-700">
               {rawCount + packingCount}
             </span>
           </button>
         </div>
 
         {/* Date Range Preset Selector */}
-        <div className="flex flex-wrap items-center gap-2 bg-white/90 p-1.5 rounded-xl border border-pink-200 text-xs shadow-2xs">
-          <div className="flex items-center gap-1 text-pink-900 font-extrabold px-1">
-            <Calendar size={14} className="text-pink-600" />
-            <span className="text-[10px] uppercase tracking-wider">Period:</span>
+        <div className="flex flex-wrap items-center gap-2 text-xs w-full md:w-auto justify-end">
+          <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 rounded-xl px-3 py-1.5">
+            <Calendar size={14} className="text-slate-500" />
+            <span className="text-[11px] font-bold text-slate-600 uppercase">Period:</span>
+            <select
+              value={datePreset}
+              onChange={(e) => handlePresetChange(e.target.value)}
+              className="bg-transparent font-bold text-slate-900 text-xs focus:outline-none cursor-pointer ml-1"
+            >
+              <option value="Today">Today</option>
+              <option value="Yesterday">Yesterday</option>
+              <option value="This Week">This Week</option>
+              <option value="This Month">This Month</option>
+              <option value="Quarterly">Quarterly</option>
+              <option value="Annual">Annual</option>
+              <option value="ALL">All Time</option>
+              <option value="Custom">Custom Range</option>
+            </select>
           </div>
-          <select
-            value={datePreset}
-            onChange={(e) => handlePresetChange(e.target.value)}
-            className="bg-pink-50 border border-pink-200 rounded-lg px-2.5 py-1 font-bold text-pink-900 text-xs focus:outline-none focus:ring-2 focus:ring-pink-500/20 cursor-pointer"
-          >
-            <option value="Today">Today</option>
-            <option value="Yesterday">Yesterday</option>
-            <option value="This Week">This Week</option>
-            <option value="This Month">This Month</option>
-            <option value="Quarterly">Quarterly</option>
-            <option value="Annual">Annual</option>
-            <option value="ALL">All Time</option>
-            <option value="Custom">Custom Range</option>
-          </select>
 
-          <input
-            type="date"
-            value={startDate}
-            onChange={(e) => { setStartDate(e.target.value); setDatePreset('Custom'); }}
-            className="bg-white border border-gray-200 rounded-lg px-2 py-1 font-mono font-bold text-gray-900 text-xs focus:outline-none focus:border-pink-500"
-          />
-          <span className="text-gray-400 font-bold text-[11px]">to</span>
-          <input
-            type="date"
-            value={endDate}
-            onChange={(e) => { setEndDate(e.target.value); setDatePreset('Custom'); }}
-            className="bg-white border border-gray-200 rounded-lg px-2 py-1 font-mono font-bold text-gray-900 text-xs focus:outline-none focus:border-pink-500"
-          />
+          <div className="flex items-center gap-1.5 bg-white border border-slate-200 rounded-xl px-2.5 py-1">
+            <input
+              type="date"
+              value={startDate}
+              onChange={(e) => { setStartDate(e.target.value); setDatePreset('Custom'); }}
+              className="font-mono font-bold text-slate-900 text-xs focus:outline-none"
+            />
+            <span className="text-slate-400 font-bold text-[11px]">to</span>
+            <input
+              type="date"
+              value={endDate}
+              onChange={(e) => { setEndDate(e.target.value); setDatePreset('Custom'); }}
+              className="font-mono font-bold text-slate-900 text-xs focus:outline-none"
+            />
+          </div>
+
           {datePreset !== 'Today' && (
             <button
               onClick={() => handlePresetChange('Today')}
-              className="text-[11px] font-extrabold text-pink-700 hover:text-pink-900 px-2 py-0.5 bg-pink-50 rounded-lg border border-pink-200 transition-colors"
+              className="text-xs font-bold text-pink-700 hover:text-pink-900 px-3 py-1.5 bg-pink-50 rounded-xl border border-pink-200 transition-colors"
             >
               Reset Today
             </button>
@@ -547,71 +548,71 @@ const RawMaterialStock = () => {
         </div>
       </div>
 
-      {/* Summary Stat Cards */}
+      {/* Spacious Summary Metric Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-4 gap-4 mb-6">
-        <div className="glass-panel p-4 flex items-center gap-4 border-l-4 border-l-blue-500">
+        <div className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-xs flex items-center gap-4">
           <div className="p-3 bg-blue-50 text-blue-600 rounded-xl">
-            <Package size={24} />
+            <Package size={22} />
           </div>
           <div>
-            <span className="text-xs text-gray-500 font-semibold uppercase tracking-wider">
-              {materialTypeFilter === 'RAW' ? 'Raw Material Items' : materialTypeFilter === 'PACKING' ? 'Packing Material Items' : 'Total Input Items'}
+            <span className="text-[11px] text-slate-400 font-bold uppercase tracking-wider block">
+              {materialTypeFilter === 'RAW' ? 'Raw Material Items' : materialTypeFilter === 'PACKING' ? 'Packing Items' : 'Total Items'}
             </span>
-            <h3 className="text-xl font-bold text-gray-900 font-mono mt-0.5">{totalProductsCount} Products</h3>
+            <h3 className="text-xl font-bold text-slate-900 font-mono mt-0.5">{totalProductsCount} Products</h3>
           </div>
         </div>
 
-        <div className="glass-panel p-4 flex items-center gap-4 border-l-4 border-l-emerald-500">
+        <div className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-xs flex items-center gap-4">
           <div className="p-3 bg-emerald-50 text-emerald-600 rounded-xl">
-            <ArrowUpRight size={24} />
+            <ArrowUpRight size={22} />
           </div>
           <div>
-            <span className="text-xs text-emerald-800 font-semibold uppercase tracking-wider">Total Inward Qty</span>
+            <span className="text-[11px] text-emerald-800 font-bold uppercase tracking-wider block">Total Inward Qty</span>
             <h3 className="text-xl font-bold text-emerald-700 font-mono mt-0.5">+ {totalInwardQty.toLocaleString()} Units</h3>
           </div>
         </div>
 
-        <div className="glass-panel p-4 flex items-center gap-4 border-l-4 border-l-rose-500">
+        <div className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-xs flex items-center gap-4">
           <div className="p-3 bg-rose-50 text-rose-600 rounded-xl">
-            <ArrowDownLeft size={24} />
+            <ArrowDownLeft size={22} />
           </div>
           <div>
-            <span className="text-xs text-rose-800 font-semibold uppercase tracking-wider">Total Outward Qty</span>
+            <span className="text-[11px] text-rose-800 font-bold uppercase tracking-wider block">Total Outward Qty</span>
             <h3 className="text-xl font-bold text-rose-700 font-mono mt-0.5">- {totalOutwardQty.toLocaleString()} Units</h3>
           </div>
         </div>
 
-        <div className="glass-panel p-4 flex items-center gap-4 border-l-4 border-l-indigo-500">
+        <div className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-xs flex items-center gap-4">
           <div className="p-3 bg-indigo-50 text-indigo-600 rounded-xl">
-            <ArrowLeftRight size={24} />
+            <ArrowLeftRight size={22} />
           </div>
           <div>
-            <span className="text-xs text-indigo-900 font-semibold uppercase tracking-wider">Net On-Hand Stock</span>
+            <span className="text-[11px] text-indigo-900 font-bold uppercase tracking-wider block">Net On-Hand Stock</span>
             <h3 className="text-xl font-bold text-indigo-950 font-mono mt-0.5">{totalAvailableStock.toLocaleString()} Units</h3>
           </div>
         </div>
       </div>
 
-      {/* Toolbar: Search, Category & Views */}
-      <div className="flex flex-col sm:flex-row justify-between items-center gap-4 mb-6 bg-white/40 p-4 rounded-2xl border border-[var(--color-glass-border)] shadow-sm">
+      {/* Navigation & Search Bar */}
+      <div className="flex flex-col sm:flex-row justify-between items-center gap-4 mb-6">
         {/* Navigation Tabs */}
-        <div className="flex gap-2 w-full sm:w-auto">
+        <div className="flex gap-1.5 bg-slate-100/80 p-1.5 rounded-2xl w-full sm:w-auto">
           <button
             onClick={() => setActiveTab('Stock Balance')}
-            className={`px-4 py-2 rounded-xl text-xs font-extrabold transition-all border ${
+            className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${
               activeTab === 'Stock Balance'
-                ? 'bg-white text-[var(--color-primary)] border-pink-400 shadow-md ring-2 ring-pink-500/20'
-                : 'bg-white/80 text-gray-700 border-transparent hover:bg-gray-100'
+                ? 'bg-white text-slate-900 shadow-xs font-extrabold'
+                : 'text-slate-600 hover:text-slate-900'
             }`}
           >
             Raw Material Stock Balances
           </button>
           <button
             onClick={() => setActiveTab('Movement Ledger')}
-            className={`px-4 py-2 rounded-xl text-xs font-extrabold transition-all border ${
+            className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${
               activeTab === 'Movement Ledger'
-                ? 'bg-white text-[var(--color-primary)] border-pink-400 shadow-md ring-2 ring-pink-500/20'
-                : 'bg-white/80 text-gray-700 border-transparent hover:bg-gray-100'
+                ? 'bg-white text-slate-900 shadow-xs font-extrabold'
+                : 'text-slate-600 hover:text-slate-900'
             }`}
           >
             Inward & Outward Movement Ledger
@@ -619,15 +620,15 @@ const RawMaterialStock = () => {
         </div>
 
         {/* Search */}
-        <div className="flex flex-wrap items-center gap-3 w-full sm:w-auto justify-end">
+        <div className="flex items-center gap-3 w-full sm:w-auto justify-end">
           <div className="relative w-full sm:w-72">
-            <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+            <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
             <input
               type="text"
               placeholder="Search product, code, ref..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-9 pr-4 py-1.5 bg-white border border-[var(--color-glass-border)] rounded-xl text-xs text-gray-900 focus:outline-none focus:border-[var(--color-primary)] shadow-xs font-semibold"
+              className="w-full pl-9 pr-4 py-2 bg-white border border-slate-200 rounded-xl text-xs text-slate-900 font-semibold focus:outline-none focus:border-slate-400 shadow-xs"
             />
           </div>
 
@@ -635,7 +636,7 @@ const RawMaterialStock = () => {
             <select
               value={txTypeFilter}
               onChange={(e) => setTxTypeFilter(e.target.value)}
-              className="bg-white border border-[var(--color-glass-border)] rounded-xl px-3 py-1.5 text-xs font-medium text-gray-800 focus:outline-none focus:border-[var(--color-primary)]"
+              className="bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold text-slate-800 focus:outline-none shadow-xs cursor-pointer"
             >
               <option value="ALL">All Types (IN & OUT)</option>
               <option value="IN">Inward Only (IN)</option>
@@ -645,11 +646,11 @@ const RawMaterialStock = () => {
         </div>
       </div>
 
-      {/* Content Panels */}
-      <div className="glass-panel overflow-hidden">
+      {/* Main Data Container */}
+      <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden">
         {loading ? (
-          <div className="p-12 text-center text-gray-600 flex justify-center items-center gap-2">
-            <Loader2 className="animate-spin text-[var(--color-primary)]" size={24} />
+          <div className="p-12 text-center text-slate-600 flex justify-center items-center gap-2">
+            <Loader2 className="animate-spin text-slate-800" size={24} />
             Loading Raw Material Stock Data...
           </div>
         ) : (
@@ -657,62 +658,55 @@ const RawMaterialStock = () => {
             {/* VIEW 1: RAW MATERIAL STOCK BALANCES */}
             {activeTab === 'Stock Balance' && (
               <div className="overflow-x-auto">
-                <table className="w-full text-left text-sm text-gray-700">
-                  <thead className="bg-gray-50/80 border-b border-[var(--color-glass-border)] text-gray-600 font-semibold text-xs uppercase tracking-wider">
+                <table className="w-full text-left text-sm text-slate-700">
+                  <thead className="bg-slate-100/70 border-b border-slate-200 text-slate-700 font-bold text-xs uppercase tracking-wider">
                     <tr>
-                      <th className="px-6 py-4">Item Code</th>
-                      <th className="px-6 py-4">{materialTypeFilter === 'PACKING' ? 'Packing Material Name' : materialTypeFilter === 'RAW' ? 'Raw Material Name' : 'Material Description'}</th>
-                      <th className="px-6 py-4">Category</th>
-                      <th className="px-6 py-4 text-right text-emerald-700">Total Inward Qty</th>
-                      <th className="px-6 py-4 text-right text-rose-700">Total Outward Qty</th>
-                      <th className="px-6 py-4 text-right text-indigo-950 font-bold">Current On-Hand Stock</th>
-                      <th className="px-6 py-4 text-center">UOM</th>
-                      <th className="px-6 py-4 text-center">Stock Status</th>
-                      <th className="px-6 py-4 text-center">Action</th>
+                      <th className="px-5 py-3.5">Raw Material Item</th>
+                      <th className="px-5 py-3.5">Category</th>
+                      <th className="px-5 py-3.5 text-right text-emerald-700">Inward Qty</th>
+                      <th className="px-5 py-3.5 text-right text-rose-700">Outward Qty</th>
+                      <th className="px-5 py-3.5 text-right font-bold text-slate-900">Current Stock</th>
+                      <th className="px-5 py-3.5 text-center">Status</th>
+                      <th className="px-5 py-3.5 text-center">Action</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-[var(--color-glass-border)]">
+                  <tbody className="divide-y divide-slate-100">
                     {filteredProducts.map((p) => {
                       const isLowStock = p.currentStock <= p.minimumStockLevel && p.currentStock > 0;
                       const isOutOfStock = p.currentStock <= 0;
 
                       return (
-                        <tr key={p.id} className="hover:bg-white/40 transition-colors">
-                          <td className="px-6 py-4 font-mono text-xs font-semibold text-gray-600">{p.itemCode}</td>
-                          <td className="px-6 py-4 font-bold text-gray-900">
+                        <tr key={p.id} className="hover:bg-slate-50/80 transition-colors">
+                          <td className="px-5 py-3.5 font-bold text-slate-900">
                             <div>{p.name}</div>
-                            {materialTypeFilter === 'ALL' && (
-                              <span className="text-[10px] font-extrabold text-pink-700 bg-pink-50 px-1.5 py-0.5 rounded border border-pink-200 uppercase tracking-wider inline-block mt-0.5">
-                                {p.itemType || 'Input'}
-                              </span>
-                            )}
+                            <span className="font-mono text-[11px] text-slate-500 font-medium block mt-0.5">Code: {p.itemCode}</span>
                           </td>
-                          <td className="px-6 py-4 font-medium text-gray-600">{p.category}</td>
-                          <td className="px-6 py-4 text-right font-mono font-bold text-emerald-600">
+                          <td className="px-5 py-3.5 font-semibold text-slate-600 text-xs">{p.category}</td>
+                          <td className="px-5 py-3.5 text-right font-mono font-bold text-emerald-600">
                             + {p.inwardQty.toLocaleString()}
                           </td>
-                          <td className="px-6 py-4 text-right font-mono font-bold text-rose-600">
+                          <td className="px-5 py-3.5 text-right font-mono font-bold text-rose-600">
                             - {p.outwardQty.toLocaleString()}
                           </td>
-                          <td className="px-6 py-4 text-right font-mono font-extrabold text-indigo-950 text-base">
-                            {p.currentStock.toLocaleString()}
+                          <td className="px-5 py-3.5 text-right font-mono font-extrabold text-slate-900 text-base">
+                            {p.currentStock.toLocaleString()} <span className="text-xs font-semibold text-slate-500">{p.unitOfMeasure}</span>
                           </td>
-                          <td className="px-6 py-4 text-center text-xs font-semibold text-gray-600">{p.unitOfMeasure}</td>
-                          <td className="px-6 py-4 text-center">
-                            <span className={`px-2.5 py-1 rounded-full text-[11px] font-bold inline-flex items-center gap-1 ${
-                              isOutOfStock ? 'bg-red-50 text-red-700 border border-red-200' :
+                          <td className="px-5 py-3.5 text-center">
+                            <span className={`px-2.5 py-1 rounded-full text-xs font-bold inline-flex items-center gap-1.5 ${
+                              isOutOfStock ? 'bg-rose-50 text-rose-700 border border-rose-200' :
                               isLowStock ? 'bg-amber-50 text-amber-700 border border-amber-200' :
                               'bg-emerald-50 text-emerald-700 border border-emerald-200'
                             }`}>
+                              <span className={`w-1.5 h-1.5 rounded-full ${isOutOfStock ? 'bg-rose-500' : isLowStock ? 'bg-amber-500' : 'bg-emerald-500'}`} />
                               {isOutOfStock ? 'Out of Stock' : isLowStock ? 'Low Stock Alert' : 'In Stock'}
                             </span>
                           </td>
-                          <td className="px-6 py-4 text-center">
+                          <td className="px-5 py-3.5 text-center">
                             <button
                               onClick={() => handleOpenProductModal(p)}
-                              className="px-3 py-1.5 text-xs font-bold rounded-lg bg-[var(--color-primary)] text-white hover:bg-[var(--color-primary-soft)] transition-all shadow-[0_0_10px_rgba(216,27,96,0.2)] inline-flex items-center gap-1"
+                              className="px-3.5 py-1.5 text-xs font-bold rounded-xl bg-slate-900 text-white hover:bg-slate-800 transition-colors shadow-xs inline-flex items-center gap-1.5"
                             >
-                              <History size={14} /> View Movement Ledger
+                              <History size={14} /> View Movement
                             </button>
                           </td>
                         </tr>
@@ -720,7 +714,7 @@ const RawMaterialStock = () => {
                     })}
                     {filteredProducts.length === 0 && (
                       <tr>
-                        <td colSpan="9" className="px-6 py-10 text-center text-gray-500">
+                        <td colSpan="7" className="px-6 py-10 text-center text-slate-500 font-medium">
                           No raw material stock records found.
                         </td>
                       </tr>
@@ -733,20 +727,20 @@ const RawMaterialStock = () => {
             {/* VIEW 2: INWARD & OUTWARD MOVEMENT LEDGER */}
             {activeTab === 'Movement Ledger' && (
               <div className="overflow-x-auto">
-                <table className="w-full text-left text-sm text-gray-700">
-                  <thead className="bg-gray-50/80 border-b border-[var(--color-glass-border)] text-gray-600 font-semibold text-xs uppercase tracking-wider">
+                <table className="w-full text-left text-sm text-slate-700">
+                  <thead className="bg-slate-100/70 border-b border-slate-200 text-slate-700 font-bold text-xs uppercase tracking-wider">
                     <tr>
-                      <th className="px-6 py-4">Date & Time</th>
-                      <th className="px-6 py-4 text-center">Type</th>
-                      <th className="px-6 py-4">Product Name & Code</th>
-                      <th className="px-6 py-4 text-center">Batch No</th>
-                      <th className="px-6 py-4 text-right text-emerald-700">Inward (+)</th>
-                      <th className="px-6 py-4 text-right text-rose-700">Outward (-)</th>
-                      <th className="px-6 py-4">Reference Source</th>
-                      <th className="px-6 py-4">Remarks</th>
+                      <th className="px-5 py-3.5">Date & Time</th>
+                      <th className="px-5 py-3.5 text-center">Type</th>
+                      <th className="px-5 py-3.5">Product Name & Code</th>
+                      <th className="px-5 py-3.5 text-center">Batch No</th>
+                      <th className="px-5 py-3.5 text-right text-emerald-700">Inward (+)</th>
+                      <th className="px-5 py-3.5 text-right text-rose-700">Outward (-)</th>
+                      <th className="px-5 py-3.5">Proof / Ref ID</th>
+                      <th className="px-5 py-3.5">Remarks</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-[var(--color-glass-border)]">
+                  <tbody className="divide-y divide-slate-100">
                     {filteredLedger.map((tx) => (
                       <tr key={tx.id} className="hover:bg-white/40 transition-colors">
                         <td className="px-6 py-4 text-xs font-medium text-gray-600 whitespace-nowrap">
