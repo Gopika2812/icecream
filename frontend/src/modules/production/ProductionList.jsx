@@ -22,10 +22,23 @@ const ProductionList = () => {
   const [selectedProductionForQc, setSelectedProductionForQc] = useState(null);
 
   // New Production Wizard Form State
-  const [wizardStep, setWizardStep] = useState(1); // 1: Product & Qty, 2: Raw Materials, 3: Store Room Entry
+  const [wizardStep, setWizardStep] = useState(1); // 1: Mix & Raw Materials Requisition, 2: Packaging Requisition, 3: Finished Goods & Store Room Submission
   const [submitting, setSubmitting] = useState(false);
   const [selectedMixProduct, setSelectedMixProduct] = useState('');
   const [mixCount, setMixCount] = useState(1);
+
+  // 1st Time Mix Creation State
+  const [mixMode, setMixMode] = useState('EXISTING'); // 'EXISTING' | 'NEW'
+  const [newMixName, setNewMixName] = useState('');
+  const [newMixCode, setNewMixCode] = useState('');
+  const [newMixIngredients, setNewMixIngredients] = useState([
+    { product: '', quantity: '' }
+  ]);
+
+  // Packaging Materials Requisition State
+  const [packagingMaterialsUsed, setPackagingMaterialsUsed] = useState([
+    { product: '', quantityRequested: '' }
+  ]);
 
   const [formData, setFormData] = useState({
     finishedGoodProduct: '',
@@ -104,6 +117,82 @@ const ProductionList = () => {
       rawMaterialsUsed: newRows
     }));
     alert(`Applied "${mixItem.name}" formula recipe for ${targetLiters} Liters! Auto-populated ${newRows.length} raw materials for batch requisition.`);
+  };
+
+  const packagingMaterials = products.filter(p => 
+    p.itemType === 'Packing Material' || p.itemType === 'Packaging' || p.category === 'Packaging'
+  );
+
+  const handleAddNewMixIngredientRow = () => {
+    setNewMixIngredients(prev => [...prev, { product: '', quantity: '' }]);
+  };
+
+  const handleRemoveNewMixIngredientRow = (idx) => {
+    setNewMixIngredients(prev => prev.filter((_, i) => i !== idx));
+  };
+
+  const handleNewMixIngredientChange = (idx, field, val) => {
+    const updated = [...newMixIngredients];
+    updated[idx][field] = val;
+    setNewMixIngredients(updated);
+  };
+
+  const handleAddPackagingRow = () => {
+    setPackagingMaterialsUsed(prev => [...prev, { product: '', quantityRequested: '' }]);
+  };
+
+  const handleRemovePackagingRow = (idx) => {
+    setPackagingMaterialsUsed(prev => prev.filter((_, i) => i !== idx));
+  };
+
+  const handlePackagingChange = (idx, field, val) => {
+    const updated = [...packagingMaterialsUsed];
+    updated[idx][field] = val;
+    setPackagingMaterialsUsed(updated);
+  };
+
+  const handleCreateNewMixAndApply = async () => {
+    if (!newMixName.trim()) return alert('Please enter a Mix Formula Name.');
+    if (newMixIngredients.length === 0 || !newMixIngredients[0].product) {
+      return alert('Please select at least 1 raw material ingredient for 1 Liter of this Mix.');
+    }
+    const targetLiters = parseFloat(mixCount) || 1;
+
+    try {
+      setSubmitting(true);
+      const code = newMixCode || `MIX-${Date.now().toString().slice(-4)}`;
+      const res = await api.post('/products', {
+        name: newMixName,
+        itemCode: code,
+        itemType: 'Mix',
+        category: 'Dairy',
+        unitOfMeasure: 'Litre',
+        rawMaterials: newMixIngredients.map(ing => ({
+          product: ing.product,
+          quantity: parseFloat(ing.quantity) || 0
+        }))
+      });
+
+      const createdProduct = res.data?.data;
+      alert(`New Mix Formula "${newMixName}" created and saved to Products Master!`);
+      
+      fetchInitialData();
+      if (createdProduct) {
+        setSelectedMixProduct(createdProduct._id);
+        const newRows = newMixIngredients.map(rm => ({
+          product: rm.product,
+          quantityUsed: ((parseFloat(rm.quantity) || 0) * targetLiters).toString(),
+          batchNumber: 'STORE-RM'
+        }));
+        setFormData(prev => ({ ...prev, rawMaterialsUsed: newRows }));
+        setMixMode('EXISTING');
+      }
+    } catch (err) {
+      console.error('Failed to create new Mix Formula', err);
+      alert(err.response?.data?.message || 'Error creating new Mix formula');
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   // Handle Finished Good selection
@@ -601,41 +690,420 @@ const ProductionList = () => {
             <button
               type="button"
               onClick={() => setWizardStep(1)}
-              className={`flex-1 px-3 py-2 rounded-lg transition-all border ${
+              className={`flex-1 px-3 py-2 rounded-lg transition-all border cursor-pointer ${
                 wizardStep === 1 
-                  ? 'bg-white text-[var(--color-primary)] border-pink-400 shadow-md ring-2 ring-pink-500/20' 
+                  ? 'bg-white text-purple-900 border-purple-400 shadow-md ring-2 ring-purple-500/20' 
                   : 'bg-gray-100 text-gray-600 border-transparent hover:bg-gray-200'
               }`}
             >
-              1. Finished Product & Target Output
+              1. Mix Raw Material Requisition
             </button>
             <button
               type="button"
-              onClick={() => formData.finishedGoodProduct && formData.quantityBoxes && setWizardStep(2)}
-              className={`flex-1 px-3 py-2 rounded-lg transition-all border ${
+              onClick={() => setWizardStep(2)}
+              className={`flex-1 px-3 py-2 rounded-lg transition-all border cursor-pointer ${
                 wizardStep === 2 
-                  ? 'bg-white text-[var(--color-primary)] border-pink-400 shadow-md ring-2 ring-pink-500/20' 
+                  ? 'bg-white text-indigo-900 border-indigo-400 shadow-md ring-2 ring-indigo-500/20' 
                   : 'bg-gray-100 text-gray-600 border-transparent hover:bg-gray-200'
               }`}
             >
-              2. Raw Material Requisition
+              2. Packaging Material Requisition
             </button>
             <button
               type="button"
-              onClick={() => formData.finishedGoodProduct && formData.quantityBoxes && setWizardStep(3)}
-              className={`flex-1 px-3 py-2 rounded-lg transition-all border ${
+              onClick={() => setWizardStep(3)}
+              className={`flex-1 px-3 py-2 rounded-lg transition-all border cursor-pointer ${
                 wizardStep === 3 
                   ? 'bg-white text-[var(--color-primary)] border-pink-400 shadow-md ring-2 ring-pink-500/20' 
                   : 'bg-gray-100 text-gray-600 border-transparent hover:bg-gray-200'
               }`}
             >
-              3. Store Room Entry & Batch Config
+              3. Finished Goods & Store Room Submission
             </button>
           </div>
 
-          {/* STEP 1: Finished Product Selection & Box Configuration */}
+          {/* STEP 1: MIX RAW MATERIAL REQUISITION (STORE ROOM REQUEST) */}
           {wizardStep === 1 && (
             <div className="space-y-4">
+              
+              {/* MIX MODE TOGGLE BAR */}
+              <div className="flex items-center gap-2 bg-purple-50 p-1.5 rounded-xl border border-purple-200">
+                <button
+                  type="button"
+                  onClick={() => setMixMode('EXISTING')}
+                  className={`flex-1 py-1.5 px-3 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                    mixMode === 'EXISTING'
+                      ? 'bg-purple-600 text-white shadow-xs'
+                      : 'text-purple-800 hover:bg-purple-100'
+                  }`}
+                >
+                  Select Existing Mix Formula
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setMixMode('NEW')}
+                  className={`flex-1 py-1.5 px-3 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                    mixMode === 'NEW'
+                      ? 'bg-purple-600 text-white shadow-xs'
+                      : 'text-purple-800 hover:bg-purple-100'
+                  }`}
+                >
+                  + Create New Mix Formula (1st Time)
+                </button>
+              </div>
+
+              {/* OPTION A: EXISTING MIX FORMULA */}
+              {mixMode === 'EXISTING' ? (
+                <div className="p-4 bg-purple-50/70 border border-purple-200 rounded-2xl space-y-3">
+                  <div className="flex justify-between items-center text-purple-950 font-extrabold text-xs uppercase tracking-wider">
+                    <span className="flex items-center gap-2">
+                      <Package size={16} className="text-purple-600" />
+                      Select Mix Formula to Auto-Calculate Raw Materials (Scaled by Liters)
+                    </span>
+                    <span className="text-[10px] text-purple-700 font-semibold lowercase">
+                      Managed in Products Master
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-12 gap-3 items-end">
+                    <div className="sm:col-span-6 space-y-1">
+                      <label className="text-[11px] font-bold text-gray-700 block">Select Mix Formula *</label>
+                      <SearchableSelect
+                        placeholder="Select Mix formula from Master..."
+                        value={selectedMixProduct}
+                        options={mixProducts.map(m => ({
+                          value: m._id,
+                          label: m.name,
+                          code: m.itemCode,
+                          sublabel: `Contains ${m.rawMaterials?.length || 0} raw materials (per 1L)`
+                        }))}
+                        onChange={(val) => setSelectedMixProduct(val)}
+                      />
+                    </div>
+
+                    <div className="sm:col-span-3 space-y-1">
+                      <label className="text-[11px] font-bold text-gray-700 block">Target Mix Volume (Liters) *</label>
+                      <input
+                        type="number"
+                        min="0.1"
+                        step="0.1"
+                        value={mixCount}
+                        onChange={(e) => setMixCount(e.target.value)}
+                        placeholder="e.g. 250 L"
+                        className={`${customInputStyle} font-mono font-bold text-purple-900 border-purple-300`}
+                      />
+                    </div>
+
+                    <div className="sm:col-span-3">
+                      <button
+                        type="button"
+                        onClick={handleApplyMixFormula}
+                        className="w-full bg-purple-600 hover:bg-purple-700 text-white py-2.5 px-3 rounded-xl text-xs font-extrabold shadow-sm transition-all flex items-center justify-center gap-1 cursor-pointer"
+                      >
+                        Scale & Apply Recipe
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                /* OPTION B: CREATE NEW MIX FORMULA (1ST TIME) */
+                <div className="p-4 bg-purple-50/90 border border-purple-300 rounded-2xl space-y-4 shadow-sm">
+                  <div className="flex justify-between items-center text-purple-950 font-extrabold text-xs uppercase tracking-wider">
+                    <span className="flex items-center gap-2">
+                      <Plus size={16} className="text-purple-600" />
+                      Create New Mix Recipe Record (Saved to Products Master for Future Use)
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <div className="space-y-1">
+                      <label className="text-[11px] font-bold text-gray-700 block">Mix Formula Name *</label>
+                      <input
+                        type="text"
+                        required
+                        value={newMixName}
+                        onChange={(e) => setNewMixName(e.target.value)}
+                        placeholder="e.g. Mango Kulfi Base Mix"
+                        className={`${customInputStyle} font-bold`}
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-[11px] font-bold text-gray-700 block">Item Code (Optional)</label>
+                      <input
+                        type="text"
+                        value={newMixCode}
+                        onChange={(e) => setNewMixCode(e.target.value)}
+                        placeholder="e.g. MIX-005"
+                        className={`${customInputStyle} font-mono`}
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-[11px] font-bold text-gray-700 block">Target Volume to Produce (Liters) *</label>
+                      <input
+                        type="number"
+                        min="0.1"
+                        step="0.1"
+                        value={mixCount}
+                        onChange={(e) => setMixCount(e.target.value)}
+                        placeholder="e.g. 500 L"
+                        className={`${customInputStyle} font-mono font-bold text-purple-900 border-purple-300`}
+                      />
+                    </div>
+                  </div>
+
+                  {/* 1-Liter Ingredient Rows Grid */}
+                  <div className="space-y-2 pt-2 border-t border-purple-200">
+                    <div className="flex justify-between items-center">
+                      <span className="text-[11px] font-extrabold text-purple-900 uppercase">Select Raw Material Ingredients (Proportions per 1 Liter of Mix)</span>
+                      <button
+                        type="button"
+                        onClick={handleAddNewMixIngredientRow}
+                        className="text-xs font-bold text-purple-700 hover:underline flex items-center gap-1"
+                      >
+                        + Add Ingredient
+                      </button>
+                    </div>
+
+                    {newMixIngredients.map((ing, idx) => (
+                      <div key={idx} className="flex items-center gap-3 bg-white p-2.5 rounded-xl border border-purple-200">
+                        <div className="flex-1">
+                          <SearchableSelect
+                            placeholder="Select Raw Material..."
+                            value={ing.product}
+                            options={rawMaterials.map(m => ({
+                              value: m._id,
+                              label: m.name,
+                              code: m.itemCode,
+                              sublabel: `UOM: ${m.unitOfMeasure}`
+                            }))}
+                            onChange={(val) => handleNewMixIngredientChange(idx, 'product', val)}
+                          />
+                        </div>
+                        <div className="w-36">
+                          <input
+                            type="number"
+                            step="0.001"
+                            placeholder="Qty per 1 Ltr"
+                            value={ing.quantity}
+                            onChange={(e) => handleNewMixIngredientChange(idx, 'quantity', e.target.value)}
+                            className="w-full bg-gray-50 border border-gray-300 rounded-lg px-2.5 py-1.5 text-xs text-gray-900 font-mono font-bold"
+                          />
+                        </div>
+                        {newMixIngredients.length > 1 && (
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveNewMixIngredientRow(idx)}
+                            className="p-1 text-rose-500 hover:bg-rose-50 rounded-lg"
+                          >
+                            <Trash2 size={14} />
+                          </button>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={handleCreateNewMixAndApply}
+                    className="w-full bg-purple-700 hover:bg-purple-800 text-white py-2.5 rounded-xl text-xs font-extrabold shadow-sm transition-all flex items-center justify-center gap-1 cursor-pointer"
+                  >
+                    Save Mix Formula to Master & Apply Requisition
+                  </button>
+                </div>
+              )}
+
+              {/* REQUISITION RAW MATERIALS LIST */}
+              <div className="flex justify-between items-center pt-2">
+                <h4 className="text-xs font-bold text-gray-700 uppercase tracking-wider">Allocated Raw Materials Store Room Requisition List</h4>
+                <button
+                  type="button"
+                  onClick={handleAddRawMaterialRow}
+                  className="text-xs font-bold text-[var(--color-primary)] hover:underline flex items-center gap-1"
+                >
+                  <Plus size={14} /> Add Raw Material Row
+                </button>
+              </div>
+
+              {formData.rawMaterialsUsed.map((rm, idx) => {
+                const selectedMat = rawMaterials.find(m => m._id === rm.product);
+                const uom = selectedMat?.unitOfMeasure || 'Units';
+
+                return (
+                  <div key={idx} className="flex items-center gap-4 p-4 rounded-2xl bg-purple-50/40 border border-purple-100 shadow-sm">
+                    <div className="flex-1">
+                      <label className="text-[11px] font-bold text-gray-600 uppercase tracking-wider block mb-1">
+                        Raw Material Item
+                      </label>
+                      <SearchableSelect
+                        required
+                        placeholder="Search & select raw material..."
+                        value={rm.product}
+                        options={rawMaterials.map(m => ({
+                          value: m._id,
+                          label: m.name,
+                          code: m.itemCode,
+                          sublabel: `UOM: ${m.unitOfMeasure}`
+                        }))}
+                        onChange={(val) => handleRawMaterialChange(idx, 'product', val)}
+                      />
+                    </div>
+
+                    <div className="w-48">
+                      <label className="text-[11px] font-bold text-gray-600 uppercase tracking-wider flex items-center justify-between mb-1">
+                        <span>Qty Needed *</span>
+                        {selectedMat && (
+                          <span className="px-2 py-0.5 rounded-md bg-purple-100 text-purple-900 font-mono text-[10px] font-extrabold border border-purple-200">
+                            {uom}
+                          </span>
+                        )}
+                      </label>
+                      <div className="relative flex items-center">
+                        <input
+                          type="number"
+                          step="0.01"
+                          min="0.01"
+                          required
+                          value={rm.quantityUsed}
+                          onChange={(e) => handleRawMaterialChange(idx, 'quantityUsed', e.target.value)}
+                          placeholder={`Qty in ${uom}`}
+                          className={`${customInputStyle} font-mono ${selectedMat ? 'pr-12' : ''}`}
+                        />
+                        {selectedMat && (
+                          <span className="absolute right-3 font-mono font-bold text-xs text-purple-900 pointer-events-none">
+                            {uom}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+
+                    {formData.rawMaterialsUsed.length > 1 && (
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveRawMaterialRow(idx)}
+                        className="text-rose-500 hover:text-rose-700 p-2 mt-5 hover:bg-rose-50 rounded-xl transition-colors shrink-0"
+                        title="Remove material row"
+                      >
+                        <Trash2 size={18} />
+                      </button>
+                    )}
+                  </div>
+                );
+              })}
+
+              <div className="flex justify-end pt-4">
+                <button
+                  type="button"
+                  onClick={() => setWizardStep(2)}
+                  className="bg-white border-2 border-indigo-600 text-indigo-700 hover:bg-indigo-50 px-6 py-2.5 rounded-xl text-sm font-extrabold transition-all shadow-md flex items-center gap-2 cursor-pointer"
+                >
+                  Next: Packaging Material Requisition <ArrowRight size={16} />
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* STEP 2: PACKAGING MATERIAL REQUISITION */}
+          {wizardStep === 2 && (
+            <div className="space-y-4">
+              <div className="p-4 bg-indigo-50/80 border border-indigo-200 rounded-2xl flex justify-between items-center">
+                <div>
+                  <h3 className="text-xs font-extrabold text-indigo-950 uppercase tracking-wider flex items-center gap-2">
+                    <Box size={16} className="text-indigo-600" />
+                    Packaging Materials Requisition (Store Room Request)
+                  </h3>
+                  <p className="text-[10px] text-indigo-700 mt-0.5 font-medium">Select tubs, cups, lids, sticks, outer corrugated boxes, & foils to be issued from Store Room for packing</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleAddPackagingRow}
+                  className="bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1.5 rounded-xl text-xs font-bold transition-all shadow-xs cursor-pointer flex items-center gap-1"
+                >
+                  <Plus size={14} /> Add Packaging Material
+                </button>
+              </div>
+
+              {packagingMaterialsUsed.map((pkg, idx) => {
+                const selectedPkg = packagingMaterials.find(m => m._id === pkg.product);
+                const uom = selectedPkg?.unitOfMeasure || 'Pcs';
+
+                return (
+                  <div key={idx} className="flex items-center gap-4 p-4 rounded-2xl bg-indigo-50/30 border border-indigo-100 shadow-sm">
+                    <div className="flex-1">
+                      <label className="text-[11px] font-bold text-gray-600 uppercase tracking-wider block mb-1">
+                        Packaging Material Item
+                      </label>
+                      <SearchableSelect
+                        placeholder="Search & select packaging item (e.g. Tub 250ml, Paper Cup, Box)..."
+                        value={pkg.product}
+                        options={packagingMaterials.map(m => ({
+                          value: m._id,
+                          label: m.name,
+                          code: m.itemCode,
+                          sublabel: `UOM: ${m.unitOfMeasure}`
+                        }))}
+                        onChange={(val) => handlePackagingChange(idx, 'product', val)}
+                      />
+                    </div>
+
+                    <div className="w-48">
+                      <label className="text-[11px] font-bold text-gray-600 uppercase tracking-wider flex items-center justify-between mb-1">
+                        <span>Requested Qty *</span>
+                        {selectedPkg && (
+                          <span className="px-2 py-0.5 rounded-md bg-indigo-100 text-indigo-900 font-mono text-[10px] font-extrabold border border-indigo-200">
+                            {uom}
+                          </span>
+                        )}
+                      </label>
+                      <input
+                        type="number"
+                        min="1"
+                        value={pkg.quantityRequested}
+                        onChange={(e) => handlePackagingChange(idx, 'quantityRequested', e.target.value)}
+                        placeholder={`Qty in ${uom}`}
+                        className={`${customInputStyle} font-mono text-indigo-950 font-bold`}
+                      />
+                    </div>
+
+                    {packagingMaterialsUsed.length > 1 && (
+                      <button
+                        type="button"
+                        onClick={() => handleRemovePackagingRow(idx)}
+                        className="text-rose-500 hover:text-rose-700 p-2 mt-5 hover:bg-rose-50 rounded-xl transition-colors shrink-0 cursor-pointer"
+                        title="Remove packaging row"
+                      >
+                        <Trash2 size={18} />
+                      </button>
+                    )}
+                  </div>
+                );
+              })}
+
+              <div className="flex justify-between pt-4">
+                <button
+                  type="button"
+                  onClick={() => setWizardStep(1)}
+                  className="px-4 py-2 text-xs font-bold text-gray-600 hover:text-gray-900 cursor-pointer"
+                >
+                  Back
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setWizardStep(3)}
+                  className="bg-white border-2 border-[var(--color-primary)] text-[var(--color-primary)] hover:bg-pink-50 px-6 py-2.5 rounded-xl text-sm font-extrabold transition-all shadow-md flex items-center gap-2 cursor-pointer"
+                >
+                  Next: Finished Goods & Store Room Submission <ArrowRight size={16} />
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* STEP 3: FINISHED GOODS OUTPUT & STORE ROOM SUBMISSION */}
+          {wizardStep === 3 && (
+            <div className="space-y-4">
+              <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-xl text-emerald-900 text-xs font-semibold flex items-center gap-2">
+                <ShieldCheck size={16} className="text-emerald-600 shrink-0" />
+                <span>Requisition will be sent directly to <strong>Factory Store Room</strong> for stock issue & dispatch.</span>
+              </div>
+
               <div className="space-y-1">
                 <label className="text-xs font-bold text-gray-600 uppercase tracking-wider block mb-1">Select Finished Good Product to Produce *</label>
                 <SearchableSelect
@@ -689,187 +1157,6 @@ const ProductionList = () => {
                     className={`${customInputStyle} font-mono`}
                   />
                 </div>
-              </div>
-
-              {formData.quantityBoxes > 0 && (
-                <div className="p-3 bg-emerald-50 rounded-xl border border-emerald-200 text-emerald-800 text-xs font-semibold flex justify-between items-center">
-                  <span>Calculated Finished Goods Output:</span>
-                  <span className="text-base font-extrabold font-mono">
-                    {formData.quantityBoxes} Boxes × {formData.piecesPerBox} Pcs = {formData.quantityBoxes * formData.piecesPerBox} Total Pieces
-                  </span>
-                </div>
-              )}
-
-              <div className="flex justify-end pt-4">
-                <button
-                  type="button"
-                  disabled={!formData.finishedGoodProduct || !formData.quantityBoxes}
-                  onClick={() => setWizardStep(2)}
-                  className="bg-white border-2 border-[var(--color-primary)] text-[var(--color-primary)] hover:bg-pink-50 px-6 py-2.5 rounded-xl text-sm font-extrabold transition-all shadow-md disabled:opacity-50 flex items-center gap-2"
-                >
-                  Next: Raw Material Requisition <ArrowRight size={16} />
-                </button>
-              </div>
-            </div>
-          )}
-
-          {/* STEP 2: Raw Material Allocation */}
-          {wizardStep === 2 && (
-            <div className="space-y-4">
-              {/* MIX FORMULA AUTO-FILL SECTION */}
-              <div className="p-4 bg-purple-50/80 border border-purple-200 rounded-2xl space-y-3">
-                <div className="flex justify-between items-center text-purple-950 font-extrabold text-xs uppercase tracking-wider">
-                  <span className="flex items-center gap-2">
-                    <Package size={16} className="text-purple-600" />
-                    Select Mix Formula to Auto-Calculate Raw Materials (Scaled by Liters)
-                  </span>
-                  <span className="text-[10px] text-purple-700 font-semibold lowercase">
-                    Recipes managed in Products Master
-                  </span>
-                </div>
-                <div className="grid grid-cols-1 sm:grid-cols-12 gap-3 items-end">
-                  <div className="sm:col-span-6 space-y-1">
-                    <label className="text-[11px] font-bold text-gray-700 block">Select Mix Formula *</label>
-                    <SearchableSelect
-                      placeholder="Select Mix formula from Master..."
-                      value={selectedMixProduct}
-                      options={mixProducts.map(m => ({
-                        value: m._id,
-                        label: m.name,
-                        code: m.itemCode,
-                        sublabel: `Contains ${m.rawMaterials?.length || 0} raw materials (per 1L)`
-                      }))}
-                      onChange={(val) => setSelectedMixProduct(val)}
-                    />
-                  </div>
-
-                  <div className="sm:col-span-3 space-y-1">
-                    <label className="text-[11px] font-bold text-gray-700 block">Target Mix Volume (Liters) *</label>
-                    <input
-                      type="number"
-                      min="0.1"
-                      step="0.1"
-                      value={mixCount}
-                      onChange={(e) => setMixCount(e.target.value)}
-                      placeholder="e.g. 250 L"
-                      className={`${customInputStyle} font-mono font-bold text-purple-900 border-purple-300`}
-                    />
-                  </div>
-
-                  <div className="sm:col-span-3">
-                    <button
-                      type="button"
-                      onClick={handleApplyMixFormula}
-                      className="w-full bg-purple-600 hover:bg-purple-700 text-white py-2.5 px-3 rounded-xl text-xs font-extrabold shadow-sm transition-all flex items-center justify-center gap-1 cursor-pointer"
-                    >
-                      Scale & Apply Recipe
-                    </button>
-                  </div>
-                </div>
-              </div>
-
-              <div className="flex justify-between items-center pt-2">
-                <h4 className="text-xs font-bold text-gray-700 uppercase tracking-wider">Allocated Raw Materials Requisition List</h4>
-                <button
-                  type="button"
-                  onClick={handleAddRawMaterialRow}
-                  className="text-xs font-bold text-[var(--color-primary)] hover:underline flex items-center gap-1"
-                >
-                  <Plus size={14} /> Add Material Row
-                </button>
-              </div>
-
-              {formData.rawMaterialsUsed.map((rm, idx) => {
-                const selectedMat = rawMaterials.find(m => m._id === rm.product);
-                const uom = selectedMat?.unitOfMeasure || 'Units';
-
-                return (
-                  <div key={idx} className="flex items-center gap-4 p-4 rounded-2xl bg-pink-50/40 border border-pink-100/80 shadow-sm">
-                    <div className="flex-1">
-                      <label className="text-[11px] font-bold text-gray-600 uppercase tracking-wider block mb-1">
-                        Raw Material Item
-                      </label>
-                      <SearchableSelect
-                        required
-                        placeholder="Search & select raw material..."
-                        value={rm.product}
-                        options={rawMaterials.map(m => ({
-                          value: m._id,
-                          label: m.name,
-                          code: m.itemCode,
-                          sublabel: `UOM: ${m.unitOfMeasure}`
-                        }))}
-                        onChange={(val) => handleRawMaterialChange(idx, 'product', val)}
-                      />
-                    </div>
-
-                    <div className="w-48">
-                      <label className="text-[11px] font-bold text-gray-600 uppercase tracking-wider flex items-center justify-between mb-1">
-                        <span>Qty Used *</span>
-                        {selectedMat && (
-                          <span className="px-2 py-0.5 rounded-md bg-pink-100/90 text-[var(--color-primary)] font-mono text-[10px] font-extrabold border border-pink-200">
-                            {uom}
-                          </span>
-                        )}
-                      </label>
-                      <div className="relative flex items-center">
-                        <input
-                          type="number"
-                          step="0.01"
-                          min="0.01"
-                          required
-                          value={rm.quantityUsed}
-                          onChange={(e) => handleRawMaterialChange(idx, 'quantityUsed', e.target.value)}
-                          placeholder={`Qty in ${uom}`}
-                          className={`${customInputStyle} font-mono ${selectedMat ? 'pr-12' : ''}`}
-                        />
-                        {selectedMat && (
-                          <span className="absolute right-3 font-mono font-bold text-xs text-[var(--color-primary)] pointer-events-none">
-                            {uom}
-                          </span>
-                        )}
-                      </div>
-                    </div>
-
-                    {formData.rawMaterialsUsed.length > 1 && (
-                      <button
-                        type="button"
-                        onClick={() => handleRemoveRawMaterialRow(idx)}
-                        className="text-rose-500 hover:text-rose-700 p-2 mt-5 hover:bg-rose-50 rounded-xl transition-colors shrink-0"
-                        title="Remove material row"
-                      >
-                        <Trash2 size={18} />
-                      </button>
-                    )}
-                  </div>
-                );
-              })}
-
-              <div className="flex justify-between pt-4">
-                <button
-                  type="button"
-                  onClick={() => setWizardStep(1)}
-                  className="px-4 py-2 text-xs font-bold text-gray-600 hover:text-gray-900"
-                >
-                  Back
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setWizardStep(3)}
-                  className="bg-white border-2 border-[var(--color-primary)] text-[var(--color-primary)] hover:bg-pink-50 px-6 py-2.5 rounded-xl text-sm font-extrabold transition-all shadow-md flex items-center gap-2"
-                >
-                  Next: Store Room Entry & Pricing <ArrowRight size={16} />
-                </button>
-              </div>
-            </div>
-          )}
-
-          {/* STEP 3: Store Room Entry & Batch Parameters */}
-          {wizardStep === 3 && (
-            <div className="space-y-4">
-              <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl text-amber-900 text-xs font-semibold flex items-center gap-2">
-                <AlertTriangle size={16} className="text-amber-600 shrink-0" />
-                <span>Batch will be logged in <strong>Factory Store Room</strong> awaiting Finished Goods Quality Control (QC Inspection).</span>
               </div>
 
               <div className="grid grid-cols-3 gap-4">
@@ -957,7 +1244,7 @@ const ProductionList = () => {
                 <button
                   type="button"
                   onClick={() => setWizardStep(2)}
-                  className="px-4 py-2 text-xs font-bold text-gray-600 hover:text-gray-900"
+                  className="px-4 py-2 text-xs font-bold text-gray-600 hover:text-gray-900 cursor-pointer"
                 >
                   Back
                 </button>
@@ -965,9 +1252,9 @@ const ProductionList = () => {
                 <button
                   type="submit"
                   disabled={submitting}
-                  className="bg-white border-2 border-[var(--color-primary)] text-[var(--color-primary)] hover:bg-pink-50 px-6 py-2.5 rounded-xl text-sm font-extrabold transition-all shadow-md disabled:opacity-50 flex items-center gap-2"
+                  className="bg-emerald-600 hover:bg-emerald-700 text-white px-6 py-2.5 rounded-xl text-sm font-extrabold transition-all shadow-md disabled:opacity-50 flex items-center gap-2 cursor-pointer"
                 >
-                  {submitting ? 'Manufacturing Batch...' : 'Submit Batch & Store in Factory Store Room'}
+                  {submitting ? 'Submitting Requisition...' : 'Submit Material Requisition to Store Room'}
                 </button>
               </div>
             </div>
