@@ -13,6 +13,8 @@ import QCList from './modules/procurement/QCList';
 import VendorLedgers from './modules/procurement/VendorLedgers';
 import RawMaterialStock from './modules/inventory/RawMaterialStock';
 import ProductionList from './modules/production/ProductionList';
+import StoreRoomRequisitions from './modules/production/StoreRoomRequisitions';
+import ProductRequisitionList from './modules/procurement/ProductRequisitionList';
 import FinishedGoodsStock from './modules/inventory/FinishedGoodsStock';
 import SalesInvoice from './modules/inventory/SalesInvoice';
 import AutoSalesLedger from './modules/inventory/AutoSalesLedger';
@@ -38,9 +40,11 @@ function App() {
             
             {/* Procurement & Production */}
             <Route path="purchase-orders" element={<PurchaseOrderList />} />
+            <Route path="product-requisitions" element={<ProductRequisitionList />} />
             <Route path="qc" element={<QCList />} />
             <Route path="vendor-ledgers" element={<VendorLedgers />} />
             <Route path="raw-material-stock" element={<RawMaterialStock />} />
+            <Route path="store-room-requisitions" element={<StoreRoomRequisitions />} />
             <Route path="production" element={<ProductionList />} />
 
             {/* Inventory & Sales */}

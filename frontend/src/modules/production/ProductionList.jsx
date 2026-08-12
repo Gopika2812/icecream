@@ -1142,29 +1142,41 @@ const ProductionList = () => {
                 />
               </div>
 
-              <div className="grid grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <div className="space-y-1">
-                  <label className="text-xs font-bold text-gray-600 uppercase tracking-wider block mb-1">Batch Code / Number *</label>
-                  <input
-                    type="text"
-                    required
-                    value={formData.batchNumber}
-                    onChange={(e) => setFormData({ ...formData, batchNumber: e.target.value })}
-                    placeholder="e.g. BATCH-1"
-                    className={`${customInputStyle} font-mono font-bold text-indigo-700`}
-                  />
-                </div>
-
-                <div className="space-y-1">
-                  <label className="text-xs font-bold text-gray-600 uppercase tracking-wider block mb-1">Target Output Quantity (Boxes) *</label>
+                  <label className="text-xs font-bold font-mono text-purple-900 uppercase tracking-wider block mb-1">Target Output Quantity (Pcs) *</label>
                   <input
                     type="number"
                     min="1"
                     required
-                    value={formData.quantityBoxes}
-                    onChange={(e) => setFormData({ ...formData, quantityBoxes: e.target.value })}
+                    value={formData.totalPieces || ''}
+                    onChange={(e) => {
+                      const pcs = parseFloat(e.target.value) || 0;
+                      const pPerBox = parseInt(formData.piecesPerBox) || 12;
+                      const boxes = Number((pcs / pPerBox).toFixed(2));
+                      setFormData({ ...formData, totalPieces: pcs, quantityBoxes: boxes });
+                    }}
+                    placeholder="e.g. 240 Pcs"
+                    className={`${customInputStyle} font-mono font-black text-purple-950 border-purple-300 bg-purple-50/40 text-base`}
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-xs font-bold text-gray-600 uppercase tracking-wider block mb-1">Calculated Output (Boxes)</label>
+                  <input
+                    type="number"
+                    step="any"
+                    min="0.1"
+                    required
+                    value={formData.quantityBoxes || ''}
+                    onChange={(e) => {
+                      const boxes = parseFloat(e.target.value) || 0;
+                      const pPerBox = parseInt(formData.piecesPerBox) || 12;
+                      const pcs = boxes * pPerBox;
+                      setFormData({ ...formData, quantityBoxes: boxes, totalPieces: pcs });
+                    }}
                     placeholder="e.g. 10 Boxes"
-                    className={`${customInputStyle} font-mono`}
+                    className={`${customInputStyle} font-mono font-bold text-gray-800`}
                   />
                 </div>
 
@@ -1175,89 +1187,24 @@ const ProductionList = () => {
                     min="1"
                     required
                     value={formData.piecesPerBox}
-                    onChange={(e) => setFormData({ ...formData, piecesPerBox: e.target.value })}
-                    className={`${customInputStyle} font-mono`}
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-3 gap-4">
-                <div className="space-y-1">
-                  <label className="text-xs font-bold text-gray-600 uppercase tracking-wider flex items-center gap-1 mb-1">
-                    <ThermometerSnowflake size={14} className="text-blue-500" />
-                    Storage Temp (°C) *
-                  </label>
-                  <input
-                    type="number"
-                    step="0.1"
-                    required
-                    value={formData.temperature}
-                    onChange={(e) => setFormData({ ...formData, temperature: e.target.value })}
-                    className={`${customInputStyle} font-mono`}
-                    placeholder="e.g. -18"
-                  />
-                </div>
-
-                <div className="space-y-1">
-                  <label className="text-xs font-bold text-gray-600 uppercase tracking-wider block mb-1">Selling Price per Box (₹) *</label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    min="0"
-                    required
-                    value={formData.sellingPrice}
-                    onChange={(e) => setFormData({ ...formData, sellingPrice: e.target.value })}
-                    className={`${customInputStyle} font-mono`}
-                    placeholder="0.00"
-                  />
-                </div>
-
-                <div className="space-y-1">
-                  <label className="text-xs font-bold text-gray-600 uppercase tracking-wider block mb-1">MRP per Box (₹) *</label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    min="0"
-                    required
-                    value={formData.mrp}
-                    onChange={(e) => setFormData({ ...formData, mrp: e.target.value })}
-                    className={`${customInputStyle} font-mono`}
-                    placeholder="0.00"
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-1">
-                  <label className="text-xs font-bold text-gray-600 uppercase tracking-wider block mb-1">Manufacturing Date *</label>
-                  <input
-                    type="date"
-                    required
-                    value={formData.manufacturingDate}
-                    onChange={(e) => setFormData({ ...formData, manufacturingDate: e.target.value })}
-                    className={customInputStyle}
-                  />
-                </div>
-
-                <div className="space-y-1">
-                  <label className="text-xs font-bold text-gray-600 uppercase tracking-wider block mb-1">Expiry Date *</label>
-                  <input
-                    type="date"
-                    required
-                    value={formData.expiryDate}
-                    onChange={(e) => setFormData({ ...formData, expiryDate: e.target.value })}
-                    className={customInputStyle}
+                    onChange={(e) => {
+                      const pPerBox = parseInt(e.target.value) || 12;
+                      const pcs = parseFloat(formData.totalPieces) || 0;
+                      const boxes = Number((pcs / pPerBox).toFixed(2));
+                      setFormData({ ...formData, piecesPerBox: pPerBox, quantityBoxes: boxes });
+                    }}
+                    className={`${customInputStyle} font-mono font-bold`}
                   />
                 </div>
               </div>
 
               <div className="space-y-1">
-                <label className="text-xs font-bold text-gray-600 uppercase tracking-wider block mb-1">Production Remarks</label>
+                <label className="text-xs font-bold text-gray-600 uppercase tracking-wider block mb-1">Production Requisition Remarks</label>
                 <input
                   type="text"
                   value={formData.remarks}
                   onChange={(e) => setFormData({ ...formData, remarks: e.target.value })}
-                  placeholder="Optional production notes"
+                  placeholder="Optional material requisition notes for Store Room"
                   className={customInputStyle}
                 />
               </div>

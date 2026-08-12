@@ -139,9 +139,11 @@ const DashboardLayout = () => {
 
           <NavGroup title="Procurement & Production">
             <NavItem to="/purchase-orders" icon={ShoppingCart} title="Purchase Invoice" />
+            <NavItem to="/product-requisitions" icon={FileText} title="Product Requisition" />
             <NavItem to="/qc" icon={ShieldCheck} title="Quality Control" />
             <NavItem to="/vendor-ledgers" icon={Building2} title="Vendor Ledgers & Payments" />
             <NavItem to="/raw-material-stock" icon={ArrowLeftRight} title="Raw Material Stock" />
+            <NavItem to="/store-room-requisitions" icon={Truck} title="Store Room Requisitions" />
             <NavItem to="/production" icon={Factory} title="Production & Assembly" />
           </NavGroup>
 

@@ -37,7 +37,9 @@ exports.createProductionBatch = async (req, res) => {
             finishedGoodProduct,
             quantityBoxes,
             piecesPerBox,
+            totalPieces: reqTotalPieces,
             rawMaterialsUsed,
+            packagingMaterialsUsed,
             temperature,
             sellingPrice,
             mrp,
@@ -47,65 +49,42 @@ exports.createProductionBatch = async (req, res) => {
         } = req.body;
 
         if (!finishedGoodProduct) return res.status(400).json({ success: false, message: 'Finished Good product is required.' });
-        if (!quantityBoxes || parseFloat(quantityBoxes) <= 0) return res.status(400).json({ success: false, message: 'Valid quantity in boxes is required.' });
-        if (!expiryDate) return res.status(400).json({ success: false, message: 'Expiry date is required for finished goods.' });
 
         // Resolve branch
-        let targetBranch = branchId || req.user.branch;
+        let targetBranch = branchId || req.user?.branch;
         if (!targetBranch) {
             const firstBranch = await Branch.findOne();
             if (firstBranch) targetBranch = firstBranch._id;
         }
 
-        const boxCount = parseFloat(quantityBoxes);
         const pPerBox = parseInt(piecesPerBox) || 12;
-        const totalPieces = boxCount * pPerBox;
+        let totalPieces = parseInt(reqTotalPieces) || 0;
+        let boxCount = parseFloat(quantityBoxes) || 0;
 
-        // Auto-generate Production Number & Batch Code
-        const countToday = await Production.countDocuments();
-        const dateStr = new Date().toISOString().split('T')[0].replace(/-/g, '');
-        const productionNumber = `PRD-${dateStr}-${(countToday + 1).toString().padStart(3, '0')}`;
+        if (totalPieces <= 0 && boxCount > 0) {
+            totalPieces = boxCount * pPerBox;
+        } else if (totalPieces > 0 && boxCount <= 0) {
+            boxCount = Number((totalPieces / pPerBox).toFixed(2));
+        }
+
+        if (totalPieces <= 0) return res.status(400).json({ success: false, message: 'Valid quantity in Pcs or Boxes is required.' });
+
+        // Auto-generate Production Number (e.g. PR-01, PR-02) & Batch Code
         const totalBatches = await Production.countDocuments();
+        const productionNumber = req.body.productionNumber || `PR-${(totalBatches + 1).toString().padStart(2, '0')}`;
         const batchNumber = req.body.batchNumber || `BATCH-${totalBatches + 1}`;
 
         // Verify Finished Good Product
         const fgProductObj = await Product.findById(finishedGoodProduct);
         if (!fgProductObj) return res.status(404).json({ success: false, message: 'Finished Good Product not found.' });
 
-        // 1. Issue & Deduct Raw Materials Used from Raw Material Stock (OUTWARD)
+        // Process Raw Materials Array
         const processedRawMaterials = [];
         if (Array.isArray(rawMaterialsUsed)) {
             for (const rm of rawMaterialsUsed) {
                 const qtyUsed = parseFloat(rm.quantityUsed) || 0;
                 if (qtyUsed > 0 && rm.product) {
                     const rmProd = await Product.findById(rm.product);
-                    
-                    // Deduct from Raw Material Store Room Inventory
-                    let rmInv = await Inventory.findOne({
-                        branch: targetBranch,
-                        product: rm.product,
-                        inventoryType: 'Store Room'
-                    });
-
-                    if (rmInv) {
-                        rmInv.quantity = Math.max(0, rmInv.quantity - qtyUsed);
-                        rmInv.lastUpdated = Date.now();
-                        await rmInv.save();
-                    }
-
-                    // Create Outward Transaction for Issued Raw Material
-                    await InventoryTransaction.create({
-                        branch: targetBranch,
-                        product: rm.product,
-                        inventoryType: 'Store Room',
-                        batchNumber: rm.batchNumber || 'STORE-RM',
-                        transactionType: 'OUT',
-                        quantity: qtyUsed,
-                        referenceType: 'PRODUCTION',
-                        remarks: `Issued to Factory Floor for Production ${productionNumber} (${fgProductObj.name})`,
-                        performedBy: req.user._id
-                    });
-
                     processedRawMaterials.push({
                         product: rm.product,
                         batchNumber: rm.batchNumber || 'STORE-RM',
@@ -116,51 +95,27 @@ exports.createProductionBatch = async (req, res) => {
             }
         }
 
-        // 2. Inward Finished Goods into Factory Store Room Inventory (Pending QC Inspection)
+        // Process Packaging Materials Array
+        const processedPackagingMaterials = [];
+        if (Array.isArray(packagingMaterialsUsed)) {
+            for (const pkg of packagingMaterialsUsed) {
+                const qtyReq = parseFloat(pkg.quantityRequested) || 0;
+                if (qtyReq > 0 && pkg.product) {
+                    const pkgProd = await Product.findById(pkg.product);
+                    processedPackagingMaterials.push({
+                        product: pkg.product,
+                        quantityRequested: qtyReq,
+                        unitOfMeasure: pkgProd ? pkgProd.unitOfMeasure : 'Pcs'
+                    });
+                }
+            }
+        }
+
         const fgSellingPrice = parseFloat(sellingPrice) || fgProductObj.wholesalePrice || 0;
         const fgMrp = parseFloat(mrp) || fgProductObj.mrp || 0;
         const fgTemp = parseFloat(temperature) !== undefined ? parseFloat(temperature) : -18;
         const mfgDate = manufacturingDate ? new Date(manufacturingDate) : new Date();
-        const expDate = new Date(expiryDate);
-
-        // Stock into Factory Store Room
-        await Inventory.findOneAndUpdate(
-            {
-                branch: targetBranch,
-                product: finishedGoodProduct,
-                inventoryType: 'Store Room',
-                batchNumber
-            },
-            {
-                $inc: { quantity: totalPieces },
-                $set: {
-                    purchasePrice: fgSellingPrice,
-                    mrp: fgMrp,
-                    manufacturingDate: mfgDate,
-                    expiryDate: expDate,
-                    temperature: fgTemp,
-                    lastUpdated: Date.now()
-                }
-            },
-            { new: true, upsert: true }
-        );
-
-        // Log Store Room Inward Transaction
-        await InventoryTransaction.create({
-            branch: targetBranch,
-            product: finishedGoodProduct,
-            inventoryType: 'Store Room',
-            batchNumber,
-            purchasePrice: fgSellingPrice,
-            mrp: fgMrp,
-            manufacturingDate: mfgDate,
-            expiryDate: expDate,
-            transactionType: 'IN',
-            quantity: totalPieces,
-            referenceType: 'PRODUCTION',
-            remarks: `Factory Production Completed. ${boxCount} Boxes (${totalPieces} Pcs @ ${fgTemp}°C) in Store Room pending QC.`,
-            performedBy: req.user._id
-        });
+        const expDate = expiryDate ? new Date(expiryDate) : new Date(Date.now() + 180 * 24 * 60 * 60 * 1000);
 
         // Generate QR Code Payload String
         const qrPayload = JSON.stringify({
@@ -171,13 +126,10 @@ exports.createProductionBatch = async (req, res) => {
             itemCode: fgProductObj.itemCode,
             quantityBoxes: boxCount,
             totalPieces,
-            temperature: `${fgTemp} °C`,
-            mfgDate: mfgDate.toISOString().split('T')[0],
-            expiryDate: expDate.toISOString().split('T')[0],
-            qcStatus: 'STORE_ROOM_PENDING_QC'
+            status: 'PENDING_STORE_ROOM_DISPATCH'
         });
 
-        // Save Production Record
+        // Save Production Requisition Record
         const productionBatch = await Production.create({
             productionNumber,
             branch: targetBranch,
@@ -187,29 +139,127 @@ exports.createProductionBatch = async (req, res) => {
             piecesPerBox: pPerBox,
             totalPieces,
             rawMaterialsUsed: processedRawMaterials,
+            packagingMaterialsUsed: processedPackagingMaterials,
             temperature: fgTemp,
             sellingPrice: fgSellingPrice,
             mrp: fgMrp,
             manufacturingDate: mfgDate,
             expiryDate: expDate,
             qrCodeData: qrPayload,
+            status: 'PENDING_STORE_ROOM_DISPATCH',
             qcStatus: 'STORE_ROOM_PENDING_QC',
-            remarks: remarks || 'Production completed & stored in Store Room awaiting QC',
-            performedBy: req.user._id
+            remarks: remarks || 'Material Requisition submitted to Store Room',
+            performedBy: req.user?._id
         });
 
         const populatedProduction = await Production.findById(productionBatch._id)
             .populate('branch', 'branchName')
             .populate('finishedGoodProduct', 'name itemCode unitOfMeasure category')
-            .populate('rawMaterialsUsed.product', 'name itemCode unitOfMeasure');
+            .populate('rawMaterialsUsed.product', 'name itemCode unitOfMeasure')
+            .populate('packagingMaterialsUsed.product', 'name itemCode unitOfMeasure');
 
         res.status(201).json({
             success: true,
             data: populatedProduction,
-            message: `Production Batch ${productionNumber} created in Factory Store Room! Awaiting QC Inspection.`
+            message: `Material Requisition ID ${productionNumber} submitted to Factory Store Room for Stock Issue!`
         });
     } catch (error) {
         console.error('Error creating production batch', error);
+        res.status(500).json({ success: false, message: error.message });
+    }
+};
+
+// @desc    Store Room Dispatches Raw Materials & Packaging Materials to Production Team
+// @route   POST /api/v1/production/:id/dispatch
+// @access  Private
+exports.dispatchStock = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const production = await Production.findById(id);
+        if (!production) return res.status(404).json({ success: false, message: 'Production Requisition not found.' });
+
+        if (production.status === 'DISPATCHED_TO_PRODUCTION' || production.status === 'QC_PASSED') {
+            return res.status(400).json({ success: false, message: 'Stock for this Requisition has already been dispatched.' });
+        }
+
+        const targetBranch = production.branch || req.user?.branch;
+        const prodIdCode = production.productionNumber || `PR-${id.slice(-4)}`;
+
+        // 1. Deduct Raw Materials from Store Room Inventory
+        if (Array.isArray(production.rawMaterialsUsed)) {
+            for (const rm of production.rawMaterialsUsed) {
+                const qtyUsed = parseFloat(rm.quantityUsed) || 0;
+                if (qtyUsed > 0 && rm.product) {
+                    const rmProdId = rm.product._id || rm.product;
+                    let rmInv = await Inventory.findOne({
+                        product: rmProdId,
+                        inventoryType: 'Store Room'
+                    });
+
+                    if (rmInv) {
+                        rmInv.quantity = Math.max(0, rmInv.quantity - qtyUsed);
+                        rmInv.lastUpdated = Date.now();
+                        await rmInv.save();
+                    }
+
+                    await InventoryTransaction.create({
+                        branch: targetBranch,
+                        product: rmProdId,
+                        inventoryType: 'Store Room',
+                        batchNumber: rm.batchNumber || 'STORE-RM',
+                        transactionType: 'OUT',
+                        quantity: qtyUsed,
+                        referenceType: 'PRODUCTION',
+                        remarks: `Issued Raw Material to Production for Requisition ${prodIdCode}`,
+                        performedBy: req.user?._id
+                    });
+                }
+            }
+        }
+
+        // 2. Deduct Packaging Materials from Store Room Inventory
+        if (Array.isArray(production.packagingMaterialsUsed)) {
+            for (const pkg of production.packagingMaterialsUsed) {
+                const qtyReq = parseFloat(pkg.quantityRequested) || 0;
+                if (qtyReq > 0 && pkg.product) {
+                    const pkgProdId = pkg.product._id || pkg.product;
+                    let pkgInv = await Inventory.findOne({
+                        product: pkgProdId,
+                        inventoryType: 'Store Room'
+                    });
+
+                    if (pkgInv) {
+                        pkgInv.quantity = Math.max(0, pkgInv.quantity - qtyReq);
+                        pkgInv.lastUpdated = Date.now();
+                        await pkgInv.save();
+                    }
+
+                    await InventoryTransaction.create({
+                        branch: targetBranch,
+                        product: pkgProdId,
+                        inventoryType: 'Store Room',
+                        transactionType: 'OUT',
+                        quantity: qtyReq,
+                        referenceType: 'PRODUCTION',
+                        remarks: `Issued Packaging Material to Production for Requisition ${prodIdCode}`,
+                        performedBy: req.user?._id
+                    });
+                }
+            }
+        }
+
+        production.status = 'DISPATCHED_TO_PRODUCTION';
+        production.dispatchedAt = new Date();
+        production.dispatchedBy = req.user?._id;
+        await production.save();
+
+        res.json({
+            success: true,
+            message: `Store Room Stock Dispatched successfully for Requisition ID ${prodIdCode}!`,
+            data: production
+        });
+    } catch (error) {
+        console.error('Error dispatching stock from Store Room', error);
         res.status(500).json({ success: false, message: error.message });
     }
 };
