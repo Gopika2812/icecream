@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import api from '../../services/api';
 import { 
-  ShieldCheck, Package, QrCode, RefreshCw, Loader2, CheckCircle2, AlertTriangle, Printer, X
+  ShieldCheck, Package, QrCode, RefreshCw, Loader2, CheckCircle2, AlertTriangle, Printer, X, Tag
 } from 'lucide-react';
 import Modal from '../../components/Modal';
 import { QRCodeSVG } from 'qrcode.react';
@@ -17,6 +17,10 @@ const FinishedGoodsQC = () => {
   const [isQcModalOpen, setIsQcModalOpen] = useState(false);
   const [isQrModalOpen, setIsQrModalOpen] = useState(false);
   const [currentQrStickers, setCurrentQrStickers] = useState([]);
+
+  // QR Code Color Settings
+  const [qrFgColor, setQrFgColor] = useState('#000000');
+  const [qrBgColor, setQrBgColor] = useState('#FFFFFF');
 
   // Form State
   const [damagedPieces, setDamagedPieces] = useState(0);
@@ -353,14 +357,67 @@ const FinishedGoodsQC = () => {
         <>
           <Modal isOpen={isQrModalOpen} onClose={() => setIsQrModalOpen(false)} title="Printable Box QR Code Stickers" size="xl">
             <div className="space-y-4">
-              <div className="no-print flex justify-between items-center bg-rose-50 p-3 rounded-2xl border border-rose-200 text-rose-950 text-xs font-bold">
+              <div className="no-print flex flex-col sm:flex-row justify-between items-start sm:items-center bg-rose-50 p-3 rounded-2xl border border-rose-200 text-rose-950 text-xs font-bold gap-2">
                 <span>Generated <strong>{currentQrStickers.length} Box QR Stickers</strong> (1 Sticker per Box)</span>
                 <button
                   onClick={() => window.print()}
-                  className="bg-rose-600 hover:bg-rose-700 text-white px-4 py-1.5 rounded-xl text-xs font-extrabold shadow-sm flex items-center gap-1.5 cursor-pointer"
+                  className="bg-rose-600 hover:bg-rose-700 text-white px-4 py-1.5 rounded-xl text-xs font-extrabold shadow-sm flex items-center gap-1.5 cursor-pointer shrink-0"
                 >
                   <Printer size={14} /> Print Sticker Sheet
                 </button>
+              </div>
+
+              {/* QR CODE COLOR SETTINGS BAR */}
+              <div className="no-print p-3 bg-slate-900 text-white rounded-2xl flex flex-wrap items-center justify-between gap-3 shadow-md border border-slate-800">
+                <div className="flex items-center gap-2 text-xs font-extrabold">
+                  <Tag size={15} className="text-rose-400" />
+                  <span>QR Code Color Settings</span>
+                </div>
+
+                <div className="flex items-center gap-4 flex-wrap">
+                  {/* Preset Swatches */}
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-[10px] text-slate-400 font-bold uppercase">Presets:</span>
+                    {[
+                      { name: 'Classic Black', fg: '#000000', bg: '#FFFFFF' },
+                      { name: 'Brand Rose', fg: '#9F1239', bg: '#FFFFFF' },
+                      { name: 'Navy Blue', fg: '#1E3A8A', bg: '#FFFFFF' },
+                      { name: 'Forest Green', fg: '#065F46', bg: '#FFFFFF' },
+                      { name: 'Dark Charcoal', fg: '#111827', bg: '#FEF3C7' }
+                    ].map((preset, idx) => (
+                      <button
+                        key={idx}
+                        type="button"
+                        onClick={() => { setQrFgColor(preset.fg); setQrBgColor(preset.bg); }}
+                        title={preset.name}
+                        className={`w-5 h-5 rounded-full border-2 transition-all cursor-pointer ${qrFgColor === preset.fg ? 'ring-2 ring-rose-400 scale-110 border-white' : 'border-slate-700'}`}
+                        style={{ backgroundColor: preset.fg }}
+                      />
+                    ))}
+                  </div>
+
+                  {/* Custom Pickers */}
+                  <div className="flex items-center gap-2 text-[11px] font-bold">
+                    <label className="flex items-center gap-1 cursor-pointer">
+                      <span className="text-slate-300">QR:</span>
+                      <input
+                        type="color"
+                        value={qrFgColor}
+                        onChange={(e) => setQrFgColor(e.target.value)}
+                        className="w-6 h-6 rounded cursor-pointer border-0 bg-transparent"
+                      />
+                    </label>
+                    <label className="flex items-center gap-1 cursor-pointer">
+                      <span className="text-slate-300">BG:</span>
+                      <input
+                        type="color"
+                        value={qrBgColor}
+                        onChange={(e) => setQrBgColor(e.target.value)}
+                        className="w-6 h-6 rounded cursor-pointer border-0 bg-transparent"
+                      />
+                    </label>
+                  </div>
+                </div>
               </div>
 
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 max-h-[60vh] overflow-y-auto p-2">
@@ -391,10 +448,12 @@ const FinishedGoodsQC = () => {
                         {trackingData.system}
                       </div>
 
-                      <div className="p-2 bg-white rounded-xl border border-gray-200 shadow-2xs my-1 flex justify-center items-center">
+                      <div className="p-2 rounded-xl border border-gray-200 shadow-2xs my-1 flex justify-center items-center" style={{ backgroundColor: qrBgColor }}>
                         <QRCodeSVG
                           value={qrString}
                           size={110}
+                          fgColor={qrFgColor}
+                          bgColor={qrBgColor}
                           level="M"
                           includeMargin={true}
                         />
@@ -445,10 +504,12 @@ const FinishedGoodsQC = () => {
                         {trackingData.system}
                       </div>
 
-                      <div className="p-2 bg-white rounded-xl border border-gray-300 my-1 flex justify-center items-center">
+                      <div className="p-2 rounded-xl border border-gray-300 my-1 flex justify-center items-center" style={{ backgroundColor: qrBgColor }}>
                         <QRCodeSVG
                           value={qrString}
                           size={110}
+                          fgColor={qrFgColor}
+                          bgColor={qrBgColor}
                           level="M"
                           includeMargin={true}
                         />
