@@ -237,26 +237,41 @@ const RawMaterialStock = () => {
 
   const compiledProducts = compileProductStock();
 
-  // Counts for tabs
-  const rawCount = (products || []).filter(p => {
-    if (p.itemType === 'Finished Goods' || p.itemType === 'Finished Good') return false;
+  const isMixProduct = (p) => {
     const type = (p.itemType || '').toLowerCase();
     const cat = (p.category || '').toLowerCase();
-    return type.includes('raw') || (!type.includes('pack') && !cat.includes('packaging'));
-  }).length;
+    const name = (p.name || '').toLowerCase();
+    return type.includes('mix') || cat.includes('mix') || name.includes(' mix') || name.includes('base mix');
+  };
 
-  const packingCount = (products || []).filter(p => {
-    if (p.itemType === 'Finished Goods' || p.itemType === 'Finished Good') return false;
+  const isPackingProduct = (p) => {
     const type = (p.itemType || '').toLowerCase();
     const cat = (p.category || '').toLowerCase();
     return type.includes('pack') || cat.includes('packaging');
-  }).length;
+  };
+
+  const isFinishedGoodProduct = (p) => {
+    const type = (p.itemType || '').toLowerCase();
+    return type.includes('finished') || type.includes('fg');
+  };
+
+  // Counts for tabs
+  const mixCount = (products || []).filter(p => !isFinishedGoodProduct(p) && isMixProduct(p)).length;
+  const packingCount = (products || []).filter(p => !isFinishedGoodProduct(p) && !isMixProduct(p) && isPackingProduct(p)).length;
+  const rawCount = (products || []).filter(p => !isFinishedGoodProduct(p) && !isMixProduct(p) && !isPackingProduct(p)).length;
+  const allInputCount = (products || []).filter(p => !isFinishedGoodProduct(p)).length;
 
   // Categories list
   const categories = ['ALL', ...new Set(compiledProducts.map(p => p.category))];
 
   // Filtered Products for Stock Balance view
   const filteredProducts = compiledProducts.filter(p => {
+    if (isFinishedGoodProduct(p)) return false;
+
+    if (materialTypeFilter === 'RAW' && (isMixProduct(p) || isPackingProduct(p))) return false;
+    if (materialTypeFilter === 'MIX' && !isMixProduct(p)) return false;
+    if (materialTypeFilter === 'PACKING' && (!isPackingProduct(p) || isMixProduct(p))) return false;
+
     if (selectedCategory !== 'ALL' && p.category !== selectedCategory) return false;
     if (searchTerm.trim()) {
       const q = searchTerm.toLowerCase();
@@ -447,7 +462,7 @@ const RawMaterialStock = () => {
       {/* Streamlined Top Control Bar */}
       <div className="bg-white rounded-2xl p-4 border border-slate-200/80 shadow-xs mb-6 flex flex-col md:flex-row justify-between items-center gap-4">
         {/* Material Type Segment Pills */}
-        <div className="flex items-center gap-1.5 bg-slate-100/80 p-1.5 rounded-xl w-full md:w-auto">
+        <div className="flex items-center gap-1.5 bg-slate-100/80 p-1.5 rounded-xl w-full md:w-auto flex-wrap">
           <button
             type="button"
             onClick={() => { setMaterialTypeFilter('RAW'); setSelectedCategory('ALL'); }}
@@ -463,6 +478,24 @@ const RawMaterialStock = () => {
               materialTypeFilter === 'RAW' ? 'bg-pink-50 text-pink-700 border border-pink-200' : 'bg-slate-200 text-slate-700'
             }`}>
               {rawCount}
+            </span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => { setMaterialTypeFilter('MIX'); setSelectedCategory('ALL'); }}
+            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+              materialTypeFilter === 'MIX'
+                ? 'bg-white text-slate-900 shadow-xs font-extrabold'
+                : 'text-slate-600 hover:text-slate-900'
+            }`}
+          >
+            <Milk size={15} className="text-amber-600" />
+            <span>Prepared Mix Stock</span>
+            <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+              materialTypeFilter === 'MIX' ? 'bg-amber-50 text-amber-700 border border-amber-200' : 'bg-slate-200 text-slate-700'
+            }`}>
+              {mixCount}
             </span>
           </button>
 
@@ -494,8 +527,10 @@ const RawMaterialStock = () => {
             }`}
           >
             <span>All Input Materials</span>
-            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-200 text-slate-700">
-              {rawCount + packingCount}
+            <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+              materialTypeFilter === 'ALL' ? 'bg-slate-900 text-white' : 'bg-slate-200 text-slate-700'
+            }`}>
+              {allInputCount}
             </span>
           </button>
         </div>
