@@ -546,14 +546,20 @@ const ProductionList = () => {
     }
   };
 
+  const [typeFilter, setTypeFilter] = useState('ALL'); // 'ALL' | 'MIX' | 'FINISHED_GOOD'
+
   // Filtered Production List
   const filteredProductions = productions.filter(p => {
+    const isMix = p.requisitionType === 'MIX_REQUISITION';
+    if (typeFilter === 'MIX' && !isMix) return false;
+    if (typeFilter === 'FINISHED_GOOD' && isMix) return false;
+
     if (!searchTerm.trim()) return true;
     const q = searchTerm.toLowerCase();
     const matchNo = (p.productionNumber || '').toLowerCase().includes(q);
     const matchBatch = (p.batchNumber || '').toLowerCase().includes(q);
-    const matchProd = (p.finishedGoodProduct?.name || '').toLowerCase().includes(q);
-    const matchCode = (p.finishedGoodProduct?.itemCode || '').toLowerCase().includes(q);
+    const matchProd = (p.finishedGoodProduct?.name || p.mixProduct?.name || '').toLowerCase().includes(q);
+    const matchCode = (p.finishedGoodProduct?.itemCode || p.mixProduct?.itemCode || '').toLowerCase().includes(q);
     return matchNo || matchBatch || matchProd || matchCode;
   });
 
@@ -793,21 +799,51 @@ const ProductionList = () => {
         </div>
       </div>
 
-      {/* Search Bar */}
-      <div className="flex justify-between items-center gap-4 mb-6 bg-white/40 p-4 rounded-2xl border border-[var(--color-glass-border)]">
-        <div className="relative w-full sm:w-80">
+      {/* Requisition Type Filter Tabs */}
+      <div className="flex flex-wrap items-center justify-between gap-4 mb-6 bg-white/60 p-3 rounded-2xl border border-[var(--color-glass-border)] shadow-xs">
+        <div className="flex items-center gap-2 flex-wrap">
+          <button
+            onClick={() => setTypeFilter('ALL')}
+            className={`px-3.5 py-1.5 rounded-xl text-xs font-black transition-all cursor-pointer ${
+              typeFilter === 'ALL'
+                ? 'bg-rose-950 text-white shadow-xs'
+                : 'bg-white text-gray-700 hover:bg-rose-50 border border-gray-200'
+            }`}
+          >
+            All Runs ({productions.length})
+          </button>
+          <button
+            onClick={() => setTypeFilter('MIX')}
+            className={`px-3.5 py-1.5 rounded-xl text-xs font-black transition-all flex items-center gap-1.5 cursor-pointer ${
+              typeFilter === 'MIX'
+                ? 'bg-amber-600 text-white shadow-xs'
+                : 'bg-amber-50 text-amber-900 hover:bg-amber-100 border border-amber-200'
+            }`}
+          >
+            🧪 Mix Preparation ({productions.filter(p => p.requisitionType === 'MIX_REQUISITION').length})
+          </button>
+          <button
+            onClick={() => setTypeFilter('FINISHED_GOOD')}
+            className={`px-3.5 py-1.5 rounded-xl text-xs font-black transition-all flex items-center gap-1.5 cursor-pointer ${
+              typeFilter === 'FINISHED_GOOD'
+                ? 'bg-rose-600 text-white shadow-xs'
+                : 'bg-rose-50 text-rose-900 hover:bg-rose-100 border border-rose-200'
+            }`}
+          >
+            📦 Finished Goods Assembly ({productions.filter(p => p.requisitionType !== 'MIX_REQUISITION').length})
+          </button>
+        </div>
+
+        <div className="relative w-full sm:w-72">
           <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
           <input
             type="text"
-            placeholder="Search production no, batch, product..."
+            placeholder="Search production no, batch..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             className="w-full pl-9 pr-4 py-1.5 bg-white border border-[var(--color-glass-border)] rounded-xl text-xs text-gray-900 focus:outline-none focus:border-[var(--color-primary)]"
           />
         </div>
-        <span className="text-xs font-semibold text-gray-500">
-          Showing {filteredProductions.length} of {productions.length} production runs
-        </span>
       </div>
 
       {/* Production Runs History Table */}
