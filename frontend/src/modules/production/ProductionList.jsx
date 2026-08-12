@@ -320,9 +320,13 @@ const ProductionList = () => {
     setFormData({ ...formData, rawMaterialsUsed: updated });
   };
 
+  // Requisition Type State
+  const [activeReqType, setActiveReqType] = useState('MIX_REQUISITION'); // 'MIX_REQUISITION' | 'FG_ASSEMBLY_REQUISITION'
+
   // Open New Batch Modal with auto-incremented batch code
-  const handleOpenNewBatchModal = () => {
+  const handleOpenNewBatchModal = (type = 'MIX_REQUISITION') => {
     const nextBatchNum = `BATCH-${productions.length + 1}`;
+    setActiveReqType(type);
     setWizardStep(1);
     setFormData({
       batchNumber: nextBatchNum,
@@ -343,23 +347,44 @@ const ProductionList = () => {
   // Submit Production Batch to Factory Store Room
   const handleSubmitBatch = async (e) => {
     e.preventDefault();
-    if (!formData.finishedGoodProduct) return alert('Please select a finished good product.');
-    if (!formData.quantityBoxes || parseFloat(formData.quantityBoxes) <= 0) return alert('Please enter target box quantity.');
-    if (!formData.expiryDate) return alert('Please select expiry date.');
+
+    const isMix = activeReqType === 'MIX_REQUISITION';
+
+    if (isMix) {
+      if (mixMode === 'EXISTING' && !selectedMixProduct) {
+        return alert('Please select a mix formula from master.');
+      }
+      if (mixMode === 'NEW' && (!newMixName.trim() || !newMixCode.trim())) {
+        return alert('Please enter new mix formula name and item code.');
+      }
+      if (!mixCount || parseFloat(mixCount) <= 0) {
+        return alert('Please enter target mix volume in Liters.');
+      }
+    } else {
+      if (!formData.finishedGoodProduct) return alert('Please select a finished good product.');
+      if (!formData.quantityBoxes || parseFloat(formData.quantityBoxes) <= 0) return alert('Please enter target output in Pcs/Boxes.');
+    }
 
     try {
       setSubmitting(true);
-      const response = await api.post('/production', {
+      const payload = {
         ...formData,
+        requisitionType: activeReqType,
         batchNumber: formData.batchNumber || `BATCH-${productions.length + 1}`,
-        quantityBoxes: parseFloat(formData.quantityBoxes),
+        mixProduct: isMix ? (mixMode === 'NEW' ? { name: newMixName, itemCode: newMixCode } : selectedMixProduct) : selectedMixProduct,
+        mixLiters: parseFloat(mixCount) || 0,
+        quantityBoxes: parseFloat(formData.quantityBoxes) || 1,
         piecesPerBox: parseInt(formData.piecesPerBox) || 12,
         sellingPrice: parseFloat(formData.sellingPrice) || 0,
         mrp: parseFloat(formData.mrp) || 0,
-        temperature: parseFloat(formData.temperature) || -18
-      });
+        temperature: parseFloat(formData.temperature) || -18,
+        packagingMaterialsUsed,
+        essenceMaterialsUsed: packagingMaterialsUsed // reused add-on materials
+      };
 
-      alert(response.data.message || 'Production Batch Created & Stored in Factory Store Room!');
+      const response = await api.post('/production', payload);
+
+      alert(response.data.message || `${isMix ? 'Mix Preparation' : 'Finished Goods Assembly'} Requisition Submitted to Factory Store Room!`);
       setIsNewBatchModalOpen(false);
       setWizardStep(1);
       fetchInitialData();
@@ -609,12 +634,20 @@ const ProductionList = () => {
           </p>
         </div>
 
-        <button
-          onClick={handleOpenNewBatchModal}
-          className="flex items-center gap-2 bg-white border-2 border-[var(--color-primary)] text-[var(--color-primary)] hover:bg-pink-50 px-5 py-2.5 rounded-xl text-xs font-extrabold transition-all shadow-md"
-        >
-          <Plus size={18} /> Start New Production Batch
-        </button>
+        <div className="flex items-center gap-3">
+          <button
+            onClick={() => handleOpenNewBatchModal('MIX_REQUISITION')}
+            className="flex items-center gap-2 bg-purple-600 hover:bg-purple-700 text-white px-4 py-2.5 rounded-xl text-xs font-extrabold transition-all shadow-md cursor-pointer"
+          >
+            <Plus size={16} /> 🥣 Request Mix Preparation
+          </button>
+          <button
+            onClick={() => handleOpenNewBatchModal('FG_ASSEMBLY_REQUISITION')}
+            className="flex items-center gap-2 bg-[var(--color-primary)] hover:bg-pink-700 text-white px-4 py-2.5 rounded-xl text-xs font-extrabold transition-all shadow-md cursor-pointer"
+          >
+            <Plus size={16} /> 🍦 Request FG Assembly
+          </button>
+        </div>
       </div>
 
       {/* Summary Cards */}

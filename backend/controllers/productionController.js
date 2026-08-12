@@ -79,13 +79,17 @@ exports.getProductionBatches = async (req, res) => {
 exports.createProductionBatch = async (req, res) => {
     try {
         const {
+            requisitionType,
             branchId,
             finishedGoodProduct,
+            mixProduct,
+            mixLiters,
             quantityBoxes,
             piecesPerBox,
             totalPieces: reqTotalPieces,
             rawMaterialsUsed,
             packagingMaterialsUsed,
+            essenceMaterialsUsed,
             temperature,
             sellingPrice,
             mrp,
@@ -94,8 +98,6 @@ exports.createProductionBatch = async (req, res) => {
             remarks
         } = req.body;
 
-        if (!finishedGoodProduct) return res.status(400).json({ success: false, message: 'Finished Good product is required.' });
-
         // Resolve branch
         let targetBranch = branchId || req.user?.branch;
         if (!targetBranch) {
@@ -103,26 +105,57 @@ exports.createProductionBatch = async (req, res) => {
             if (firstBranch) targetBranch = firstBranch._id;
         }
 
-        const pPerBox = parseInt(piecesPerBox) || 12;
-        let totalPieces = parseInt(reqTotalPieces) || 0;
-        let boxCount = parseFloat(quantityBoxes) || 0;
-
-        if (totalPieces <= 0 && boxCount > 0) {
-            totalPieces = boxCount * pPerBox;
-        } else if (totalPieces > 0 && boxCount <= 0) {
-            boxCount = Number((totalPieces / pPerBox).toFixed(2));
-        }
-
-        if (totalPieces <= 0) return res.status(400).json({ success: false, message: 'Valid quantity in Pcs or Boxes is required.' });
-
-        // Auto-generate Production Number (e.g. PR-01, PR-02) & Batch Code
         const totalBatches = await Production.countDocuments();
         const productionNumber = `PR-${(totalBatches + 1).toString().padStart(2, '0')}`;
         const batchNumber = req.body.batchNumber || `BATCH-${totalBatches + 1}`;
 
-        // Verify Finished Good Product
-        const fgProductObj = await Product.findById(finishedGoodProduct);
-        if (!fgProductObj) return res.status(404).json({ success: false, message: 'Finished Good Product not found.' });
+        const isMixReq = requisitionType === 'MIX_REQUISITION';
+        let fgProductObj = null;
+        let pPerBox = parseInt(piecesPerBox) || 12;
+        let totalPieces = parseInt(reqTotalPieces) || 0;
+        let boxCount = parseFloat(quantityBoxes) || 0;
+
+        if (isMixReq) {
+            // Mix Preparation Requisition
+            let targetMixProduct = mixProduct;
+            if (typeof mixProduct === 'object' && mixProduct.name) {
+                // Handle new mix creation
+                let existingMix = await Product.findOne({ name: mixProduct.name });
+                if (!existingMix) {
+                    existingMix = await Product.create({
+                        name: mixProduct.name,
+                        itemCode: mixProduct.itemCode || `MIX-${Date.now().toString().slice(-4)}`,
+                        itemType: 'Mix',
+                        unitOfMeasure: 'Litre',
+                        rawMaterials: rawMaterialsUsed || []
+                    });
+                }
+                targetMixProduct = existingMix._id || existingMix.id;
+                fgProductObj = existingMix;
+            } else if (targetMixProduct) {
+                fgProductObj = await Product.findById(targetMixProduct);
+            }
+
+            if (!fgProductObj) return res.status(400).json({ success: false, message: 'Mix product selection is required.' });
+
+            totalPieces = parseFloat(mixLiters) || 1;
+            boxCount = 1;
+        } else {
+            // Finished Goods Assembly Requisition
+            if (!finishedGoodProduct) return res.status(400).json({ success: false, message: 'Finished Good product selection is required.' });
+            fgProductObj = await Product.findById(finishedGoodProduct);
+            if (!fgProductObj) return res.status(404).json({ success: false, message: 'Finished Good Product not found.' });
+
+            pPerBox = parseInt(fgProductObj.piecesPerBox) || parseInt(piecesPerBox) || 12;
+
+            if (totalPieces <= 0 && boxCount > 0) {
+                totalPieces = boxCount * pPerBox;
+            } else if (totalPieces > 0 && boxCount <= 0) {
+                boxCount = Number((totalPieces / pPerBox).toFixed(2));
+            }
+
+            if (totalPieces <= 0) return res.status(400).json({ success: false, message: 'Valid Target Output in Pcs is required.' });
+        }
 
         // Process Raw Materials Array
         const processedRawMaterials = [];
@@ -159,51 +192,59 @@ exports.createProductionBatch = async (req, res) => {
             }
         }
 
+        // Process Essence / Fruits / Nuts / Add-ons Array
+        const processedEssenceMaterials = [];
+        if (Array.isArray(essenceMaterialsUsed)) {
+            for (const ess of essenceMaterialsUsed) {
+                const qtyReq = parseFloat(ess.quantityRequested) || 0;
+                if (qtyReq > 0 && ess.product) {
+                    const essProd = await Product.findById(ess.product);
+                    processedEssenceMaterials.push({
+                        product: ess.product,
+                        productName: essProd ? essProd.name : '',
+                        quantityRequested: qtyReq,
+                        unitOfMeasure: essProd ? essProd.unitOfMeasure : 'Units'
+                    });
+                }
+            }
+        }
+
         const fgSellingPrice = parseFloat(sellingPrice) || fgProductObj.wholesalePrice || 0;
         const fgMrp = parseFloat(mrp) || fgProductObj.mrp || 0;
         const fgTemp = parseFloat(temperature) !== undefined ? parseFloat(temperature) : -18;
         const mfgDate = manufacturingDate ? new Date(manufacturingDate) : new Date();
         const expDate = expiryDate ? new Date(expiryDate) : new Date(Date.now() + 180 * 24 * 60 * 60 * 1000);
 
-        // Generate QR Code Payload String
-        const qrPayload = JSON.stringify({
-            brand: 'SRI SARAVANAA ERP',
-            productionNumber,
-            batchNumber,
-            product: fgProductObj.name,
-            itemCode: fgProductObj.itemCode,
-            quantityBoxes: boxCount,
-            totalPieces,
-            status: 'PENDING_STORE_ROOM_DISPATCH'
-        });
-
         // Save Production Requisition Record
         const productionBatch = await Production.create({
             productionNumber,
+            requisitionType: isMixReq ? 'MIX_REQUISITION' : 'FG_ASSEMBLY_REQUISITION',
             branch: targetBranch,
-            finishedGoodProduct,
+            finishedGoodProduct: fgProductObj._id || fgProductObj.id,
+            mixProduct: mixProduct || null,
+            mixLiters: parseFloat(mixLiters) || 0,
             batchNumber,
             quantityBoxes: boxCount,
             piecesPerBox: pPerBox,
             totalPieces,
             rawMaterialsUsed: processedRawMaterials,
             packagingMaterialsUsed: processedPackagingMaterials,
+            essenceMaterialsUsed: processedEssenceMaterials,
             temperature: fgTemp,
             sellingPrice: fgSellingPrice,
             mrp: fgMrp,
             manufacturingDate: mfgDate,
             expiryDate: expDate,
-            qrCodeData: qrPayload,
             status: 'PENDING_STORE_ROOM_DISPATCH',
             qcStatus: 'STORE_ROOM_PENDING_QC',
-            remarks: remarks || 'Material Requisition submitted to Store Room',
+            remarks: remarks || (isMixReq ? 'Mix Preparation Requisition' : 'Finished Goods Assembly Requisition'),
             performedBy: req.user?._id
         });
 
         res.status(201).json({
             success: true,
             data: productionBatch,
-            message: `Material Requisition ID ${productionNumber} submitted to Factory Store Room for Stock Issue!`
+            message: `${isMixReq ? 'Mix Preparation' : 'Finished Goods Assembly'} Requisition ID ${productionNumber} submitted to Factory Store Room!`
         });
     } catch (error) {
         console.error('Error creating production batch', error);
@@ -211,7 +252,7 @@ exports.createProductionBatch = async (req, res) => {
     }
 };
 
-// @desc    Store Room Dispatches Raw Materials & Packaging Materials to Production Team
+// @desc    Store Room Dispatches Stock (Auto-inwards Mix Product if MIX_REQUISITION)
 // @route   POST /api/v1/production/:id/dispatch
 // @access  Private
 exports.dispatchStock = async (req, res) => {
@@ -226,6 +267,7 @@ exports.dispatchStock = async (req, res) => {
 
         const targetBranch = production.branch || req.user?.branch;
         const prodIdCode = production.productionNumber || `PR-${id.slice(-4)}`;
+        const isMixReq = production.requisitionType === 'MIX_REQUISITION';
 
         // 1. Deduct Raw Materials from Store Room Inventory
         if (Array.isArray(production.rawMaterialsUsed)) {
@@ -288,6 +330,75 @@ exports.dispatchStock = async (req, res) => {
                     });
                 }
             }
+        }
+
+        // 3. Deduct Essence / Fruits / Nuts / Add-ons from Store Room Inventory
+        if (Array.isArray(production.essenceMaterialsUsed)) {
+            for (const ess of production.essenceMaterialsUsed) {
+                const qtyReq = parseFloat(ess.quantityRequested) || 0;
+                if (qtyReq > 0 && ess.product) {
+                    const essProdId = ess.product._id || ess.product;
+                    let essInv = await Inventory.findOne({
+                        product: essProdId,
+                        inventoryType: 'Store Room'
+                    });
+
+                    if (essInv) {
+                        essInv.quantity = Math.max(0, essInv.quantity - qtyReq);
+                        essInv.lastUpdated = Date.now();
+                        await essInv.save();
+                    }
+
+                    await InventoryTransaction.create({
+                        branch: targetBranch,
+                        product: essProdId,
+                        inventoryType: 'Store Room',
+                        transactionType: 'OUT',
+                        quantity: qtyReq,
+                        referenceType: 'PRODUCTION',
+                        remarks: `Issued Essence/Nut Material to Production for Requisition ${prodIdCode}`,
+                        performedBy: req.user?._id
+                    });
+                }
+            }
+        }
+
+        // 4. AUTOMATIC STOCK CREATION FOR MIX PREPARATION REQUISITIONS!
+        if (isMixReq && production.finishedGoodProduct) {
+            const mixProdId = production.finishedGoodProduct._id || production.finishedGoodProduct;
+            const mixLitersAdded = parseFloat(production.totalPieces) || parseFloat(production.mixLiters) || 1;
+
+            let mixInv = await Inventory.findOne({
+                product: mixProdId,
+                inventoryType: 'Store Room'
+            });
+
+            if (mixInv) {
+                mixInv.quantity = (mixInv.quantity || 0) + mixLitersAdded;
+                mixInv.lastUpdated = Date.now();
+                await mixInv.save();
+            } else {
+                mixInv = await Inventory.create({
+                    branch: targetBranch,
+                    product: mixProdId,
+                    inventoryType: 'Store Room',
+                    quantity: mixLitersAdded,
+                    batchNumber: production.batchNumber || 'MIX-BATCH-1',
+                    lastUpdated: Date.now()
+                });
+            }
+
+            await InventoryTransaction.create({
+                branch: targetBranch,
+                product: mixProdId,
+                inventoryType: 'Store Room',
+                batchNumber: production.batchNumber || 'MIX-BATCH-1',
+                transactionType: 'IN',
+                quantity: mixLitersAdded,
+                referenceType: 'PRODUCTION_MIX',
+                remarks: `Prepared Mix Inwarded to Store Room Inventory (${mixLitersAdded} Liters) for Requisition ${prodIdCode}`,
+                performedBy: req.user?._id
+            });
         }
 
         const updatedProduction = await Production.findByIdAndUpdate(id, {

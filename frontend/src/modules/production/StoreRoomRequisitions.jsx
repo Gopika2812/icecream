@@ -103,9 +103,24 @@ const StoreRoomRequisitions = () => {
                       ID: {reqId}
                     </span>
                     <div>
-                      <h3 className="text-base font-extrabold text-gray-900">{prod.finishedGoodProduct?.name || 'Finished Product'}</h3>
+                      <div className="flex items-center gap-2">
+                        {prod.requisitionType === 'MIX_REQUISITION' ? (
+                          <span className="px-2.5 py-0.5 rounded-md bg-purple-100 text-purple-900 text-[10px] font-black uppercase tracking-wide border border-purple-300">
+                            🥣 Mix Preparation Requisition
+                          </span>
+                        ) : (
+                          <span className="px-2.5 py-0.5 rounded-md bg-indigo-100 text-indigo-900 text-[10px] font-black uppercase tracking-wide border border-indigo-300">
+                            🍦 Finished Goods Assembly Requisition
+                          </span>
+                        )}
+                      </div>
+                      <h3 className="text-base font-extrabold text-gray-900 mt-1">{prod.finishedGoodProduct?.name || 'Finished Product'}</h3>
                       <p className="text-xs text-gray-500 font-semibold">
-                        Target Output: <span className="font-mono text-gray-900 font-extrabold">{prod.totalPieces || prod.quantityBoxes * 12} Pcs ({prod.quantityBoxes} Boxes)</span>
+                        {prod.requisitionType === 'MIX_REQUISITION' ? (
+                          <>Target Mix Volume: <span className="font-mono text-purple-900 font-extrabold">{prod.totalPieces || prod.mixLiters} Liters</span></>
+                        ) : (
+                          <>Target Output: <span className="font-mono text-gray-900 font-extrabold">{prod.totalPieces || prod.quantityBoxes * 12} Pcs ({prod.quantityBoxes} Boxes)</span></>
+                        )}
                       </p>
                     </div>
                   </div>
@@ -133,7 +148,7 @@ const StoreRoomRequisitions = () => {
                           </>
                         ) : (
                           <>
-                            <Truck size={15} /> Dispatch Stock to Production Team
+                            <Truck size={15} /> Dispatch Stock & Auto-Inward Mix
                           </>
                         )}
                       </button>
