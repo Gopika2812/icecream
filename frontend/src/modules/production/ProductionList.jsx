@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import api from '../../services/api';
 import { 
   Factory, Plus, Search, Filter, Printer, Loader2, ThermometerSnowflake, 
-  Package, Calendar, CheckCircle2, QrCode, ArrowRight, ShieldCheck, Trash2, X, DollarSign, Box, ShieldAlert, AlertTriangle, Tag, Clock 
+  Package, Calendar, CheckCircle2, QrCode, ArrowRight, ShieldCheck, Trash2, X, DollarSign, Box, ShieldAlert, AlertTriangle, Tag, Clock, ShoppingCart
 } from 'lucide-react';
 import Modal from '../../components/Modal';
 import SearchableSelect from '../../components/SearchableSelect';
@@ -12,6 +12,7 @@ const ProductionList = () => {
   const [products, setProducts] = useState([]);
   const [rawMaterialStock, setRawMaterialStock] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [sendingReqId, setSendingReqId] = useState(null);
 
   // Search & Filter
   const [searchTerm, setSearchTerm] = useState('');
@@ -169,6 +170,36 @@ const ProductionList = () => {
       return pId?.toString() === prodIdStr && (i.inventoryType === 'Store Room' || i.inventoryType === 'Factory');
     });
     return inv ? (parseFloat(inv.quantity) || 0) : 0;
+  };
+
+  const handleSendPurchaseRequisition = async (prodRef, quantityNeeded) => {
+    if (!prodRef) return alert('Please select a valid item.');
+    const prodId = typeof prodRef === 'object' ? (prodRef._id || prodRef.id) : prodRef;
+    const prodObj = products.find(p => (p._id || p.id) === prodId) || (typeof prodRef === 'object' ? prodRef : null);
+    const prodName = prodObj ? prodObj.name : 'Out of Stock Item';
+    const uom = prodObj ? prodObj.unitOfMeasure : 'Units';
+
+    try {
+      setSendingReqId(prodId);
+      const payload = {
+        items: [{
+          product: prodId,
+          requestedQuantity: parseFloat(quantityNeeded) || 10,
+          currentStock: getStoreRoomAvailableStock(prodId),
+          unitOfMeasure: uom
+        }],
+        priority: 'HIGH',
+        remarks: `Out-of-stock production floor indent for ${prodName}`
+      };
+
+      const res = await api.post('/product-requisitions', payload);
+      alert(`✅ Purchase Requisition successfully sent to Purchase Team & Super Admin for "${prodName}"! (Appears on Product Purchase Requisitions page).`);
+    } catch (err) {
+      console.error('Failed to send purchase requisition', err);
+      alert(err.response?.data?.message || 'Error sending purchase requisition to Purchase Team.');
+    } finally {
+      setSendingReqId(null);
+    }
   };
 
   useEffect(() => {
@@ -1305,20 +1336,43 @@ const ProductionList = () => {
                       const isShortage = availMix < neededLiters;
 
                       return (
-                        <div className="p-2.5 rounded-xl bg-purple-50 border border-purple-200 flex items-center justify-between text-xs font-bold">
-                          <span className="text-purple-950">Store Room Prepared Mix Balance:</span>
-                          {availMix <= 0 ? (
-                            <span className="px-3 py-1 rounded-lg bg-rose-100 text-rose-900 font-black border border-rose-300 animate-pulse">
-                              🔴 OUT OF STOCK (0 Liters) — Requisition Will Be Blocked!
-                            </span>
-                          ) : isShortage ? (
-                            <span className="px-3 py-1 rounded-lg bg-amber-100 text-amber-900 font-black border border-amber-300">
-                              ⚠️ INSUFFICIENT (Avail: {availMix} L, Needed: {neededLiters} L)
-                            </span>
-                          ) : (
-                            <span className="px-3 py-1 rounded-lg bg-emerald-100 text-emerald-900 font-black border border-emerald-300">
-                              🟢 Available in Store Room ({availMix} Liters)
-                            </span>
+                        <div className="space-y-2">
+                          <div className="p-2.5 rounded-xl bg-purple-50 border border-purple-200 flex items-center justify-between text-xs font-bold">
+                            <span className="text-purple-950">Store Room Prepared Mix Balance:</span>
+                            {availMix <= 0 ? (
+                              <span className="px-3 py-1 rounded-lg bg-rose-100 text-rose-900 font-black border border-rose-300 animate-pulse">
+                                🔴 OUT OF STOCK (0 Liters) — Requisition Will Be Blocked!
+                              </span>
+                            ) : isShortage ? (
+                              <span className="px-3 py-1 rounded-lg bg-amber-100 text-amber-900 font-black border border-amber-300">
+                                ⚠️ INSUFFICIENT (Avail: {availMix} L, Needed: {neededLiters} L)
+                              </span>
+                            ) : (
+                              <span className="px-3 py-1 rounded-lg bg-emerald-100 text-emerald-900 font-black border border-emerald-300">
+                                🟢 Available in Store Room ({availMix} Liters)
+                              </span>
+                            )}
+                          </div>
+
+                          {isShortage && (
+                            <div className="p-3 bg-rose-50 border-2 border-rose-300 rounded-2xl flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+                              <div className="flex items-center gap-2 text-rose-950 text-xs font-black">
+                                <AlertTriangle size={18} className="text-rose-600 shrink-0" />
+                                <span>🔴 Prepared Mix is OUT OF STOCK / Insufficient in Store Room ({availMix} L / Needed {neededLiters} L)</span>
+                              </div>
+                              <button
+                                type="button"
+                                onClick={() => handleSendPurchaseRequisition(selectedMixProduct, neededLiters)}
+                                disabled={sendingReqId === selectedMixProduct}
+                                className="px-3.5 py-2 bg-rose-600 hover:bg-rose-700 text-white font-extrabold text-xs rounded-xl shadow-md transition-all flex items-center gap-1.5 shrink-0 cursor-pointer disabled:opacity-50"
+                              >
+                                {sendingReqId === selectedMixProduct ? (
+                                  <><Loader2 size={13} className="animate-spin" /> Sending Indent...</>
+                                ) : (
+                                  <><ShoppingCart size={14} /> 🛒 Send Purchase Request to Purchase Team</>
+                                )}
+                              </button>
+                            </div>
                           )}
                         </div>
                       );
@@ -1432,25 +1486,46 @@ const ProductionList = () => {
                 </>
               )}
 
-              <div className="flex justify-end pt-4">
-                {activeReqType === 'MIX_REQUISITION' ? (
-                  <button
-                    type="submit"
-                    disabled={submitting}
-                    className="bg-purple-600 hover:bg-purple-700 text-white px-6 py-2.5 rounded-xl text-sm font-extrabold transition-all shadow-md disabled:opacity-50 flex items-center gap-2 cursor-pointer"
-                  >
-                    {submitting ? 'Submitting Requisition...' : 'Submit Mix Preparation Requisition to Store Room'}
-                  </button>
-                ) : (
-                  <button
-                    type="button"
-                    onClick={() => setWizardStep(2)}
-                    className="bg-white border-2 border-indigo-600 text-indigo-700 hover:bg-indigo-50 px-6 py-2.5 rounded-xl text-sm font-extrabold transition-all shadow-md flex items-center gap-2 cursor-pointer"
-                  >
-                    Next: Packaging Material Requisition <ArrowRight size={16} />
-                  </button>
-                )}
-              </div>
+              {(() => {
+                const availMix = selectedMixProduct ? getStoreRoomAvailableStock(selectedMixProduct) : 0;
+                const neededLiters = parseFloat(mixCount) || 1;
+                const isStep1MixShortage = activeReqType === 'FG_ASSEMBLY_REQUISITION' && (!selectedMixProduct || !formData.finishedGoodProduct || !formData.totalPieces || availMix < neededLiters);
+
+                return (
+                  <div className="flex justify-end pt-4 border-t border-purple-100">
+                    {activeReqType === 'MIX_REQUISITION' ? (
+                      <button
+                        type="submit"
+                        disabled={submitting}
+                        className="bg-purple-600 hover:bg-purple-700 text-white px-6 py-2.5 rounded-xl text-sm font-extrabold transition-all shadow-md disabled:opacity-50 flex items-center gap-2 cursor-pointer"
+                      >
+                        {submitting ? 'Submitting Requisition...' : 'Submit Mix Preparation Requisition to Store Room'}
+                      </button>
+                    ) : isStep1MixShortage ? (
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs font-extrabold text-rose-700 bg-rose-50 px-3 py-1.5 rounded-xl border border-rose-200">
+                          ⚠️ Selected Mix is OUT OF STOCK. Send Purchase Request above to unlock next step.
+                        </span>
+                        <button
+                          type="button"
+                          disabled
+                          className="bg-gray-200 text-gray-400 px-5 py-2.5 rounded-xl text-xs font-extrabold border border-gray-300 cursor-not-allowed"
+                        >
+                          Next: Packaging Material Requisition →
+                        </button>
+                      </div>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => setWizardStep(2)}
+                        className="bg-white border-2 border-indigo-600 text-indigo-700 hover:bg-indigo-50 px-6 py-2.5 rounded-xl text-sm font-extrabold transition-all shadow-md flex items-center gap-2 cursor-pointer"
+                      >
+                        Next: Packaging Material Requisition <ArrowRight size={16} />
+                      </button>
+                    )}
+                  </div>
+                );
+              })()}
             </div>
           )}
 
@@ -1497,23 +1572,47 @@ const ProductionList = () => {
                       />
                       {selectedPkg && (() => {
                         const availStock = getStoreRoomAvailableStock(pkg.product);
-                        const isShortage = availStock < (parseFloat(pkg.quantityRequested) || 0);
+                        const reqQty = parseFloat(pkg.quantityRequested) || 0;
+                        const isShortage = availStock < reqQty || reqQty <= 0;
 
                         return (
-                          <div className="mt-1 flex items-center justify-between text-[10px] font-bold">
-                            <span className="text-gray-500">Store Room Balance:</span>
-                            {availStock <= 0 ? (
-                              <span className="px-2 py-0.5 rounded-md bg-rose-100 text-rose-900 font-black border border-rose-300 flex items-center gap-1 animate-pulse">
-                                🔴 OUT OF STOCK (0 {uom})
-                              </span>
-                            ) : isShortage ? (
-                              <span className="px-2 py-0.5 rounded-md bg-amber-100 text-amber-900 font-black border border-amber-300 flex items-center gap-1">
-                                ⚠️ INSUFFICIENT (Avail: {availStock} {uom})
-                              </span>
-                            ) : (
-                              <span className="px-2 py-0.5 rounded-md bg-emerald-100 text-emerald-900 font-black border border-emerald-300">
-                                🟢 Available ({availStock} {uom})
-                              </span>
+                          <div className="mt-1.5 space-y-2">
+                            <div className="flex items-center justify-between text-[10px] font-bold">
+                              <span className="text-gray-500">Store Room Balance:</span>
+                              {availStock <= 0 ? (
+                                <span className="px-2 py-0.5 rounded-md bg-rose-100 text-rose-900 font-black border border-rose-300 flex items-center gap-1 animate-pulse">
+                                  🔴 OUT OF STOCK (0 {uom})
+                                </span>
+                              ) : isShortage ? (
+                                <span className="px-2 py-0.5 rounded-md bg-amber-100 text-amber-900 font-black border border-amber-300 flex items-center gap-1">
+                                  ⚠️ INSUFFICIENT (Avail: {availStock} {uom})
+                                </span>
+                              ) : (
+                                <span className="px-2 py-0.5 rounded-md bg-emerald-100 text-emerald-900 font-black border border-emerald-300">
+                                  🟢 Available ({availStock} {uom})
+                                </span>
+                              )}
+                            </div>
+
+                            {isShortage && (
+                              <div className="p-2.5 bg-rose-50 border border-rose-300 rounded-xl flex items-center justify-between gap-2">
+                                <div className="text-[11px] font-black text-rose-950 flex items-center gap-1.5">
+                                  <AlertTriangle size={14} className="text-rose-600 shrink-0" />
+                                  <span>Out of Stock in Store Room</span>
+                                </div>
+                                <button
+                                  type="button"
+                                  onClick={() => handleSendPurchaseRequisition(pkg.product, reqQty || 10)}
+                                  disabled={sendingReqId === pkg.product}
+                                  className="px-3 py-1.5 bg-rose-600 hover:bg-rose-700 text-white font-extrabold text-[11px] rounded-lg shadow-xs transition-all flex items-center gap-1 shrink-0 cursor-pointer disabled:opacity-50"
+                                >
+                                  {sendingReqId === pkg.product ? (
+                                    <><Loader2 size={12} className="animate-spin" /> Sending...</>
+                                  ) : (
+                                    <><ShoppingCart size={13} /> 🛒 Send Purchase Request to Purchase Team</>
+                                  )}
+                                </button>
+                              </div>
                             )}
                           </div>
                         );
@@ -1553,22 +1652,48 @@ const ProductionList = () => {
                 );
               })}
 
-              <div className="flex justify-between pt-4">
-                <button
-                  type="button"
-                  onClick={() => setWizardStep(1)}
-                  className="px-4 py-2 text-xs font-bold text-gray-600 hover:text-gray-900 cursor-pointer"
-                >
-                  Back
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setWizardStep(3)}
-                  className="bg-white border-2 border-[var(--color-primary)] text-[var(--color-primary)] hover:bg-pink-50 px-6 py-2.5 rounded-xl text-sm font-extrabold transition-all shadow-md flex items-center gap-2 cursor-pointer"
-                >
-                  Next: Finished Goods & Store Room Submission <ArrowRight size={16} />
-                </button>
-              </div>
+              {(() => {
+                const isStep2PackagingShortage = packagingMaterialsUsed.some(pkg => {
+                  if (!pkg.product) return true;
+                  const avail = getStoreRoomAvailableStock(pkg.product);
+                  const req = parseFloat(pkg.quantityRequested) || 0;
+                  return avail < req || req <= 0;
+                });
+
+                return (
+                  <div className="flex justify-between items-center pt-4 border-t border-indigo-100">
+                    <button
+                      type="button"
+                      onClick={() => setWizardStep(1)}
+                      className="px-4 py-2 text-xs font-bold text-gray-600 hover:text-gray-900 cursor-pointer"
+                    >
+                      Back
+                    </button>
+                    {isStep2PackagingShortage ? (
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs font-extrabold text-rose-700 bg-rose-50 px-3 py-1.5 rounded-xl border border-rose-200">
+                          ⚠️ 1 or more items are OUT OF STOCK. Send Purchase Request above to unlock next step.
+                        </span>
+                        <button
+                          type="button"
+                          disabled
+                          className="bg-gray-200 text-gray-400 px-5 py-2.5 rounded-xl text-xs font-extrabold border border-gray-300 cursor-not-allowed"
+                        >
+                          Next: Finished Goods & Store Room Submission →
+                        </button>
+                      </div>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => setWizardStep(3)}
+                        className="bg-white border-2 border-[var(--color-primary)] text-[var(--color-primary)] hover:bg-pink-50 px-6 py-2.5 rounded-xl text-sm font-extrabold transition-all shadow-md flex items-center gap-2 cursor-pointer"
+                      >
+                        Next: Finished Goods & Store Room Submission <ArrowRight size={16} />
+                      </button>
+                    )}
+                  </div>
+                );
+              })()}
             </div>
           )}
 
