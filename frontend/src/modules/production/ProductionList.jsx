@@ -918,17 +918,20 @@ const ProductionList = () => {
                               <CheckCircle2 size={14} /> Complete Production
                             </button>
                           )}
-                          {isCompleted && (
-                            <button
-                              onClick={() => handleSendToQc(p._id, reqId)}
-                              disabled={submitting}
-                              className="px-3 py-1.5 text-xs font-extrabold rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white transition-all shadow-sm flex items-center gap-1.5 mx-auto cursor-pointer"
-                            >
-                              <ArrowRight size={14} /> Send to QC
-                            </button>
-                          )}
-                          {(isSentToQc || isQcApproved) && (
-                            <span className="text-xs text-emerald-800 font-bold">Processed in QC Module</span>
+                          {(isCompleted || isSentToQc || isQcApproved) && (
+                            <div className="flex flex-col items-center gap-1.5">
+                              {p.requisitionType !== 'MIX_REQUISITION' && (
+                                <button
+                                  onClick={() => handleOpenQrModal(p)}
+                                  className="px-3 py-1.5 text-xs font-extrabold rounded-xl bg-rose-50 text-rose-900 border border-rose-300 hover:bg-rose-100 transition-all flex items-center gap-1.5 cursor-pointer shadow-xs"
+                                >
+                                  <QrCode size={14} /> Print Box QRs
+                                </button>
+                              )}
+                              <span className="text-xs text-emerald-800 font-extrabold flex items-center gap-1">
+                                <CheckCircle2 size={14} /> Inwarded & Completed
+                              </span>
+                            </div>
                           )}
                         </td>
                       </tr>

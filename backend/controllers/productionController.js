@@ -534,7 +534,7 @@ exports.startProduction = async (req, res) => {
     }
 };
 
-// @desc    Complete Production Phase & Log Actual Produced Pieces Output
+// @desc    Complete Production Phase (Auto-inwards Finished Goods to Stock & Generates Box QRs)
 // @route   POST /api/v1/production/:id/complete-production
 // @access  Private
 exports.completeProduction = async (req, res) => {
@@ -547,18 +547,88 @@ exports.completeProduction = async (req, res) => {
 
         const pPcs = parseInt(actualProducedPieces) || production.totalPieces || 0;
         const pPerBox = parseInt(production.piecesPerBox) || 12;
-        const pBoxes = Number((pPcs / pPerBox).toFixed(2));
+        const passedBoxes = Math.floor(pPcs / pPerBox);
+        const loosePcs = pPcs % pPerBox;
+        const prodIdCode = production.productionNumber || `PR-${id.slice(-4)}`;
+
+        // 1. Inward Finished Goods to Stock (if FG Assembly Requisition)
+        if (production.requisitionType !== 'MIX_REQUISITION' && production.finishedGoodProduct) {
+            const fgProductObj = await Product.findById(production.finishedGoodProduct);
+            const fgSellingPrice = parseFloat(production.sellingPrice) || fgProductObj?.wholesalePrice || 0;
+            const fgMrp = parseFloat(production.mrp) || fgProductObj?.mrp || 0;
+
+            if (fgProductObj) {
+                await Inventory.findOneAndUpdate(
+                    {
+                        product: fgProductObj._id || fgProductObj.id,
+                        inventoryType: 'Finished Goods',
+                        batchNumber: production.batchNumber || 'BATCH-1'
+                    },
+                    {
+                        $inc: { quantity: pPcs },
+                        $set: {
+                            purchasePrice: fgSellingPrice,
+                            mrp: fgMrp,
+                            temperature: production.temperature || -18,
+                            lastUpdated: Date.now()
+                        }
+                    },
+                    { new: true, upsert: true }
+                );
+
+                await InventoryTransaction.create({
+                    branch: production.branch,
+                    product: fgProductObj._id || fgProductObj.id,
+                    inventoryType: 'Finished Goods',
+                    batchNumber: production.batchNumber || 'BATCH-1',
+                    transactionType: 'IN',
+                    quantity: pPcs,
+                    referenceType: 'PRODUCTION',
+                    remarks: `Inwarded Finished Goods (${pPcs} Pcs = ${passedBoxes} Boxes + ${loosePcs} Loose Pcs). Production ID: ${prodIdCode}`,
+                    performedBy: req.user?._id
+                });
+            }
+        }
+
+        // 2. Generate Box QR Stickers List
+        const boxQrStickers = [];
+        const totalBoxesToGenerate = passedBoxes + (loosePcs > 0 ? 1 : 0);
+        for (let b = 1; b <= totalBoxesToGenerate; b++) {
+            const isPartialBox = b === totalBoxesToGenerate && loosePcs > 0;
+            const pcsInThisBox = isPartialBox ? loosePcs : pPerBox;
+            boxQrStickers.push({
+                boxIndex: b,
+                totalBoxes: totalBoxesToGenerate,
+                qrCodeText: JSON.stringify({
+                    brand: 'SRI SARAVANAA ERP',
+                    productionId: prodIdCode,
+                    batchNumber: production.batchNumber || 'BATCH-1',
+                    boxNumber: `${b} / ${totalBoxesToGenerate}`,
+                    piecesInBox: pcsInThisBox,
+                    mfgDate: new Date().toISOString().split('T')[0]
+                })
+            });
+        }
 
         const updatedProd = await Production.findByIdAndUpdate(id, {
             producedPieces: pPcs,
-            producedBoxes: pBoxes,
-            status: 'PRODUCTION_COMPLETED',
+            producedBoxes: Number((pPcs / pPerBox).toFixed(2)),
+            passedPieces: pPcs,
+            passedBoxes: passedBoxes,
+            status: 'QC_PASSED',
+            qcStatus: 'PASSED',
             completedAt: new Date(),
-            completedBy: req.user?._id
+            completedBy: req.user?._id,
+            boxQrStickers: boxQrStickers
         }, { new: true });
 
-        res.json({ success: true, message: `Production completed with ${pPcs} Pcs output! Ready to send to QC.`, data: updatedProd });
+        res.json({
+            success: true,
+            message: `Production Completed & Finished Goods Inwarded (${pPcs} Pcs)! Box QR Code stickers generated.`,
+            data: updatedProd
+        });
     } catch (error) {
+        console.error('Error completing production batch', error);
         res.status(500).json({ success: false, message: error.message });
     }
 };
