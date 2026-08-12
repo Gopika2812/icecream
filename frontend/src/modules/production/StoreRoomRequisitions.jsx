@@ -54,20 +54,20 @@ const StoreRoomRequisitions = () => {
     }
   };
 
+  const [expandedRowId, setExpandedRowId] = useState(null);
+
   return (
-    <div className="p-6 space-y-6 max-w-7xl mx-auto">
-      {/* Header */}
-      <div className="flex flex-wrap justify-between items-center gap-4 bg-white p-6 rounded-3xl border border-gray-100 shadow-sm">
-        <div className="flex items-center gap-4">
-          <div className="p-3 bg-purple-100/70 text-purple-700 rounded-2xl">
-            <Truck size={28} />
-          </div>
-          <div>
-            <h1 className="text-2xl font-black text-gray-900 tracking-tight">Store Room Requisitions & Stock Issue</h1>
-            <p className="text-xs text-gray-500 font-medium mt-0.5">
-              Review material requisitions from Production Team and issue stock to factory floor
-            </p>
-          </div>
+    <div className="p-6 max-w-7xl mx-auto space-y-6">
+      {/* Header Bar */}
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white p-6 rounded-3xl border border-gray-100 shadow-sm">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900 font-display flex items-center gap-2">
+            <Truck className="text-purple-600" size={26} />
+            Store Room Requisitions & Stock Issue
+          </h1>
+          <p className="text-xs text-gray-500 mt-1">
+            Dispatch raw & packaging materials requested by Production team to reduce Store Room inventory
+          </p>
         </div>
 
         <button
@@ -78,7 +78,7 @@ const StoreRoomRequisitions = () => {
         </button>
       </div>
 
-      {/* Main List */}
+      {/* Main Compact Table UI */}
       {loading ? (
         <div className="p-12 text-center text-gray-500 bg-white rounded-3xl border border-gray-100">
           <Loader2 size={32} className="animate-spin mx-auto text-purple-600 mb-2" />
@@ -91,120 +91,150 @@ const StoreRoomRequisitions = () => {
           <p className="text-xs text-gray-500">Requisitions requested by Production Team will appear here.</p>
         </div>
       ) : (
-        <div className="space-y-4">
-          {productions.map((prod) => {
-            const isPending = !prod.status || prod.status === 'PENDING_STORE_ROOM_DISPATCH';
-            const reqId = prod.productionNumber || `PR-${prod._id.slice(-4)}`;
+        <div className="glass-panel overflow-hidden border border-gray-200/80 rounded-3xl shadow-sm bg-white">
+          <div className="overflow-x-auto">
+            <table className="w-full text-left border-collapse">
+              <thead>
+                <tr className="border-b border-gray-200 bg-gray-50/70 text-[11px] font-extrabold text-gray-600 uppercase tracking-wider">
+                  <th className="px-6 py-4">Requisition ID</th>
+                  <th className="px-6 py-4">Requisition Type</th>
+                  <th className="px-6 py-4">Product / Mix Name (Click for Details)</th>
+                  <th className="px-6 py-4 text-center">Target Output</th>
+                  <th className="px-6 py-4 text-center">Dispatch Status</th>
+                  <th className="px-6 py-4 text-center">Action</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {productions.map((prod) => {
+                  const isPending = !prod.status || prod.status === 'PENDING_STORE_ROOM_DISPATCH';
+                  const reqId = prod.productionNumber || `PR-${prod._id.slice(-4)}`;
+                  const isExpanded = expandedRowId === prod._id;
 
-            return (
-              <div key={prod._id} className="bg-white rounded-3xl p-6 border border-gray-100 shadow-sm space-y-4 hover:shadow-md transition-shadow">
-                {/* Requisition Header */}
-                <div className="flex flex-wrap justify-between items-center gap-3 border-b border-gray-100 pb-4">
-                  <div className="flex items-center gap-3">
-                    <span className="text-lg font-black font-mono text-purple-900 px-3 py-1 bg-purple-50 rounded-xl border border-purple-200">
-                      ID: {reqId}
-                    </span>
-                    <div>
-                      <div className="flex items-center gap-2">
-                        {prod.requisitionType === 'MIX_REQUISITION' ? (
-                          <span className="px-2.5 py-0.5 rounded-md bg-purple-100 text-purple-900 text-[10px] font-black uppercase tracking-wide border border-purple-300">
-                            🥣 Mix Preparation Requisition
-                          </span>
-                        ) : (
-                          <span className="px-2.5 py-0.5 rounded-md bg-indigo-100 text-indigo-900 text-[10px] font-black uppercase tracking-wide border border-indigo-300">
-                            🍦 Finished Goods Assembly Requisition
-                          </span>
-                        )}
-                      </div>
-                      <h3 className="text-base font-extrabold text-gray-900 mt-1">{prod.finishedGoodProduct?.name || 'Finished Product'}</h3>
-                      <p className="text-xs text-gray-500 font-semibold">
-                        {prod.requisitionType === 'MIX_REQUISITION' ? (
-                          <>Target Mix Volume: <span className="font-mono text-purple-900 font-extrabold">{prod.totalPieces || prod.mixLiters} Liters</span></>
-                        ) : (
-                          <>Target Output: <span className="font-mono text-gray-900 font-extrabold">{prod.totalPieces || prod.quantityBoxes * 12} Pcs ({prod.quantityBoxes} Boxes)</span></>
-                        )}
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center gap-3">
-                    {isPending ? (
-                      <span className="px-3 py-1 rounded-full bg-amber-50 text-amber-800 text-xs font-extrabold border border-amber-200 flex items-center gap-1.5">
-                        <Clock size={14} className="text-amber-600" /> Pending Store Room Dispatch
-                      </span>
-                    ) : (
-                      <span className="px-3 py-1 rounded-full bg-emerald-50 text-emerald-800 text-xs font-extrabold border border-emerald-200 flex items-center gap-1.5">
-                        <CheckCircle2 size={14} className="text-emerald-600" /> Dispatched to Production
-                      </span>
-                    )}
-
-                    {isPending && (
-                      <button
-                        onClick={() => handleDispatchStock(prod._id, reqId)}
-                        disabled={dispatchingId === prod._id}
-                        className="bg-emerald-600 hover:bg-emerald-700 text-white px-5 py-2.5 rounded-xl text-xs font-extrabold transition-all shadow-md flex items-center gap-2 cursor-pointer disabled:opacity-50"
-                      >
-                        {dispatchingId === prod._id ? (
-                          <>
-                            <Loader2 size={14} className="animate-spin" /> Dispatching...
-                          </>
-                        ) : (
-                          <>
-                            <Truck size={15} /> Dispatch Stock & Auto-Inward Mix
-                          </>
-                        )}
-                      </button>
-                    )}
-                  </div>
-                </div>
-
-                {/* Materials Breakdown */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-1">
-                  {/* Raw Materials */}
-                  <div className="bg-purple-50/50 p-4 rounded-2xl border border-purple-100 space-y-2">
-                    <h4 className="text-xs font-extrabold text-purple-950 uppercase tracking-wider flex items-center gap-1.5">
-                      <Package size={14} className="text-purple-600" /> Requested Raw Materials
-                    </h4>
-                    {prod.rawMaterialsUsed?.length > 0 ? (
-                      <ul className="space-y-1.5 text-xs">
-                        {prod.rawMaterialsUsed.map((rm, idx) => (
-                          <li key={idx} className="flex justify-between items-center bg-white p-2.5 rounded-xl border border-purple-100 shadow-sm">
-                            <span className="font-extrabold text-purple-950">{getProductName(rm.product, rm.productName || 'Raw Material')}</span>
-                            <span className="font-mono font-black text-purple-900 bg-purple-50 px-2 py-0.5 rounded-lg border border-purple-200">
-                              {rm.quantityUsed} {rm.unitOfMeasure || rm.product?.unitOfMeasure}
+                  return (
+                    <React.Fragment key={prod._id}>
+                      <tr className="hover:bg-purple-50/30 transition-colors">
+                        <td className="px-6 py-4 font-mono text-xs font-black text-purple-900">{reqId}</td>
+                        <td className="px-6 py-4">
+                          {prod.requisitionType === 'MIX_REQUISITION' ? (
+                            <span className="px-2.5 py-1 rounded-lg bg-purple-100 text-purple-900 text-[10px] font-black uppercase tracking-wide border border-purple-300 inline-flex items-center gap-1">
+                              🥣 Mix Preparation
                             </span>
-                          </li>
-                        ))}
-                      </ul>
-                    ) : (
-                      <p className="text-xs text-gray-500 italic">No raw material items listed.</p>
-                    )}
-                  </div>
-
-                  {/* Packaging Materials */}
-                  <div className="bg-indigo-50/50 p-4 rounded-2xl border border-indigo-100 space-y-2">
-                    <h4 className="text-xs font-extrabold text-indigo-950 uppercase tracking-wider flex items-center gap-1.5">
-                      <Box size={14} className="text-indigo-600" /> Requested Packaging Materials
-                    </h4>
-                    {prod.packagingMaterialsUsed?.length > 0 ? (
-                      <ul className="space-y-1.5 text-xs">
-                        {prod.packagingMaterialsUsed.map((pkg, idx) => (
-                          <li key={idx} className="flex justify-between items-center bg-white p-2.5 rounded-xl border border-indigo-100 shadow-sm">
-                            <span className="font-extrabold text-indigo-950">{getProductName(pkg.product, pkg.productName || 'Packaging Item')}</span>
-                            <span className="font-mono font-black text-indigo-900 bg-indigo-50 px-2 py-0.5 rounded-lg border border-indigo-200">
-                              {pkg.quantityRequested} {pkg.unitOfMeasure || pkg.product?.unitOfMeasure}
+                          ) : (
+                            <span className="px-2.5 py-1 rounded-lg bg-indigo-100 text-indigo-900 text-[10px] font-black uppercase tracking-wide border border-indigo-300 inline-flex items-center gap-1">
+                              🍦 FG Assembly
                             </span>
-                          </li>
-                        ))}
-                      </ul>
-                    ) : (
-                      <p className="text-xs text-gray-500 italic">No packaging items listed.</p>
-                    )}
-                  </div>
-                </div>
-              </div>
-            );
-          })}
+                          )}
+                        </td>
+                        <td className="px-6 py-4 font-bold text-gray-900">
+                          <button
+                            type="button"
+                            onClick={() => setExpandedRowId(isExpanded ? null : prod._id)}
+                            className="text-left font-extrabold text-purple-950 hover:text-purple-700 hover:underline flex items-center gap-1.5 cursor-pointer"
+                          >
+                            <Package size={16} className="text-purple-600 shrink-0" />
+                            {prod.finishedGoodProduct?.name || 'Finished Product'}
+                            <span className="text-[10px] text-purple-600 font-normal">
+                              ({isExpanded ? '▲ hide materials' : '▼ view materials'})
+                            </span>
+                          </button>
+                        </td>
+                        <td className="px-6 py-4 text-center font-mono text-xs font-extrabold text-gray-800">
+                          {prod.requisitionType === 'MIX_REQUISITION' ? (
+                            <span className="text-purple-900">{prod.totalPieces || prod.mixLiters} Liters</span>
+                          ) : (
+                            <span>{prod.totalPieces || prod.quantityBoxes * 12} Pcs ({prod.quantityBoxes} Boxes)</span>
+                          )}
+                        </td>
+                        <td className="px-6 py-4 text-center">
+                          {isPending ? (
+                            <span className="px-3 py-1 rounded-full bg-amber-50 text-amber-800 text-[11px] font-extrabold border border-amber-200 inline-flex items-center gap-1">
+                              <Clock size={12} className="text-amber-600" /> Pending Dispatch
+                            </span>
+                          ) : (
+                            <span className="px-3 py-1 rounded-full bg-emerald-50 text-emerald-800 text-[11px] font-extrabold border border-emerald-200 inline-flex items-center gap-1">
+                              <CheckCircle2 size={12} className="text-emerald-600" /> Dispatched
+                            </span>
+                          )}
+                        </td>
+                        <td className="px-6 py-4 text-center">
+                          {isPending ? (
+                            <button
+                              onClick={() => handleDispatchStock(prod._id, reqId)}
+                              disabled={dispatchingId === prod._id}
+                              className="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-xl text-xs font-extrabold transition-all shadow-sm flex items-center gap-1.5 mx-auto cursor-pointer disabled:opacity-50"
+                            >
+                              {dispatchingId === prod._id ? (
+                                <>
+                                  <Loader2 size={13} className="animate-spin" /> Dispatching...
+                                </>
+                              ) : (
+                                <>
+                                  <Truck size={14} /> Dispatch Stock
+                                </>
+                              )}
+                            </button>
+                          ) : (
+                            <span className="text-xs text-gray-400 font-semibold italic">Dispatched</span>
+                          )}
+                        </td>
+                      </tr>
+
+                      {/* Expandable Materials Breakdown Drawer Row */}
+                      {isExpanded && (
+                        <tr className="bg-purple-50/40">
+                          <td colSpan="6" className="px-6 py-4">
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                              {/* Requested Raw Materials */}
+                              <div className="bg-white p-4 rounded-2xl border border-purple-200 space-y-2 shadow-xs">
+                                <h4 className="text-xs font-extrabold text-purple-950 uppercase tracking-wider flex items-center gap-1.5">
+                                  <Package size={14} className="text-purple-600" /> Requested Raw Materials
+                                </h4>
+                                {prod.rawMaterialsUsed?.length > 0 ? (
+                                  <ul className="space-y-1.5 text-xs">
+                                    {prod.rawMaterialsUsed.map((rm, idx) => (
+                                      <li key={idx} className="flex justify-between items-center bg-purple-50/50 p-2 rounded-xl border border-purple-100">
+                                        <span className="font-extrabold text-purple-950">{getProductName(rm.product, rm.productName || 'Raw Material')}</span>
+                                        <span className="font-mono font-black text-purple-900 bg-white px-2 py-0.5 rounded-lg border border-purple-200">
+                                          {rm.quantityUsed} {rm.unitOfMeasure || rm.product?.unitOfMeasure}
+                                        </span>
+                                      </li>
+                                    ))}
+                                  </ul>
+                                ) : (
+                                  <p className="text-xs text-gray-500 italic">No raw material items listed.</p>
+                                )}
+                              </div>
+
+                              {/* Requested Packaging Materials */}
+                              <div className="bg-white p-4 rounded-2xl border border-indigo-200 space-y-2 shadow-xs">
+                                <h4 className="text-xs font-extrabold text-indigo-950 uppercase tracking-wider flex items-center gap-1.5">
+                                  <Box size={14} className="text-indigo-600" /> Requested Packaging Materials
+                                </h4>
+                                {prod.packagingMaterialsUsed?.length > 0 ? (
+                                  <ul className="space-y-1.5 text-xs">
+                                    {prod.packagingMaterialsUsed.map((pkg, idx) => (
+                                      <li key={idx} className="flex justify-between items-center bg-indigo-50/50 p-2 rounded-xl border border-indigo-100">
+                                        <span className="font-extrabold text-indigo-950">{getProductName(pkg.product, pkg.productName || 'Packaging Item')}</span>
+                                        <span className="font-mono font-black text-indigo-900 bg-white px-2 py-0.5 rounded-lg border border-indigo-200">
+                                          {pkg.quantityRequested} {pkg.unitOfMeasure || pkg.product?.unitOfMeasure}
+                                        </span>
+                                      </li>
+                                    ))}
+                                  </ul>
+                                ) : (
+                                  <p className="text-xs text-gray-500 italic">No packaging items listed.</p>
+                                )}
+                              </div>
+                            </div>
+                          </td>
+                        </tr>
+                      )}
+                    </React.Fragment>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
     </div>
