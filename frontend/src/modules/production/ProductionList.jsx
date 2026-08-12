@@ -153,16 +153,18 @@ const ProductionList = () => {
     }
   };
 
-  const getProductName = (prodRef, defaultFallback) => {
-    if (!prodRef) return defaultFallback;
-    if (typeof prodRef === 'object' && prodRef.name) return prodRef.name;
+  const getProductName = (prodRef, defaultFallback = 'Item') => {
     const prodId = typeof prodRef === 'object' ? (prodRef._id || prodRef.id) : prodRef;
     const found = products.find(p => (p._id || p.id) === prodId);
     return found ? found.name : defaultFallback;
+  };
+
   const getStoreRoomAvailableStock = (productId) => {
     if (!productId) return 0;
+    if (!Array.isArray(rawMaterialStock)) return 0;
     const prodIdStr = typeof productId === 'object' ? (productId._id || productId.id) : productId.toString();
     const inv = rawMaterialStock.find(i => {
+      if (!i) return false;
       const pId = typeof i.product === 'object' ? (i.product?._id || i.product?.id) : i.product;
       return pId?.toString() === prodIdStr && (i.inventoryType === 'Store Room' || i.inventoryType === 'Factory');
     });
@@ -1677,7 +1679,6 @@ const ProductionList = () => {
       )}
     </div>
   );
-};
 };
 
 export default ProductionList;
