@@ -15,12 +15,13 @@ const app = express();
 app.use(express.json());
 app.use(cookieParser());
 app.use(cors({
-    origin: function (origin, callback) {
-        callback(null, true);
-    },
-    credentials: true
+    origin: '*',
+    credentials: false,
+    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept', 'Origin']
 }));
-app.use(helmet());
+app.options('*', cors());
+app.use(helmet({ crossOriginResourcePolicy: false }));
 if (process.env.NODE_ENV !== 'production') {
     app.use(morgan('dev'));
 }

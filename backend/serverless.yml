@@ -7,6 +7,15 @@ provider:
   stage: ${opt:stage, 'dev'}
   memorySize: 512
   timeout: 29
+  httpApi:
+    cors:
+      allowedOrigins:
+        - '*'
+      allowedHeaders:
+        - '*'
+      allowedMethods:
+        - '*'
+      allowCredentials: false
   environment:
     NODE_ENV: production
     JWT_SECRET: ${env:JWT_SECRET, 'super_secret_jwt_key_for_erp_2026'}
