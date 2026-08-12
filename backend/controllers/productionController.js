@@ -105,7 +105,8 @@ exports.createProductionBatch = async (req, res) => {
             if (firstBranch) targetBranch = firstBranch._id;
         }
 
-        const totalBatches = await Production.countDocuments();
+        const allProds = await Production.find({});
+        const totalBatches = allProds.length;
         const productionNumber = `PR-${(totalBatches + 1).toString().padStart(2, '0')}`;
         const batchNumber = req.body.batchNumber || `BATCH-${totalBatches + 1}`;
 
@@ -114,10 +115,10 @@ exports.createProductionBatch = async (req, res) => {
         let pPerBox = parseInt(piecesPerBox) || 12;
         let totalPieces = parseInt(reqTotalPieces) || 0;
         let boxCount = parseFloat(quantityBoxes) || 0;
+        let targetMixProduct = mixProduct;
 
         if (isMixReq) {
             // Mix Preparation Requisition
-            let targetMixProduct = mixProduct;
             if (typeof mixProduct === 'object' && mixProduct.name) {
                 // Handle new mix creation
                 let existingMix = await Product.findOne({ name: mixProduct.name });
@@ -158,16 +159,18 @@ exports.createProductionBatch = async (req, res) => {
 
             // STRICT PREPARED MIX STORE ROOM STOCK VALIDATION FOR FG ASSEMBLY
             if (targetMixProduct) {
-                const mixProdObj = await Product.findById(targetMixProduct);
+                const mixId = typeof targetMixProduct === 'object' ? (targetMixProduct._id || targetMixProduct.id) : targetMixProduct;
+                const mixProdObj = await Product.findById(mixId);
                 const mixName = mixProdObj ? mixProdObj.name : 'Prepared Mix';
                 const neededLiters = parseFloat(mixLiters) || Number((totalPieces / (pPerBox || 12)).toFixed(2)) || 1;
 
-                const mixInv = await Inventory.findOne({
-                    product: targetMixProduct,
-                    inventoryType: 'Store Room'
+                const allStoreInv = await Inventory.find({ inventoryType: 'Store Room' });
+                const mixInvList = allStoreInv.filter(i => {
+                    const pId = typeof i.product === 'object' ? (i.product._id || i.product.id) : i.product;
+                    return pId?.toString() === mixId?.toString();
                 });
+                const availMixQty = mixInvList.reduce((sum, i) => sum + (parseFloat(i.quantity) || 0), 0);
 
-                const availMixQty = mixInv ? (parseFloat(mixInv.quantity) || 0) : 0;
                 if (availMixQty < neededLiters) {
                     return res.status(400).json({
                         success: false,
