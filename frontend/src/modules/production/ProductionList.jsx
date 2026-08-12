@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import Modal from '../../components/Modal';
 import SearchableSelect from '../../components/SearchableSelect';
+import { QRCodeSVG } from 'qrcode.react';
 
 const ProductionList = () => {
   const [productions, setProductions] = useState([]);
@@ -893,12 +894,14 @@ const ProductionList = () => {
                                 <Factory size={14} /> Start Production
                               </button>
 
-                              <button
-                                onClick={() => handleOpenQrModal(p)}
-                                className="px-2.5 py-1 text-[11px] font-extrabold rounded-lg bg-purple-50 text-purple-900 border border-purple-300 hover:bg-purple-100 transition-all flex items-center gap-1 cursor-pointer"
-                              >
-                                <QrCode size={13} /> Print Box QRs
-                              </button>
+                              {p.requisitionType !== 'MIX_REQUISITION' && (
+                                <button
+                                  onClick={() => handleOpenQrModal(p)}
+                                  className="px-2.5 py-1 text-[11px] font-extrabold rounded-lg bg-purple-50 text-purple-900 border border-purple-300 hover:bg-purple-100 transition-all flex items-center gap-1 cursor-pointer"
+                                >
+                                  <QrCode size={13} /> Print Box QRs
+                                </button>
+                              )}
                             </div>
                           )}
                           {isInProduction && (
@@ -1890,20 +1893,41 @@ const ProductionList = () => {
 
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 max-h-[60vh] overflow-y-auto p-2">
               {currentQrStickers.map((sticker, idx) => {
-                const data = JSON.parse(sticker.qrCodeText || '{}');
+                const data = typeof sticker.qrCodeText === 'string' && sticker.qrCodeText.startsWith('{') 
+                  ? JSON.parse(sticker.qrCodeText) 
+                  : {
+                      brand: 'SRI SARAVANAA ERP',
+                      productionId: sticker.productionId || 'PR-01',
+                      batchNumber: sticker.batchNumber || 'BATCH-1',
+                      box: `${sticker.boxIndex} / ${sticker.totalBoxes}`,
+                      quantity: `${sticker.piecesInBox} Pcs`,
+                      product: sticker.productName || 'Finished Product'
+                    };
+
+                const qrString = typeof sticker.qrCodeText === 'string' ? sticker.qrCodeText : JSON.stringify(data, null, 2);
 
                 return (
-                  <div key={idx} className="bg-white p-3 rounded-2xl border-2 border-dashed border-gray-300 space-y-2 text-center text-[10px]">
-                    <div className="font-extrabold text-purple-950 border-b border-gray-200 pb-1">
+                  <div key={idx} className="bg-white p-3.5 rounded-2xl border-2 border-dashed border-purple-200 hover:border-purple-400 space-y-2 text-center text-[10px] shadow-xs transition-all flex flex-col items-center justify-between">
+                    <div className="font-black text-purple-950 border-b border-purple-100 pb-1 text-xs w-full uppercase tracking-wider">
                       {data.brand || 'SRI SARAVANAA ERP'}
                     </div>
-                    <div className="p-2 bg-gray-50 rounded-xl font-mono text-[9px] text-gray-800 font-bold space-y-0.5">
-                      <div className="text-xs font-black text-purple-900">BOX {sticker.boxIndex} / {sticker.totalBoxes}</div>
-                      <div>PROD ID: {data.productionId}</div>
-                      <div>BATCH: {data.batchNumber}</div>
-                      <div>QTY: {data.piecesInBox} Pcs</div>
+
+                    <div className="p-2 bg-white rounded-xl border border-gray-200 shadow-2xs my-1 flex justify-center items-center">
+                      <QRCodeSVG
+                        value={qrString}
+                        size={110}
+                        level="M"
+                        includeMargin={true}
+                      />
                     </div>
-                    <div className="text-[9px] font-bold text-gray-500">{data.product}</div>
+
+                    <div className="p-2 bg-purple-50/80 rounded-xl font-mono text-[9.5px] text-gray-800 font-bold space-y-0.5 w-full border border-purple-100">
+                      <div className="text-xs font-black text-purple-950">BOX {sticker.boxIndex} / {sticker.totalBoxes}</div>
+                      <div className="text-purple-900">PROD ID: {data.productionId || sticker.productionId}</div>
+                      <div>BATCH: {data.batchNumber || sticker.batchNumber}</div>
+                      <div className="text-emerald-700 font-black">QTY: {data.piecesInBox || sticker.piecesInBox} Pcs</div>
+                    </div>
+                    <div className="text-[10px] font-extrabold text-gray-700 truncate w-full">{data.product || sticker.productName}</div>
                   </div>
                 );
               })}
