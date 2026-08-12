@@ -890,46 +890,53 @@ const ProductionList = () => {
         )}
       </div>
 
-      {/* --- POPUP MODAL: START NEW PRODUCTION BATCH WIZARD --- */}
-      <Modal isOpen={isNewBatchModalOpen} onClose={() => setIsNewBatchModalOpen(false)} title="Assembly & Production Wizard" size="2xl">
+      {/* --- POPUP MODAL: PRODUCTION & MIX REQUISITION WIZARD --- */}
+      <Modal
+        isOpen={isNewBatchModalOpen}
+        onClose={() => setIsNewBatchModalOpen(false)}
+        title={activeReqType === 'MIX_REQUISITION' ? "🥣 Mix Preparation Requisition (Store Room Request)" : "🍦 Finished Goods Assembly Requisition"}
+        size="2xl"
+      >
         <form onSubmit={handleSubmitBatch} className="space-y-6">
 
-          {/* Wizard Header Progress Bar */}
-          <div className="flex justify-between items-center bg-gray-50 p-2.5 rounded-xl border border-gray-200 text-xs font-extrabold gap-2">
-            <button
-              type="button"
-              onClick={() => setWizardStep(1)}
-              className={`flex-1 px-3 py-2 rounded-lg transition-all border cursor-pointer ${
-                wizardStep === 1 
-                  ? 'bg-white text-purple-900 border-purple-400 shadow-md ring-2 ring-purple-500/20' 
-                  : 'bg-gray-100 text-gray-600 border-transparent hover:bg-gray-200'
-              }`}
-            >
-              1. Mix Raw Material Requisition
-            </button>
-            <button
-              type="button"
-              onClick={() => setWizardStep(2)}
-              className={`flex-1 px-3 py-2 rounded-lg transition-all border cursor-pointer ${
-                wizardStep === 2 
-                  ? 'bg-white text-indigo-900 border-indigo-400 shadow-md ring-2 ring-indigo-500/20' 
-                  : 'bg-gray-100 text-gray-600 border-transparent hover:bg-gray-200'
-              }`}
-            >
-              2. Packaging Material Requisition
-            </button>
-            <button
-              type="button"
-              onClick={() => setWizardStep(3)}
-              className={`flex-1 px-3 py-2 rounded-lg transition-all border cursor-pointer ${
-                wizardStep === 3 
-                  ? 'bg-white text-[var(--color-primary)] border-pink-400 shadow-md ring-2 ring-pink-500/20' 
-                  : 'bg-gray-100 text-gray-600 border-transparent hover:bg-gray-200'
-              }`}
-            >
-              3. Finished Goods & Store Room Submission
-            </button>
-          </div>
+          {/* Wizard Header Progress Bar for FG Assembly */}
+          {activeReqType === 'FG_ASSEMBLY_REQUISITION' && (
+            <div className="flex justify-between items-center bg-gray-50 p-2.5 rounded-xl border border-gray-200 text-xs font-extrabold gap-2">
+              <button
+                type="button"
+                onClick={() => setWizardStep(1)}
+                className={`flex-1 px-3 py-2 rounded-lg transition-all border cursor-pointer ${
+                  wizardStep === 1 
+                    ? 'bg-white text-purple-900 border-purple-400 shadow-md ring-2 ring-purple-500/20' 
+                    : 'bg-gray-100 text-gray-600 border-transparent hover:bg-gray-200'
+                }`}
+              >
+                1. Finished Good & Mix Output
+              </button>
+              <button
+                type="button"
+                onClick={() => setWizardStep(2)}
+                className={`flex-1 px-3 py-2 rounded-lg transition-all border cursor-pointer ${
+                  wizardStep === 2 
+                    ? 'bg-white text-indigo-900 border-indigo-400 shadow-md ring-2 ring-indigo-500/20' 
+                    : 'bg-gray-100 text-gray-600 border-transparent hover:bg-gray-200'
+                }`}
+              >
+                2. Packaging Material Requisition
+              </button>
+              <button
+                type="button"
+                onClick={() => setWizardStep(3)}
+                className={`flex-1 px-3 py-2 rounded-lg transition-all border cursor-pointer ${
+                  wizardStep === 3 
+                    ? 'bg-white text-[var(--color-primary)] border-pink-400 shadow-md ring-2 ring-pink-500/20' 
+                    : 'bg-gray-100 text-gray-600 border-transparent hover:bg-gray-200'
+                }`}
+              >
+                3. Finished Goods & Store Room Submission
+              </button>
+            </div>
+          )}
 
           {/* STEP 1: MIX RAW MATERIAL REQUISITION (STORE ROOM REQUEST) */}
           {wizardStep === 1 && (
@@ -1221,13 +1228,23 @@ const ProductionList = () => {
               })}
 
               <div className="flex justify-end pt-4">
-                <button
-                  type="button"
-                  onClick={() => setWizardStep(2)}
-                  className="bg-white border-2 border-indigo-600 text-indigo-700 hover:bg-indigo-50 px-6 py-2.5 rounded-xl text-sm font-extrabold transition-all shadow-md flex items-center gap-2 cursor-pointer"
-                >
-                  Next: Packaging Material Requisition <ArrowRight size={16} />
-                </button>
+                {activeReqType === 'MIX_REQUISITION' ? (
+                  <button
+                    type="submit"
+                    disabled={submitting}
+                    className="bg-purple-600 hover:bg-purple-700 text-white px-6 py-2.5 rounded-xl text-sm font-extrabold transition-all shadow-md disabled:opacity-50 flex items-center gap-2 cursor-pointer"
+                  >
+                    {submitting ? 'Submitting Requisition...' : 'Submit Mix Preparation Requisition to Store Room'}
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => setWizardStep(2)}
+                    className="bg-white border-2 border-indigo-600 text-indigo-700 hover:bg-indigo-50 px-6 py-2.5 rounded-xl text-sm font-extrabold transition-all shadow-md flex items-center gap-2 cursor-pointer"
+                  >
+                    Next: Packaging Material Requisition <ArrowRight size={16} />
+                  </button>
+                )}
               </div>
             </div>
           )}
