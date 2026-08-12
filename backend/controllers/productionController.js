@@ -249,7 +249,13 @@ exports.createProductionBatch = async (req, res) => {
             for (const ess of essenceMaterialsUsed) {
                 const qtyReq = parseFloat(ess.quantityRequested) || 0;
                 if (qtyReq > 0 && ess.product) {
-                    const essProdId = ess.product._id || ess.product;
+                    const essProdId = (ess.product._id || ess.product).toString();
+
+                    // Skip if already in packaging or raw materials to avoid duplicates
+                    const isDuplicatePkg = processedPackagingMaterials.some(p => (p.product?._id || p.product || '').toString() === essProdId);
+                    const isDuplicateRm = processedRawMaterials.some(r => (r.product?._id || r.product || '').toString() === essProdId);
+                    if (isDuplicatePkg || isDuplicateRm) continue;
+
                     const essProd = await Product.findById(essProdId);
                     const essName = essProd ? essProd.name : 'Essence / Add-on Item';
 
@@ -410,7 +416,13 @@ exports.dispatchStock = async (req, res) => {
             for (const ess of production.essenceMaterialsUsed) {
                 const qtyReq = parseFloat(ess.quantityRequested) || 0;
                 if (qtyReq > 0 && ess.product) {
-                    const essProdId = ess.product._id || ess.product;
+                    const essProdId = (ess.product._id || ess.product).toString();
+
+                    // Skip if already deducted under packaging or raw materials
+                    const isAlreadyDeductedInPkg = (production.packagingMaterialsUsed || []).some(pkg => (pkg.product?._id || pkg.product || '').toString() === essProdId);
+                    const isAlreadyDeductedInRm = (production.rawMaterialsUsed || []).some(rm => (rm.product?._id || rm.product || '').toString() === essProdId);
+                    if (isAlreadyDeductedInPkg || isAlreadyDeductedInRm) continue;
+
                     await deductStoreRoomStock(essProdId, qtyReq);
 
                     await InventoryTransaction.create({
