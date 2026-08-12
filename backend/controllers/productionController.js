@@ -540,13 +540,13 @@ exports.startProduction = async (req, res) => {
 exports.completeProduction = async (req, res) => {
     try {
         const { id } = req.params;
-        const { actualProducedPieces } = req.body;
+        const { actualProducedPieces, piecesPerBox } = req.body;
 
         const production = await Production.findById(id);
         if (!production) return res.status(404).json({ success: false, message: 'Production batch not found.' });
 
         const pPcs = parseInt(actualProducedPieces) || production.totalPieces || 0;
-        const pPerBox = parseInt(production.piecesPerBox) || 12;
+        const pPerBox = parseInt(piecesPerBox) || parseInt(production.piecesPerBox) || 12;
         const passedBoxes = Math.floor(pPcs / pPerBox);
         const loosePcs = pPcs % pPerBox;
         const prodIdCode = production.productionNumber || `PR-${id.slice(-4)}`;
@@ -613,6 +613,7 @@ exports.completeProduction = async (req, res) => {
         const updatedProd = await Production.findByIdAndUpdate(id, {
             producedPieces: pPcs,
             producedBoxes: Number((pPcs / pPerBox).toFixed(2)),
+            piecesPerBox: pPerBox,
             passedPieces: pPcs,
             passedBoxes: passedBoxes,
             status: 'QC_PASSED',

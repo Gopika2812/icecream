@@ -66,7 +66,11 @@ const ProductionList = () => {
   const [expandedRowId, setExpandedRowId] = useState(null);
   const [isCompleteModalOpen, setIsCompleteModalOpen] = useState(false);
   const [selectedProdForCompletion, setSelectedProdForCompletion] = useState(null);
-  const [actualProducedPieces, setActualProducedPieces] = useState('');
+  const [completionForm, setCompletionForm] = useState({
+    piecesPerBox: 12,
+    actualProducedBoxes: '',
+    actualProducedPieces: ''
+  });
 
   // Box QR Generation Modal State
   const [isQrModalOpen, setIsQrModalOpen] = useState(false);
@@ -121,8 +125,16 @@ const ProductionList = () => {
   };
 
   const handleOpenCompleteModal = (prod) => {
+    const ppb = prod.piecesPerBox || 12;
+    const boxes = prod.quantityBoxes || (prod.totalPieces ? Number((prod.totalPieces / ppb).toFixed(2)) : '');
+    const pcs = prod.totalPieces || (prod.quantityBoxes ? (prod.quantityBoxes * ppb) : '');
+
     setSelectedProdForCompletion(prod);
-    setActualProducedPieces(prod.totalPieces || '');
+    setCompletionForm({
+      piecesPerBox: ppb,
+      actualProducedBoxes: boxes,
+      actualProducedPieces: pcs
+    });
     setIsCompleteModalOpen(true);
   };
 
@@ -133,9 +145,10 @@ const ProductionList = () => {
     try {
       setSubmitting(true);
       const res = await api.post(`/production/${selectedProdForCompletion._id}/complete-production`, {
-        actualProducedPieces: parseInt(actualProducedPieces) || selectedProdForCompletion.totalPieces
+        actualProducedPieces: parseInt(completionForm.actualProducedPieces) || selectedProdForCompletion.totalPieces,
+        piecesPerBox: parseInt(completionForm.piecesPerBox) || selectedProdForCompletion.piecesPerBox || 12
       });
-      alert(res.data?.message || 'Production phase completed!');
+      alert(res.data?.message || 'Production completed & stock inwarded!');
       setIsCompleteModalOpen(false);
       fetchInitialData();
     } catch (err) {
@@ -1826,43 +1839,142 @@ const ProductionList = () => {
 
       {/* --- POPUP MODAL: COMPLETE PRODUCTION PHASE --- */}
       {isCompleteModalOpen && selectedProdForCompletion && (
-        <Modal isOpen={isCompleteModalOpen} onClose={() => setIsCompleteModalOpen(false)} title="Complete Production Phase" size="md">
+        <Modal isOpen={isCompleteModalOpen} onClose={() => setIsCompleteModalOpen(false)} title="Complete Production Output Entry" size="md">
           <form onSubmit={handleSubmitCompletion} className="space-y-4">
+            {/* Product Summary Header */}
             <div className="p-4 bg-rose-50 border border-rose-200 rounded-2xl space-y-1">
               <div className="flex justify-between items-center">
-                <span className="text-base font-extrabold text-rose-950">{selectedProdForCompletion.finishedGoodProduct?.name}</span>
-                <span className="font-mono text-xs font-black text-rose-900 bg-white px-2 py-0.5 rounded border border-rose-300">
+                <span className="text-base font-extrabold text-rose-950">
+                  {selectedProdForCompletion.finishedGoodProduct?.name || selectedProdForCompletion.mixProduct?.name || 'Production Item'}
+                </span>
+                <span className="font-mono text-xs font-black text-rose-900 bg-white px-2.5 py-1 rounded-xl border border-rose-300 shadow-2xs">
                   ID: {selectedProdForCompletion.productionNumber || `PR-${selectedProdForCompletion._id.slice(-4)}`}
                 </span>
               </div>
-              <p className="text-xs text-rose-800 font-semibold">
-                Batch Code: <strong>{selectedProdForCompletion.batchNumber || 'BATCH-1'}</strong>
+              <p className="text-xs text-rose-800 font-semibold flex items-center justify-between pt-1">
+                <span>Batch Code: <strong>{selectedProdForCompletion.batchNumber || 'BATCH-1'}</strong></span>
+                <span className="text-[11px] font-bold text-rose-700 bg-rose-100 px-2 py-0.5 rounded-lg">
+                  {selectedProdForCompletion.requisitionType === 'MIX_REQUISITION' ? 'Mix Preparation' : 'Finished Goods Assembly'}
+                </span>
               </p>
             </div>
 
-            <div className="space-y-3">
-              <div className="space-y-1">
-                <label className="text-xs font-bold text-gray-500 uppercase tracking-wider block">Requested Output (Non-Editable)</label>
-                <input
-                  type="text"
-                  disabled
-                  value={`${selectedProdForCompletion.totalPieces || selectedProdForCompletion.quantityBoxes * 12} Pcs (${selectedProdForCompletion.quantityBoxes} Boxes)`}
-                  className="w-full bg-gray-200/80 border border-gray-300 rounded-xl px-3.5 py-2 text-xs font-mono font-black text-gray-700 cursor-not-allowed"
-                />
+            <div className="space-y-3.5">
+              {/* 1. REQUESTED QUANTITY (TO STORE ROOM) - NON-EDITABLE DISPLAY */}
+              <div className="space-y-1 bg-slate-50 p-3 rounded-2xl border border-slate-200">
+                <label className="text-[11px] font-extrabold text-slate-600 uppercase tracking-wider block">
+                  📋 Requested Output (to Store Room)
+                </label>
+                <div className="text-sm font-mono font-black text-slate-900 flex items-center justify-between">
+                  <span>
+                    {selectedProdForCompletion.requisitionType === 'MIX_REQUISITION' 
+                      ? `${selectedProdForCompletion.mixLiters || selectedProdForCompletion.totalPieces} Liters` 
+                      : `${selectedProdForCompletion.totalPieces || selectedProdForCompletion.quantityBoxes * 12} Pcs`}
+                  </span>
+                  {selectedProdForCompletion.requisitionType !== 'MIX_REQUISITION' && (
+                    <span className="text-xs font-bold text-slate-500 bg-slate-200 px-2 py-0.5 rounded-lg">
+                      {selectedProdForCompletion.quantityBoxes} Boxes Requested
+                    </span>
+                  )}
+                </div>
               </div>
 
-              <div className="space-y-1">
-                <label className="text-xs font-bold text-rose-900 uppercase tracking-wider block mb-1">Actual Produced Pieces Count (Pcs) *</label>
-                <input
-                  type="number"
-                  min="1"
-                  required
-                  value={actualProducedPieces}
-                  onChange={(e) => setActualProducedPieces(e.target.value)}
-                  placeholder="e.g. 480"
-                  className="w-full bg-white border-2 border-rose-300 rounded-xl px-3.5 py-2.5 text-sm font-mono font-black text-rose-950 focus:ring-2 focus:ring-rose-500/20"
-                />
-              </div>
+              {selectedProdForCompletion.requisitionType !== 'MIX_REQUISITION' && (
+                <>
+                  {/* 2. PACKAGING CONFIG / PER PIECE PRODUCTION COUNT (PCS PER BOX) */}
+                  <div className="space-y-1">
+                    <label className="text-xs font-extrabold text-rose-950 uppercase tracking-wider block">
+                      📦 Packaging Config (Per Piece Production Count / Box) *
+                    </label>
+                    <input
+                      type="number"
+                      min="1"
+                      required
+                      value={completionForm.piecesPerBox}
+                      onChange={(e) => {
+                        const ppb = parseInt(e.target.value) || 1;
+                        const boxes = parseFloat(completionForm.actualProducedBoxes) || 0;
+                        setCompletionForm({
+                          ...completionForm,
+                          piecesPerBox: ppb,
+                          actualProducedPieces: Math.round(boxes * ppb)
+                        });
+                      }}
+                      placeholder="e.g. 12 or 24"
+                      className="w-full bg-white border-2 border-rose-200 rounded-xl px-3.5 py-2 text-xs font-mono font-black text-rose-950 focus:border-rose-500 focus:ring-2 focus:ring-rose-500/20"
+                    />
+                    <span className="text-[10px] text-gray-500 font-bold block">Pcs count packaged in 1 master box</span>
+                  </div>
+
+                  {/* 3. ACTUAL ORIGINAL PRODUCED QUANTITY (BOXES & TOTAL PIECES) */}
+                  <div className="grid grid-cols-2 gap-3 p-3 bg-emerald-50/60 rounded-2xl border border-emerald-200">
+                    <div className="space-y-1">
+                      <label className="text-xs font-extrabold text-emerald-950 uppercase tracking-wider block">
+                        🏭 Actual Produced Boxes *
+                      </label>
+                      <input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        required
+                        value={completionForm.actualProducedBoxes}
+                        onChange={(e) => {
+                          const boxes = parseFloat(e.target.value) || 0;
+                          const ppb = parseInt(completionForm.piecesPerBox) || 12;
+                          setCompletionForm({
+                            ...completionForm,
+                            actualProducedBoxes: e.target.value,
+                            actualProducedPieces: Math.round(boxes * ppb)
+                          });
+                        }}
+                        placeholder="e.g. 20"
+                        className="w-full bg-white border-2 border-emerald-300 rounded-xl px-3.5 py-2 text-xs font-mono font-black text-emerald-950 focus:border-emerald-500"
+                      />
+                    </div>
+
+                    <div className="space-y-1">
+                      <label className="text-xs font-extrabold text-emerald-950 uppercase tracking-wider block">
+                        ✨ Original Produced Pcs *
+                      </label>
+                      <input
+                        type="number"
+                        min="1"
+                        required
+                        value={completionForm.actualProducedPieces}
+                        onChange={(e) => {
+                          const pcs = parseInt(e.target.value) || 0;
+                          const ppb = parseInt(completionForm.piecesPerBox) || 12;
+                          setCompletionForm({
+                            ...completionForm,
+                            actualProducedPieces: e.target.value,
+                            actualProducedBoxes: Number((pcs / ppb).toFixed(2))
+                          });
+                        }}
+                        placeholder="e.g. 240"
+                        className="w-full bg-white border-2 border-emerald-300 rounded-xl px-3.5 py-2 text-xs font-mono font-black text-emerald-950 focus:border-emerald-500"
+                      />
+                    </div>
+                  </div>
+                </>
+              )}
+
+              {selectedProdForCompletion.requisitionType === 'MIX_REQUISITION' && (
+                <div className="space-y-1">
+                  <label className="text-xs font-extrabold text-emerald-950 uppercase tracking-wider block">
+                    🧪 Actual Prepared Mix Output (Liters) *
+                  </label>
+                  <input
+                    type="number"
+                    step="0.1"
+                    min="0.1"
+                    required
+                    value={completionForm.actualProducedPieces}
+                    onChange={(e) => setCompletionForm({ ...completionForm, actualProducedPieces: e.target.value })}
+                    placeholder="e.g. 10.5"
+                    className="w-full bg-white border-2 border-emerald-300 rounded-xl px-3.5 py-2 text-xs font-mono font-black text-emerald-950 focus:border-emerald-500"
+                  />
+                </div>
+              )}
             </div>
 
             <div className="flex justify-end gap-3 pt-3 border-t border-gray-200">
@@ -1878,7 +1990,7 @@ const ProductionList = () => {
                 disabled={submitting}
                 className="bg-emerald-600 hover:bg-emerald-700 text-white px-6 py-2.5 rounded-xl text-xs font-extrabold transition-all shadow-md disabled:opacity-50 flex items-center gap-2 cursor-pointer"
               >
-                <CheckCircle2 size={16} /> Complete & Save Produced Output
+                <CheckCircle2 size={16} /> Complete & Inward Stock
               </button>
             </div>
           </form>
