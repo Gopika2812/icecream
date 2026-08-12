@@ -40,7 +40,6 @@ function App() {
             
             {/* Procurement & Production */}
             <Route path="purchase-orders" element={<PurchaseOrderList />} />
-            <Route path="product-requisitions" element={<ProductRequisitionList />} />
             <Route path="qc" element={<QCList />} />
             <Route path="vendor-ledgers" element={<VendorLedgers />} />
             <Route path="raw-material-stock" element={<RawMaterialStock />} />

@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Trash2, ArrowLeft, Loader2, Calendar, FileText, CheckCircle2, Eye, Printer, Building2, User, Clock, Tag, ChevronDown, ChevronUp, Package } from 'lucide-react';
+import { Plus, Trash2, ArrowLeft, Loader2, Calendar, FileText, CheckCircle2, Eye, Printer, Building2, User, Clock, Tag, ChevronDown, ChevronUp, Package, Zap } from 'lucide-react';
 import api from '../../services/api';
 import SearchableSelect from '../../components/SearchableSelect';
+import Modal from '../../components/Modal';
 
 const getLocalDateString = (d = new Date()) => {
   const year = d.getFullYear();
@@ -54,6 +55,9 @@ const PurchaseOrderList = () => {
   const [vendors, setVendors] = useState([]);
   const [products, setProducts] = useState([]);
   const [branches, setBranches] = useState([]);
+  const [productRequisitions, setProductRequisitions] = useState([]);
+  const [isReqModalOpen, setIsReqModalOpen] = useState(false);
+  const [activeRequisitionId, setActiveRequisitionId] = useState(null);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
@@ -278,19 +282,20 @@ const PurchaseOrderList = () => {
 
   const fetchInitialData = async () => {
     try {
-      const [vendorsRes, productsRes, branchesRes] = await Promise.all([
+      const [vendorsRes, productsRes, branchesRes, reqsRes] = await Promise.all([
         api.get('/vendors'),
         api.get('/products'),
-        api.get('/branches')
+        api.get('/branches'),
+        api.get('/product-requisitions')
       ]);
       setVendors(vendorsRes.data.data || []);
-      // Filter for raw materials & packing materials for PO purchasing
-      const purchasableItems = productsRes.data.data.filter(p => {
+      const purchasableItems = (productsRes.data.data || []).filter(p => {
         const type = (p.itemType || '').toLowerCase();
         return type.includes('raw') || type.includes('pack') || type.includes('material') || type.includes('packaging');
       });
       setProducts(purchasableItems);
       setBranches(branchesRes.data.data || []);
+      setProductRequisitions(reqsRes.data.data || []);
 
       // Default branch to user's primary branch if available
       if (currentUser.primaryBranch) {
@@ -301,6 +306,32 @@ const PurchaseOrderList = () => {
     } catch (error) {
       console.error('Failed to fetch metadata', error);
     }
+  };
+
+  const handleFulfillRequisition = (reqObj, reqItem) => {
+    const prodId = typeof reqItem.product === 'object' ? (reqItem.product._id || reqItem.product.id) : reqItem.product;
+    const foundProduct = products.find(p => (p._id || p.id) === prodId);
+
+    const unitPrice = foundProduct ? (parseFloat(foundProduct.costPrice) || parseFloat(foundProduct.wholesalePrice) || 0) : 0;
+    const qty = parseFloat(reqItem.requestedQuantity) || 1;
+
+    setItems([
+      {
+        product: prodId,
+        orderedQty: qty,
+        unitPrice: unitPrice,
+        totalPrice: Number((qty * unitPrice).toFixed(2))
+      }
+    ]);
+
+    if (foundProduct?.defaultVendor) {
+      const vId = typeof foundProduct.defaultVendor === 'object' ? (foundProduct.defaultVendor._id || foundProduct.defaultVendor.id) : foundProduct.defaultVendor;
+      setSelectedVendor(vId);
+    }
+
+    setActiveRequisitionId(reqObj._id || reqObj.id);
+    setIsReqModalOpen(false);
+    setIsCreating(true);
   };
 
   const handleAddItem = () => {
@@ -359,15 +390,26 @@ const PurchaseOrderList = () => {
       };
 
       await api.post('/purchase-orders', payload);
-      alert('Purchase Order Created Successfully!');
+
+      if (activeRequisitionId) {
+        try {
+          await api.patch(`/product-requisitions/${activeRequisitionId}/status`, { status: 'FULFILLED' });
+        } catch (err) {
+          console.error('Error fulfilling requisition status', err);
+        }
+      }
+
+      alert('Purchase Invoice Created Successfully!');
 
       // Reset Form
       setSelectedVendor('');
       setSupplierInvoiceNumber('');
       setExpectedDeliveryDate('');
       setItems([{ product: '', orderedQty: 1, unitPrice: 0, totalPrice: 0 }]);
+      setActiveRequisitionId(null);
       setIsCreating(false);
       fetchPurchaseOrders();
+      fetchInitialData();
     } catch (error) {
       console.error('Failed to create PO', error);
       alert(error.response?.data?.message || 'Error creating Purchase Order');
@@ -598,8 +640,22 @@ const PurchaseOrderList = () => {
           </div>
 
           <button
+            onClick={() => setIsReqModalOpen(true)}
+            className="relative flex items-center gap-2 bg-gradient-to-r from-amber-500 to-rose-600 hover:from-amber-600 hover:to-rose-700 text-white px-3.5 py-2 rounded-xl text-xs font-black shadow-md transition-all cursor-pointer"
+          >
+            <Package size={15} />
+            <span>Purchase Indents</span>
+            <span className="bg-white text-rose-950 font-extrabold text-[11px] px-2 py-0.5 rounded-full shadow-xs">
+              {productRequisitions.filter(r => r.status === 'PENDING_PURCHASE' || r.status === 'PENDING' || !r.status).length}
+            </span>
+            {productRequisitions.filter(r => r.status === 'PENDING_PURCHASE' || r.status === 'PENDING' || !r.status).length > 0 && (
+              <span className="absolute -top-1 -right-1 w-3 h-3 bg-emerald-400 rounded-full animate-ping" />
+            )}
+          </button>
+
+          <button
             onClick={() => setIsCreating(true)}
-            className="flex items-center gap-2 bg-[var(--color-primary)] hover:bg-[var(--color-primary-soft)] text-white px-4 py-2 rounded-xl transition-colors shadow-[0_0_15px_rgba(216,27,96,0.3)] font-medium text-xs"
+            className="flex items-center gap-2 bg-[var(--color-primary)] hover:bg-[var(--color-primary-soft)] text-white px-4 py-2 rounded-xl transition-colors shadow-[0_0_15px_rgba(216,27,96,0.3)] font-medium text-xs cursor-pointer"
           >
             <Plus size={16} /> Create PI
           </button>
@@ -758,6 +814,77 @@ const PurchaseOrderList = () => {
           </div>
         )}
       </div>
+
+      {/* --- POPUP MODAL: PENDING PRODUCT PURCHASE INDENTS --- */}
+      {isReqModalOpen && (
+        <Modal isOpen={isReqModalOpen} onClose={() => setIsReqModalOpen(false)} title="Pending Product Purchase Indents" size="lg">
+          <div className="space-y-4">
+            <div className="p-3 bg-amber-50 rounded-2xl border border-amber-200 text-amber-950 text-xs font-bold flex items-center justify-between">
+              <span>Low-stock & out-of-stock indents requested by Production & Store Room Team</span>
+              <span className="bg-amber-200 text-amber-900 px-2.5 py-0.5 rounded-xl text-[11px] font-black">
+                {productRequisitions.filter(r => r.status === 'PENDING_PURCHASE' || r.status === 'PENDING' || !r.status).length} Indents Pending
+              </span>
+            </div>
+
+            {productRequisitions.filter(r => r.status === 'PENDING_PURCHASE' || r.status === 'PENDING' || !r.status).length === 0 ? (
+              <div className="text-center py-8 text-gray-500 space-y-2 bg-gray-50 rounded-2xl border border-dashed border-gray-200">
+                <CheckCircle2 size={32} className="mx-auto text-emerald-500" />
+                <p className="font-extrabold text-sm text-gray-800">All Stock Levels Healthy!</p>
+                <p className="text-xs">No pending purchase indents from the production floor.</p>
+              </div>
+            ) : (
+              <div className="space-y-3 max-h-[60vh] overflow-y-auto p-1">
+                {productRequisitions.filter(r => r.status === 'PENDING_PURCHASE' || r.status === 'PENDING' || !r.status).map((req, idx) => (
+                  <div key={idx} className="bg-white p-4 rounded-2xl border border-gray-200 hover:border-amber-400 transition-all shadow-xs space-y-3">
+                    <div className="flex justify-between items-center border-b border-gray-100 pb-2">
+                      <div className="flex items-center gap-2">
+                        <span className="font-mono text-xs font-black text-rose-900 bg-rose-50 border border-rose-200 px-2.5 py-1 rounded-xl">
+                          {req.requisitionNumber || `PR-${req._id?.slice(-4)}`}
+                        </span>
+                        <span className="text-xs font-bold text-gray-600">Branch: <strong>{req.branch || 'Main Branch'}</strong></span>
+                      </div>
+                      <span className="text-[11px] font-mono text-gray-400">
+                        {new Date(req.createdAt || Date.now()).toLocaleString('en-IN')}
+                      </span>
+                    </div>
+
+                    <div className="space-y-2">
+                      {(req.items || []).map((item, itemIdx) => {
+                        const pName = typeof item.product === 'object' ? item.product.name : (products.find(p => (p._id || p.id) === item.product)?.name || 'Item');
+                        const pCode = typeof item.product === 'object' ? item.product.itemCode : (products.find(p => (p._id || p.id) === item.product)?.itemCode || 'N/A');
+                        const uom = item.unitOfMeasure || 'Units';
+
+                        return (
+                          <div key={itemIdx} className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3 bg-slate-50 rounded-xl border border-slate-200">
+                            <div>
+                              <div className="text-sm font-extrabold text-slate-900">{pName}</div>
+                              <div className="text-xs font-mono text-slate-500 font-bold">Code: {pCode || 'N/A'} | Current Stock: {item.currentStock || 0} {uom}</div>
+                            </div>
+
+                            <div className="flex items-center gap-4 justify-between sm:justify-end">
+                              <div className="text-right">
+                                <span className="text-[10px] text-gray-500 uppercase font-extrabold block">Requested Qty</span>
+                                <span className="text-sm font-mono font-black text-rose-950">{item.requestedQuantity} {uom}</span>
+                              </div>
+
+                              <button
+                                onClick={() => handleFulfillRequisition(req, item)}
+                                className="bg-emerald-600 hover:bg-emerald-700 text-white px-3.5 py-2 rounded-xl text-xs font-extrabold transition-all shadow-sm flex items-center gap-1.5 cursor-pointer shrink-0"
+                              >
+                                <Zap size={14} /> Take Action
+                              </button>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </Modal>
+      )}
     </div>
   );
 };
