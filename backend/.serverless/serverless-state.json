@@ -14,7 +14,9 @@
       "httpApi": {
         "cors": {
           "allowedOrigins": [
-            "*"
+            "https://saravanas-5c3bc.web.app",
+            "http://localhost:5173",
+            "http://localhost:3000"
           ],
           "allowedHeaders": [
             "*"
@@ -22,7 +24,7 @@
           "allowedMethods": [
             "*"
           ],
-          "allowCredentials": false
+          "allowCredentials": true
         }
       },
       "environment": {
@@ -237,7 +239,7 @@
                 "S3Bucket": {
                   "Ref": "ServerlessDeploymentBucket"
                 },
-                "S3Key": "serverless/icecream-erp-backend/dev/1786522190195-2026-08-12T08:09:50.195Z/icecream-erp-backend.zip"
+                "S3Key": "serverless/icecream-erp-backend/dev/1786522370460-2026-08-12T08:12:50.460Z/icecream-erp-backend.zip"
               },
               "Handler": "handler.handler",
               "Runtime": "nodejs20.x",
@@ -281,14 +283,14 @@
               "ApiLogGroup"
             ]
           },
-          "ApiLambdaVersionVPm2CAhaHbzUujga2M7qjyupeiuowsKJl03h2WEkGxg": {
+          "ApiLambdaVersionjZCMSJq9HvyFUumUM7BqzQfMiBhxlRWaMqRoMuzJls": {
             "Type": "AWS::Lambda::Version",
             "DeletionPolicy": "Retain",
             "Properties": {
               "FunctionName": {
                 "Ref": "ApiLambdaFunction"
               },
-              "CodeSha256": "oeEXkGL47OSMr8o8ZEGg9E05mIY+utuFeoLW38Io6UQ="
+              "CodeSha256": "Talq9Cgh3md4QdrXcmR4Rl1+ETqD0uYzwNkxY8rxyVo="
             }
           },
           "HttpApi": {
@@ -297,6 +299,7 @@
               "Name": "dev-icecream-erp-backend",
               "ProtocolType": "HTTP",
               "CorsConfiguration": {
+                "AllowCredentials": true,
                 "AllowHeaders": [
                   "*"
                 ],
@@ -304,7 +307,9 @@
                   "*"
                 ],
                 "AllowOrigins": [
-                  "*"
+                  "https://saravanas-5c3bc.web.app",
+                  "http://localhost:5173",
+                  "http://localhost:3000"
                 ]
               }
             }
@@ -808,7 +813,7 @@
           "ApiLambdaFunctionQualifiedArn": {
             "Description": "Current Lambda function version",
             "Value": {
-              "Ref": "ApiLambdaVersionVPm2CAhaHbzUujga2M7qjyupeiuowsKJl03h2WEkGxg"
+              "Ref": "ApiLambdaVersionjZCMSJq9HvyFUumUM7BqzQfMiBhxlRWaMqRoMuzJls"
             },
             "Export": {
               "Name": "sls-icecream-erp-backend-dev-ApiLambdaFunctionQualifiedArn"
@@ -962,7 +967,7 @@
         "timeout": 29,
         "runtime": "nodejs20.x",
         "vpc": {},
-        "versionLogicalId": "ApiLambdaVersionVPm2CAhaHbzUujga2M7qjyupeiuowsKJl03h2WEkGxg"
+        "versionLogicalId": "ApiLambdaVersionjZCMSJq9HvyFUumUM7BqzQfMiBhxlRWaMqRoMuzJls"
       }
     },
     "resources": {
@@ -1369,7 +1374,7 @@
     "artifact": "E:\\icecream\\backend\\.serverless\\icecream-erp-backend.zip"
   },
   "package": {
-    "artifactDirectoryName": "serverless/icecream-erp-backend/dev/1786522190195-2026-08-12T08:09:50.195Z",
+    "artifactDirectoryName": "serverless/icecream-erp-backend/dev/1786522370460-2026-08-12T08:12:50.460Z",
     "artifact": "icecream-erp-backend.zip"
   }
 }

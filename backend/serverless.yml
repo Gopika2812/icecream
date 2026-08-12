@@ -10,12 +10,14 @@ provider:
   httpApi:
     cors:
       allowedOrigins:
-        - '*'
+        - 'https://saravanas-5c3bc.web.app'
+        - 'http://localhost:5173'
+        - 'http://localhost:3000'
       allowedHeaders:
         - '*'
       allowedMethods:
         - '*'
-      allowCredentials: false
+      allowCredentials: true
   environment:
     NODE_ENV: production
     JWT_SECRET: ${env:JWT_SECRET, 'super_secret_jwt_key_for_erp_2026'}
