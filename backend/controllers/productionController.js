@@ -152,15 +152,9 @@ exports.createProductionBatch = async (req, res) => {
             performedBy: req.user?._id
         });
 
-        const populatedProduction = await Production.findById(productionBatch._id)
-            .populate('branch', 'branchName')
-            .populate('finishedGoodProduct', 'name itemCode unitOfMeasure category')
-            .populate('rawMaterialsUsed.product', 'name itemCode unitOfMeasure')
-            .populate('packagingMaterialsUsed.product', 'name itemCode unitOfMeasure');
-
         res.status(201).json({
             success: true,
-            data: populatedProduction,
+            data: productionBatch,
             message: `Material Requisition ID ${productionNumber} submitted to Factory Store Room for Stock Issue!`
         });
     } catch (error) {
