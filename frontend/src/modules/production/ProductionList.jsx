@@ -164,12 +164,13 @@ const ProductionList = () => {
     if (!productId) return 0;
     if (!Array.isArray(rawMaterialStock)) return 0;
     const prodIdStr = typeof productId === 'object' ? (productId._id || productId.id) : productId.toString();
-    const inv = rawMaterialStock.find(i => {
-      if (!i) return false;
-      const pId = typeof i.product === 'object' ? (i.product?._id || i.product?.id) : i.product;
-      return pId?.toString() === prodIdStr && (i.inventoryType === 'Store Room' || i.inventoryType === 'Factory');
-    });
-    return inv ? (parseFloat(inv.quantity) || 0) : 0;
+    return rawMaterialStock
+      .filter(i => {
+        if (!i) return false;
+        const pId = typeof i.product === 'object' ? (i.product?._id || i.product?.id) : i.product;
+        return pId?.toString() === prodIdStr && (i.inventoryType === 'Store Room' || i.inventoryType === 'Factory');
+      })
+      .reduce((sum, i) => sum + (parseFloat(i.quantity) || 0), 0);
   };
 
   const handleSendPurchaseRequisition = async (prodRef, quantityNeeded) => {
@@ -1573,19 +1574,20 @@ const ProductionList = () => {
                       {selectedPkg && (() => {
                         const availStock = getStoreRoomAvailableStock(pkg.product);
                         const reqQty = parseFloat(pkg.quantityRequested) || 0;
-                        const isShortage = availStock < reqQty || reqQty <= 0;
+                        const isZeroStock = availStock <= 0;
+                        const isShortage = isZeroStock || (reqQty > 0 && reqQty > availStock);
 
                         return (
                           <div className="mt-1.5 space-y-2">
                             <div className="flex items-center justify-between text-[10px] font-bold">
                               <span className="text-gray-500">Store Room Balance:</span>
-                              {availStock <= 0 ? (
+                              {isZeroStock ? (
                                 <span className="px-2 py-0.5 rounded-md bg-rose-100 text-rose-900 font-black border border-rose-300 flex items-center gap-1 animate-pulse">
                                   🔴 OUT OF STOCK (0 {uom})
                                 </span>
                               ) : isShortage ? (
                                 <span className="px-2 py-0.5 rounded-md bg-amber-100 text-amber-900 font-black border border-amber-300 flex items-center gap-1">
-                                  ⚠️ INSUFFICIENT (Avail: {availStock} {uom})
+                                  ⚠️ INSUFFICIENT (Avail: {availStock} {uom}, Requested: {reqQty} {uom})
                                 </span>
                               ) : (
                                 <span className="px-2 py-0.5 rounded-md bg-emerald-100 text-emerald-900 font-black border border-emerald-300">
@@ -1598,7 +1600,7 @@ const ProductionList = () => {
                               <div className="p-2.5 bg-rose-50 border border-rose-300 rounded-xl flex items-center justify-between gap-2">
                                 <div className="text-[11px] font-black text-rose-950 flex items-center gap-1.5">
                                   <AlertTriangle size={14} className="text-rose-600 shrink-0" />
-                                  <span>Out of Stock in Store Room</span>
+                                  <span>{isZeroStock ? 'Out of Stock in Store Room' : `Stock Shortage (Need ${reqQty} ${uom}, Have ${availStock} ${uom})`}</span>
                                 </div>
                                 <button
                                   type="button"
@@ -1657,7 +1659,7 @@ const ProductionList = () => {
                   if (!pkg.product) return true;
                   const avail = getStoreRoomAvailableStock(pkg.product);
                   const req = parseFloat(pkg.quantityRequested) || 0;
-                  return avail < req || req <= 0;
+                  return avail <= 0 || (req > 0 && req > avail) || !pkg.quantityRequested;
                 });
 
                 return (
@@ -1672,7 +1674,7 @@ const ProductionList = () => {
                     {isStep2PackagingShortage ? (
                       <div className="flex items-center gap-2">
                         <span className="text-xs font-extrabold text-rose-700 bg-rose-50 px-3 py-1.5 rounded-xl border border-rose-200">
-                          ⚠️ 1 or more items are OUT OF STOCK. Send Purchase Request above to unlock next step.
+                          ⚠️ Fill quantity for all items. Send Purchase Request above if stock is insufficient.
                         </span>
                         <button
                           type="button"
