@@ -350,8 +350,8 @@ const FinishedGoodsQC = () => {
       {/* --- POPUP MODAL: PRINT PER-BOX QR STICKERS --- */}
       {isQrModalOpen && currentQrStickers.length > 0 && (
         <Modal isOpen={isQrModalOpen} onClose={() => setIsQrModalOpen(false)} title="Printable Box QR Code Stickers" size="xl">
-          <div className="space-y-4">
-            <div className="flex justify-between items-center bg-rose-50 p-3 rounded-2xl border border-rose-200 text-rose-950 text-xs font-bold">
+          <div className="printable-qr-modal-wrapper space-y-4">
+            <div className="no-print flex justify-between items-center bg-rose-50 p-3 rounded-2xl border border-rose-200 text-rose-950 text-xs font-bold">
               <span>Generated <strong>{currentQrStickers.length} Box QR Stickers</strong> (1 Sticker per Box)</span>
               <button
                 onClick={() => window.print()}
@@ -361,26 +361,32 @@ const FinishedGoodsQC = () => {
               </button>
             </div>
 
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 max-h-[60vh] overflow-y-auto p-2">
+            <div className="printable-qr-sheet-grid grid grid-cols-2 sm:grid-cols-3 gap-3 max-h-[60vh] overflow-y-auto p-2">
               {currentQrStickers.map((sticker, idx) => {
-                const data = typeof sticker.qrCodeText === 'string' && sticker.qrCodeText.startsWith('{') 
+                const parsed = typeof sticker.qrCodeText === 'string' && sticker.qrCodeText.startsWith('{') 
                   ? JSON.parse(sticker.qrCodeText) 
-                  : {
-                      brand: 'SRI SARAVANAA ERP',
-                      productionId: sticker.productionId || 'PR-01',
-                      batchNumber: sticker.batchNumber || 'BATCH-1',
-                      qcId: sticker.qcId || 'QC-PASSED',
-                      box: `${sticker.boxIndex} / ${sticker.totalBoxes}`,
-                      quantity: `${sticker.piecesInBox} Pcs`,
-                      product: sticker.productName || 'Finished Product'
-                    };
+                  : {};
 
-                const qrString = typeof sticker.qrCodeText === 'string' ? sticker.qrCodeText : JSON.stringify(data, null, 2);
+                const trackingData = {
+                  system: 'SRI SARAVANAA ERP',
+                  product: parsed.product || sticker.productName || 'Ice Cream Product',
+                  productCode: parsed.productCode || sticker.productCode || 'N/A',
+                  productionId: parsed.productionId || sticker.productionId || 'PR-01',
+                  qcId: parsed.qcId || sticker.qcId || 'QC-PASSED',
+                  batchNumber: parsed.batchNumber || sticker.batchNumber || 'BATCH-1',
+                  boxNumber: sticker.boxIndex,
+                  totalBoxes: sticker.totalBoxes,
+                  piecesInBox: sticker.piecesInBox,
+                  manufacturingDate: parsed.mfgDate || new Date().toISOString().split('T')[0],
+                  expiryDate: parsed.expDate || ''
+                };
+
+                const qrString = JSON.stringify(trackingData, null, 2);
 
                 return (
-                  <div key={idx} className="bg-white p-3.5 rounded-2xl border-2 border-dashed border-rose-200 hover:border-rose-400 space-y-2 text-center text-[10px] shadow-xs transition-all flex flex-col items-center justify-between">
+                  <div key={idx} className="qr-sticker-card bg-white p-3.5 rounded-2xl border-2 border-dashed border-rose-200 hover:border-rose-400 space-y-2 text-center text-[10px] shadow-xs transition-all flex flex-col items-center justify-between">
                     <div className="font-black text-rose-950 border-b border-rose-100 pb-1 text-xs w-full uppercase tracking-wider">
-                      {data.brand || 'SRI SARAVANAA ERP'}
+                      {trackingData.system}
                     </div>
 
                     <div className="p-2 bg-white rounded-xl border border-gray-200 shadow-2xs my-1 flex justify-center items-center">
@@ -394,11 +400,11 @@ const FinishedGoodsQC = () => {
 
                     <div className="p-2 bg-rose-50/80 rounded-xl font-mono text-[9.5px] text-gray-800 font-bold space-y-0.5 w-full border border-rose-100">
                       <div className="text-xs font-black text-rose-950">BOX {sticker.boxIndex} / {sticker.totalBoxes}</div>
-                      <div className="text-rose-900">PROD ID: {data.productionId || sticker.productionId}</div>
-                      <div className="text-emerald-700 font-bold">QC ID: {data.qcId || sticker.qcId}</div>
-                      <div className="text-emerald-800 font-black">QTY: {data.piecesInBox || sticker.piecesInBox} Pcs</div>
+                      <div className="text-rose-900">PROD ID: {trackingData.productionId}</div>
+                      <div className="text-emerald-700 font-bold">QC ID: {trackingData.qcId}</div>
+                      <div className="text-emerald-800 font-black">QTY: {trackingData.piecesInBox} Pcs</div>
                     </div>
-                    <div className="text-[10px] font-extrabold text-gray-700 truncate w-full">{data.product || sticker.productName}</div>
+                    <div className="text-[10px] font-extrabold text-gray-700 truncate w-full">{trackingData.product}</div>
                   </div>
                 );
               })}

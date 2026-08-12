@@ -115,5 +115,60 @@ thead th {
   scrollbar-width: none;
 }
 
+/* --- PRINT OPTIMIZATION FOR BOX QR CODE STICKER SHEETS --- */
+@media print {
+  body {
+    background: #ffffff !important;
+    background-image: none !important;
+    color: #000000 !important;
+  }
+
+  /* Hide all background elements, sidebars, modal headers, action buttons during printing */
+  .no-print,
+  button,
+  header,
+  aside,
+  nav {
+    display: none !important;
+  }
+
+  /* Modal container reset for printing */
+  .printable-qr-modal-wrapper {
+    position: static !important;
+    top: 0 !important;
+    left: 0 !important;
+    width: 100% !important;
+    height: auto !important;
+    max-height: none !important;
+    overflow: visible !important;
+    background: white !important;
+    box-shadow: none !important;
+    border: none !important;
+    padding: 0 !important;
+    margin: 0 !important;
+  }
+
+  .printable-qr-sheet-grid {
+    display: grid !important;
+    grid-template-columns: repeat(3, 1fr) !important;
+    gap: 12px !important;
+    max-height: none !important;
+    height: auto !important;
+    overflow: visible !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    width: 100% !important;
+  }
+
+  .qr-sticker-card {
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+    border: 1.5px dashed #333333 !important;
+    box-shadow: none !important;
+    background: #ffffff !important;
+    margin-bottom: 4px !important;
+  }
+}
+
 
 
