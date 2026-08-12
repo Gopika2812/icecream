@@ -126,34 +126,27 @@ thead th {
     padding: 0 !important;
   }
 
-  /* Hide normal web app UI, sidebars, headers, modals, backdrops during printing */
-  #root,
-  .no-print,
-  button,
-  header,
-  aside,
-  nav {
+  /* HIDE ALL CHILDREN OF BODY BY DEFAULT (Includes #root and Modal Portals) */
+  body > * {
     display: none !important;
   }
 
-  /* Display ONLY the dedicated printable sticker area */
-  #printable-sticker-area {
+  /* UNHIDE ONLY THE DEDICATED PRINTABLE STICKER AREA */
+  body > #printable-sticker-area {
     display: block !important;
-    position: absolute !important;
-    top: 0 !important;
-    left: 0 !important;
+    position: static !important;
     width: 100% !important;
     height: auto !important;
     overflow: visible !important;
     background: #ffffff !important;
-    padding: 10px !important;
+    padding: 15px !important;
     margin: 0 !important;
   }
 
   .printable-sticker-grid {
     display: grid !important;
     grid-template-columns: repeat(3, 1fr) !important;
-    gap: 12px !important;
+    gap: 14px !important;
     width: 100% !important;
     height: auto !important;
     overflow: visible !important;
@@ -165,7 +158,9 @@ thead th {
     border: 1.5px dashed #000000 !important;
     background: #ffffff !important;
     box-shadow: none !important;
-    margin-bottom: 4px !important;
+    margin-bottom: 6px !important;
+    border-radius: 12px !important;
+    padding: 12px !important;
   }
 }
 
