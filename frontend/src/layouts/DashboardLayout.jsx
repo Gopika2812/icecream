@@ -145,6 +145,7 @@ const DashboardLayout = () => {
             <NavItem to="/raw-material-stock" icon={ArrowLeftRight} title="Raw Material Stock" />
             <NavItem to="/store-room-requisitions" icon={Truck} title="Store Room Requisitions" />
             <NavItem to="/production" icon={Factory} title="Production & Assembly" />
+            <NavItem to="/finished-goods-qc" icon={ShieldCheck} title="Finished Goods QC & QR" />
           </NavGroup>
 
           <NavGroup title="Inventory & Sales">

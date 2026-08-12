@@ -14,6 +14,7 @@ import VendorLedgers from './modules/procurement/VendorLedgers';
 import RawMaterialStock from './modules/inventory/RawMaterialStock';
 import ProductionList from './modules/production/ProductionList';
 import StoreRoomRequisitions from './modules/production/StoreRoomRequisitions';
+import FinishedGoodsQC from './modules/production/FinishedGoodsQC';
 import ProductRequisitionList from './modules/procurement/ProductRequisitionList';
 import FinishedGoodsStock from './modules/inventory/FinishedGoodsStock';
 import SalesInvoice from './modules/inventory/SalesInvoice';
@@ -46,6 +47,7 @@ function App() {
             <Route path="raw-material-stock" element={<RawMaterialStock />} />
             <Route path="store-room-requisitions" element={<StoreRoomRequisitions />} />
             <Route path="production" element={<ProductionList />} />
+            <Route path="finished-goods-qc" element={<FinishedGoodsQC />} />
 
             {/* Inventory & Sales */}
             <Route path="finished-goods-stock" element={<FinishedGoodsStock />} />

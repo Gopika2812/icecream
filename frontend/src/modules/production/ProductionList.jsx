@@ -592,82 +592,153 @@ const ProductionList = () => {
               <thead className="bg-gray-50/80 border-b border-[var(--color-glass-border)] text-gray-600 font-semibold text-xs uppercase tracking-wider">
                 <tr>
                   <th className="px-6 py-4">Production Ref</th>
-                  <th className="px-6 py-4">Finished Good Item</th>
+                  <th className="px-6 py-4">Finished Good Item (Click for Details)</th>
                   <th className="px-6 py-4 text-center">Batch Code</th>
-                  <th className="px-6 py-4 text-right">Factory Output</th>
-                  <th className="px-6 py-4 text-center">Store Temp</th>
-                  <th className="px-6 py-4">Issued Raw Materials</th>
-                  <th className="px-6 py-4 text-center">QC Lifecycle Status</th>
-                  <th className="px-6 py-4 text-center">Actions</th>
+                  <th className="px-6 py-4 text-right">Requested Output</th>
+                  <th className="px-6 py-4 text-center">Production Lifecycle Status</th>
+                  <th className="px-6 py-4 text-center">Action</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-[var(--color-glass-border)]">
-                {filteredProductions.map((p) => (
-                  <tr key={p._id} className="hover:bg-white/40 transition-colors">
-                    <td className="px-6 py-4 font-mono text-xs font-bold text-gray-700">{p.productionNumber}</td>
-                    <td className="px-6 py-4 font-bold text-gray-900">
-                      {p.finishedGoodProduct?.name}
-                      <span className="block font-mono text-[10px] text-gray-400 font-normal">Code: {p.finishedGoodProduct?.itemCode}</span>
-                    </td>
-                    <td className="px-6 py-4 text-center">
-                      <span className="px-2.5 py-1 rounded bg-indigo-50 text-indigo-700 border border-indigo-200 font-mono text-xs font-bold">
-                        {p.batchNumber}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 text-right font-mono font-bold text-emerald-700">
-                      {p.quantityBoxes} Boxes <span className="text-xs text-gray-500 font-normal">({p.totalPieces} Pcs)</span>
-                    </td>
-                    <td className="px-6 py-4 text-center font-mono text-xs font-bold text-blue-700">
-                      {p.temperature} °C
-                    </td>
-                    <td className="px-6 py-4 text-xs">
-                      {p.rawMaterialsUsed?.map((rm, idx) => (
-                        <div key={idx} className="text-gray-700 font-medium">
-                          • {rm.product?.name || 'Material'}: <span className="font-mono font-bold text-rose-600">{rm.quantityUsed} {rm.unitOfMeasure}</span>
-                        </div>
-                      ))}
-                    </td>
-                    <td className="px-6 py-4 text-center">
-                      {p.qcStatus === 'STORE_ROOM_PENDING_QC' && (
-                        <span className="px-3 py-1 rounded-full text-[11px] font-extrabold bg-amber-50 text-amber-800 border border-amber-300 inline-flex items-center gap-1">
-                          <AlertTriangle size={12} /> AWAITING FG QC
-                        </span>
+                {filteredProductions.map((p) => {
+                  const reqId = p.productionNumber || `PR-${p._id.slice(-4)}`;
+                  const isExpanded = expandedRowId === p._id;
+                  const isPendingStoreRoom = !p.status || p.status === 'PENDING_STORE_ROOM_DISPATCH';
+                  const isDispatched = p.status === 'DISPATCHED_TO_PRODUCTION';
+                  const isInProduction = p.status === 'IN_PRODUCTION';
+                  const isCompleted = p.status === 'PRODUCTION_COMPLETED';
+                  const isSentToQc = p.status === 'SENT_TO_QC';
+                  const isQcApproved = p.status === 'QC_APPROVED' || p.qcStatus === 'PASSED';
+
+                  return (
+                    <React.Fragment key={p._id}>
+                      <tr className="hover:bg-white/60 transition-colors">
+                        <td className="px-6 py-4 font-mono text-xs font-black text-purple-900">{reqId}</td>
+                        <td className="px-6 py-4 font-bold text-gray-900">
+                          <button
+                            type="button"
+                            onClick={() => setExpandedRowId(isExpanded ? null : p._id)}
+                            className="text-left font-extrabold text-purple-900 hover:text-purple-700 hover:underline flex items-center gap-1.5 cursor-pointer"
+                          >
+                            <Package size={16} className="text-purple-600 shrink-0" />
+                            {p.finishedGoodProduct?.name || 'Finished Product'}
+                            <span className="text-[10px] text-purple-600 font-normal">({isExpanded ? '▲ hide materials' : '▼ view materials'})</span>
+                          </button>
+                          <span className="block font-mono text-[10px] text-gray-400 font-normal ml-5">Code: {p.finishedGoodProduct?.itemCode}</span>
+                        </td>
+                        <td className="px-6 py-4 text-center">
+                          <span className="px-2.5 py-1 rounded-xl bg-indigo-50 text-indigo-700 border border-indigo-200 font-mono text-xs font-bold">
+                            {p.batchNumber}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4 text-right font-mono font-bold text-gray-900">
+                          <span className="text-sm font-black text-purple-900 block">{p.totalPieces || p.quantityBoxes * 12} Pcs</span>
+                          <span className="text-xs text-gray-500 font-semibold block">({p.quantityBoxes} Boxes)</span>
+                        </td>
+                        <td className="px-6 py-4 text-center">
+                          {isPendingStoreRoom && (
+                            <span className="px-3 py-1 rounded-full text-[11px] font-extrabold bg-amber-50 text-amber-800 border border-amber-300 inline-flex items-center gap-1">
+                              <Clock size={12} className="text-amber-600" /> Store Room Request Sent
+                            </span>
+                          )}
+                          {isDispatched && (
+                            <span className="px-3 py-1 rounded-full text-[11px] font-extrabold bg-blue-50 text-blue-800 border border-blue-300 inline-flex items-center gap-1">
+                              <Package size={12} className="text-blue-600" /> Stock Dispatched by Store Room
+                            </span>
+                          )}
+                          {isInProduction && (
+                            <span className="px-3 py-1 rounded-full text-[11px] font-extrabold bg-purple-50 text-purple-800 border border-purple-300 inline-flex items-center gap-1 animate-pulse">
+                              <Factory size={12} className="text-purple-600" /> In Production Run
+                            </span>
+                          )}
+                          {isCompleted && (
+                            <span className="px-3 py-1 rounded-full text-[11px] font-extrabold bg-emerald-50 text-emerald-800 border border-emerald-300 inline-flex items-center gap-1">
+                              <CheckCircle2 size={12} className="text-emerald-600" /> Production Completed ({p.producedPieces || p.totalPieces} Pcs)
+                            </span>
+                          )}
+                          {isSentToQc && (
+                            <span className="px-3 py-1 rounded-full text-[11px] font-extrabold bg-indigo-50 text-indigo-800 border border-indigo-300 inline-flex items-center gap-1">
+                              <ShieldCheck size={12} className="text-indigo-600" /> Sent to Finished Goods QC
+                            </span>
+                          )}
+                          {isQcApproved && (
+                            <span className="px-3 py-1 rounded-full text-[11px] font-extrabold bg-emerald-100 text-emerald-950 border border-emerald-400 inline-flex items-center gap-1">
+                              <CheckCircle2 size={12} className="text-emerald-700" /> QC Approved & Stock Inwarded
+                            </span>
+                          )}
+                        </td>
+                        <td className="px-6 py-4 text-center">
+                          {isPendingStoreRoom && (
+                            <span className="text-xs text-amber-700 font-semibold italic">Awaiting Store Room Dispatch</span>
+                          )}
+                          {isDispatched && (
+                            <button
+                              onClick={() => handleStartProduction(p._id, reqId)}
+                              disabled={submitting}
+                              className="px-3 py-1.5 text-xs font-extrabold rounded-xl bg-purple-600 hover:bg-purple-700 text-white transition-all shadow-sm flex items-center gap-1.5 mx-auto cursor-pointer"
+                            >
+                              <Factory size={14} /> Start Production
+                            </button>
+                          )}
+                          {isInProduction && (
+                            <button
+                              onClick={() => handleOpenCompleteModal(p)}
+                              disabled={submitting}
+                              className="px-3 py-1.5 text-xs font-extrabold rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white transition-all shadow-sm flex items-center gap-1.5 mx-auto cursor-pointer"
+                            >
+                              <CheckCircle2 size={14} /> Complete Production
+                            </button>
+                          )}
+                          {isCompleted && (
+                            <button
+                              onClick={() => handleSendToQc(p._id, reqId)}
+                              disabled={submitting}
+                              className="px-3 py-1.5 text-xs font-extrabold rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white transition-all shadow-sm flex items-center gap-1.5 mx-auto cursor-pointer"
+                            >
+                              <ArrowRight size={14} /> Send to QC
+                            </button>
+                          )}
+                          {(isSentToQc || isQcApproved) && (
+                            <span className="text-xs text-emerald-800 font-bold">Processed in QC Module</span>
+                          )}
+                        </td>
+                      </tr>
+
+                      {/* Expandable Materials Breakdown Drawer */}
+                      {isExpanded && (
+                        <tr className="bg-purple-50/40">
+                          <td colSpan="6" className="px-6 py-4">
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                              <div className="bg-white p-3 rounded-2xl border border-purple-200 space-y-1">
+                                <h5 className="text-[11px] font-black text-purple-950 uppercase tracking-wider">Allocated Raw Materials:</h5>
+                                <ul className="space-y-1 text-xs">
+                                  {p.rawMaterialsUsed?.map((rm, idx) => (
+                                    <li key={idx} className="flex justify-between border-b border-gray-100 py-1">
+                                      <span className="font-semibold text-gray-800">{rm.product?.name || 'Raw Material'}</span>
+                                      <span className="font-mono font-bold text-purple-900">{rm.quantityUsed} {rm.unitOfMeasure}</span>
+                                    </li>
+                                  ))}
+                                </ul>
+                              </div>
+
+                              <div className="bg-white p-3 rounded-2xl border border-indigo-200 space-y-1">
+                                <h5 className="text-[11px] font-black text-indigo-950 uppercase tracking-wider">Allocated Packaging Materials:</h5>
+                                <ul className="space-y-1 text-xs">
+                                  {p.packagingMaterialsUsed?.map((pkg, idx) => (
+                                    <li key={idx} className="flex justify-between border-b border-gray-100 py-1">
+                                      <span className="font-semibold text-gray-800">{pkg.product?.name || 'Packaging Item'}</span>
+                                      <span className="font-mono font-bold text-indigo-900">{pkg.quantityRequested} {pkg.unitOfMeasure}</span>
+                                    </li>
+                                  ))}
+                                </ul>
+                              </div>
+                            </div>
+                          </td>
+                        </tr>
                       )}
-                      {p.qcStatus === 'QC_PASSED' && (
-                        <span className="px-3 py-1 rounded-full text-[11px] font-extrabold bg-emerald-50 text-emerald-800 border border-emerald-300 inline-flex items-center gap-1">
-                          <CheckCircle2 size={12} /> QC PASSED • COLD ROOM
-                        </span>
-                      )}
-                      {p.qcStatus === 'QC_PARTIAL_DAMAGE' && (
-                        <span className="px-3 py-1 rounded-full text-[11px] font-extrabold bg-orange-50 text-orange-800 border border-orange-300 inline-flex items-center gap-1">
-                          <ShieldAlert size={12} /> {p.passedPieces || p.passedBoxes * (p.piecesPerBox || 12)} PCS PASSED / {p.damagedPieces || p.damagedBoxes * (p.piecesPerBox || 12)} PCS DAMAGED
-                        </span>
-                      )}
-                      {p.qcStatus === 'QC_REJECTED' && (
-                        <span className="px-3 py-1 rounded-full text-[11px] font-extrabold bg-rose-50 text-rose-800 border border-rose-300 inline-flex items-center gap-1">
-                          <X size={12} /> QC REJECTED
-                        </span>
-                      )}
-                    </td>
-                    <td className="px-6 py-4 text-center">
-                      {p.qcStatus === 'STORE_ROOM_PENDING_QC' ? (
-                        <button
-                          onClick={() => handleOpenQcModal(p)}
-                          className="px-3 py-1.5 text-xs font-extrabold rounded-lg bg-pink-500 text-white hover:bg-pink-600 transition-all shadow-sm inline-flex items-center gap-1.5"
-                        >
-                          <ShieldCheck size={14} /> Perform QC
-                        </button>
-                      ) : (
-                        <button
-                          onClick={() => handlePrintBatchSticker(p)}
-                          className="px-3 py-1.5 text-xs font-extrabold rounded-lg bg-white border border-[var(--color-primary)] text-[var(--color-primary)] hover:bg-pink-50 transition-all shadow-sm inline-flex items-center gap-1"
-                        >
-                          <QrCode size={14} /> Batch Sticker
-                        </button>
-                      )}
-                    </td>
-                  </tr>
-                ))}
+                    </React.Fragment>
+                  );
+                })}
                 {filteredProductions.length === 0 && (
                   <tr>
                     <td colSpan="8" className="px-6 py-10 text-center text-gray-500">
@@ -1232,148 +1303,61 @@ const ProductionList = () => {
         </form>
       </Modal>
 
-      {/* --- POPUP MODAL: FINISHED GOODS QC INSPECTION --- */}
-      {isQcModalOpen && selectedProductionForQc && (
-        <Modal isOpen={isQcModalOpen} onClose={() => setIsQcModalOpen(false)} title="Finished Goods Quality Control (QC Inspection)" size="xl">
-          <form onSubmit={handleSubmitQc} className="space-y-5">
-            <div className="p-4 bg-pink-50/60 border border-pink-200 rounded-2xl space-y-2">
+      {/* --- POPUP MODAL: COMPLETE PRODUCTION PHASE --- */}
+      {isCompleteModalOpen && selectedProdForCompletion && (
+        <Modal isOpen={isCompleteModalOpen} onClose={() => setIsCompleteModalOpen(false)} title="Complete Production Phase" size="md">
+          <form onSubmit={handleSubmitCompletion} className="space-y-4">
+            <div className="p-4 bg-purple-50 border border-purple-200 rounded-2xl space-y-1">
               <div className="flex justify-between items-center">
-                <span className="text-base font-extrabold text-gray-900">{selectedProductionForQc.finishedGoodProduct?.name}</span>
-                <span className="px-2.5 py-1 rounded bg-indigo-100 text-indigo-800 font-mono text-xs font-extrabold">
-                  {selectedProductionForQc.batchNumber}
+                <span className="text-base font-extrabold text-purple-950">{selectedProdForCompletion.finishedGoodProduct?.name}</span>
+                <span className="font-mono text-xs font-black text-purple-900 bg-white px-2 py-0.5 rounded border border-purple-300">
+                  ID: {selectedProdForCompletion.productionNumber || `PR-${selectedProdForCompletion._id.slice(-4)}`}
                 </span>
               </div>
-              <div className="text-xs text-gray-600 flex flex-wrap gap-4 font-semibold">
-                <span>Total Output: <strong>{selectedProductionForQc.quantityBoxes} Boxes ({selectedProductionForQc.totalPieces} Pcs)</strong></span>
-                <span>Config: <strong>1 Box = {selectedProductionForQc.piecesPerBox || 12} Pcs</strong></span>
-                <span>Storage Temp: <strong>{selectedProductionForQc.temperature} °C</strong></span>
+              <p className="text-xs text-purple-800 font-semibold">
+                Batch Code: <strong>{selectedProdForCompletion.batchNumber || 'BATCH-1'}</strong>
+              </p>
+            </div>
+
+            <div className="space-y-3">
+              <div className="space-y-1">
+                <label className="text-xs font-bold text-gray-500 uppercase tracking-wider block">Requested Output (Non-Editable)</label>
+                <input
+                  type="text"
+                  disabled
+                  value={`${selectedProdForCompletion.totalPieces || selectedProdForCompletion.quantityBoxes * 12} Pcs (${selectedProdForCompletion.quantityBoxes} Boxes)`}
+                  className="w-full bg-gray-200/80 border border-gray-300 rounded-xl px-3.5 py-2 text-xs font-mono font-black text-gray-700 cursor-not-allowed"
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-xs font-bold text-purple-900 uppercase tracking-wider block mb-1">Actual Produced Pieces Count (Pcs) *</label>
+                <input
+                  type="number"
+                  min="1"
+                  required
+                  value={actualProducedPieces}
+                  onChange={(e) => setActualProducedPieces(e.target.value)}
+                  placeholder="e.g. 480"
+                  className="w-full bg-white border-2 border-purple-300 rounded-xl px-3.5 py-2.5 text-sm font-mono font-black text-purple-950 focus:ring-2 focus:ring-purple-500/20"
+                />
               </div>
             </div>
 
-            {/* Support Piece-Level & Box-Level Precision */}
-            <div className="space-y-3 p-4 bg-gray-50/80 rounded-2xl border border-gray-200">
-              <span className="text-xs font-bold text-gray-700 uppercase tracking-wider block">QC Rejection & Damage Entry:</span>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-1">
-                  <label className="text-xs font-bold text-rose-700 uppercase tracking-wider block mb-1">Damaged Pieces (Pcs) *</label>
-                  <div className="relative">
-                    <input
-                      type="number"
-                      min="0"
-                      step="any"
-                      max={selectedProductionForQc.totalPieces}
-                      required
-                      value={qcForm.damagedPieces}
-                      onChange={(e) => {
-                        const dPcs = parseFloat(e.target.value) || 0;
-                        const pPcs = Math.max(0, selectedProductionForQc.totalPieces - dPcs);
-                        const pPerBox = selectedProductionForQc.piecesPerBox || 12;
-                        setQcForm({ 
-                          ...qcForm, 
-                          damagedPieces: dPcs, 
-                          passedPieces: pPcs,
-                          damagedBoxes: Number((dPcs / pPerBox).toFixed(2)),
-                          passedBoxes: Number((pPcs / pPerBox).toFixed(2))
-                        });
-                      }}
-                      className={`${customInputStyle} font-mono font-bold text-rose-700 pr-12`}
-                      placeholder="0"
-                    />
-                    <span className="absolute right-3 top-1/2 -translate-y-1/2 font-mono text-xs font-bold text-rose-700">Pcs</span>
-                  </div>
-                </div>
-
-                <div className="space-y-1">
-                  <label className="text-xs font-bold text-gray-600 uppercase tracking-wider block mb-1">Or Damaged Full Boxes</label>
-                  <div className="relative">
-                    <input
-                      type="number"
-                      min="0"
-                      step="any"
-                      max={selectedProductionForQc.quantityBoxes}
-                      value={qcForm.damagedBoxes}
-                      onChange={(e) => {
-                        const dBoxes = parseFloat(e.target.value) || 0;
-                        const pPerBox = selectedProductionForQc.piecesPerBox || 12;
-                        const dPcs = dBoxes * pPerBox;
-                        const pPcs = Math.max(0, selectedProductionForQc.totalPieces - dPcs);
-                        setQcForm({ 
-                          ...qcForm, 
-                          damagedBoxes: dBoxes, 
-                          damagedPieces: dPcs,
-                          passedPieces: pPcs,
-                          passedBoxes: Number((pPcs / pPerBox).toFixed(2))
-                        });
-                      }}
-                      className={`${customInputStyle} font-mono font-bold text-gray-700 pr-14`}
-                      placeholder="0"
-                    />
-                    <span className="absolute right-3 top-1/2 -translate-y-1/2 font-mono text-xs font-bold text-gray-500">Boxes</span>
-                  </div>
-                </div>
-              </div>
-
-              {qcForm.damagedPieces > 0 && (
-                <div className="space-y-1 pt-2">
-                  <label className="text-xs font-bold text-rose-700 uppercase tracking-wider block mb-1">Rejection / Damage Reason *</label>
-                  <select
-                    value={qcForm.damageReason}
-                    onChange={(e) => setQcForm({ ...qcForm, damageReason: e.target.value })}
-                    className="w-full bg-white border border-rose-300 rounded-xl px-4 py-2.5 text-xs font-bold text-rose-900 focus:outline-none focus:ring-2 focus:ring-rose-500/20"
-                  >
-                    <option value="Melted / Temperature Fluctuated">Melted / Temperature Fluctuated</option>
-                    <option value="Defective Packaging / Tear">Defective Packaging / Tear</option>
-                    <option value="Flavor / Texture Discrepancy">Flavor / Texture Discrepancy</option>
-                    <option value="Weight Under-specification">Weight Under-specification</option>
-                    <option value="Damaged during Handling">Damaged during Handling</option>
-                  </select>
-                </div>
-              )}
-            </div>
-
-            <div className="space-y-1">
-              <label className="text-xs font-bold text-gray-600 uppercase tracking-wider block mb-1">QC Inspector Remarks</label>
-              <input
-                type="text"
-                value={qcForm.remarks}
-                onChange={(e) => setQcForm({ ...qcForm, remarks: e.target.value })}
-                placeholder="QC checklist notes & findings"
-                className={customInputStyle}
-              />
-            </div>
-
-            {/* Calculation Breakdown Panel */}
-            <div className="grid grid-cols-2 gap-3 p-3 bg-gray-50 border border-gray-200 rounded-2xl text-xs font-semibold">
-              <div className="p-3 bg-emerald-50/80 rounded-xl border border-emerald-200 text-emerald-900 space-y-0.5">
-                <span className="text-[10px] font-bold text-emerald-800 uppercase tracking-wider block">🟢 Passed to Cold Room Sales:</span>
-                <span className="text-sm font-extrabold font-mono text-emerald-700 block">
-                  {qcForm.passedPieces} Pcs ({Math.floor(qcForm.passedPieces / (selectedProductionForQc.piecesPerBox || 12))} Boxes + {qcForm.passedPieces % (selectedProductionForQc.piecesPerBox || 12)} Loose Pcs)
-                </span>
-              </div>
-
-              <div className="p-3 bg-rose-50/80 rounded-xl border border-rose-200 text-rose-900 space-y-0.5">
-                <span className="text-[10px] font-bold text-rose-800 uppercase tracking-wider block">🔴 Damaged to Rejected Stock:</span>
-                <span className="text-sm font-extrabold font-mono text-rose-700 block">
-                  {qcForm.damagedPieces} Pcs ({Math.floor(qcForm.damagedPieces / (selectedProductionForQc.piecesPerBox || 12))} Boxes + {qcForm.damagedPieces % (selectedProductionForQc.piecesPerBox || 12)} Loose Pcs)
-                </span>
-              </div>
-            </div>
-
-            <div className="flex justify-end gap-3 pt-4 border-t border-gray-200">
+            <div className="flex justify-end gap-3 pt-3 border-t border-gray-200">
               <button
                 type="button"
-                onClick={() => setIsQcModalOpen(false)}
-                className="px-4 py-2 text-xs font-bold text-gray-600 hover:text-gray-900"
+                onClick={() => setIsCompleteModalOpen(false)}
+                className="px-4 py-2 text-xs font-bold text-gray-600 hover:text-gray-900 cursor-pointer"
               >
                 Cancel
               </button>
               <button
                 type="submit"
                 disabled={submitting}
-                className="bg-emerald-600 hover:bg-emerald-700 text-white px-6 py-2.5 rounded-xl text-xs font-extrabold transition-all shadow-md disabled:opacity-50 flex items-center gap-2"
+                className="bg-emerald-600 hover:bg-emerald-700 text-white px-6 py-2.5 rounded-xl text-xs font-extrabold transition-all shadow-md disabled:opacity-50 flex items-center gap-2 cursor-pointer"
               >
-                <ShieldCheck size={16} /> Complete QC & Inward to Cold Room
+                <CheckCircle2 size={16} /> Complete & Save Produced Output
               </button>
             </div>
           </form>

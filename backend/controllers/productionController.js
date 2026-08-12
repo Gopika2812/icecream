@@ -258,6 +258,179 @@ exports.dispatchStock = async (req, res) => {
     }
 };
 
+// @desc    Start Production Execution (Store Room stock has been dispatched)
+// @route   POST /api/v1/production/:id/start-production
+// @access  Private
+exports.startProduction = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const production = await Production.findById(id);
+        if (!production) return res.status(404).json({ success: false, message: 'Production Requisition not found.' });
+
+        production.status = 'IN_PRODUCTION';
+        production.startedAt = new Date();
+        production.startedBy = req.user?._id;
+        await production.save();
+
+        res.json({ success: true, message: `Production started for Batch ${production.productionNumber || 'PR-01'}!`, data: production });
+    } catch (error) {
+        res.status(500).json({ success: false, message: error.message });
+    }
+};
+
+// @desc    Complete Production Phase & Log Actual Produced Pieces Output
+// @route   POST /api/v1/production/:id/complete-production
+// @access  Private
+exports.completeProduction = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { actualProducedPieces } = req.body;
+
+        const production = await Production.findById(id);
+        if (!production) return res.status(404).json({ success: false, message: 'Production batch not found.' });
+
+        const pPcs = parseInt(actualProducedPieces) || production.totalPieces || 0;
+        const pPerBox = parseInt(production.piecesPerBox) || 12;
+        const pBoxes = Number((pPcs / pPerBox).toFixed(2));
+
+        production.producedPieces = pPcs;
+        production.producedBoxes = pBoxes;
+        production.status = 'PRODUCTION_COMPLETED';
+        production.completedAt = new Date();
+        production.completedBy = req.user?._id;
+        await production.save();
+
+        res.json({ success: true, message: `Production completed with ${pPcs} Pcs output! Ready to send to QC.`, data: production });
+    } catch (error) {
+        res.status(500).json({ success: false, message: error.message });
+    }
+};
+
+// @desc    Send Production Batch to QC Inspection Module
+// @route   POST /api/v1/production/:id/send-to-qc
+// @access  Private
+exports.sendToQc = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const production = await Production.findById(id);
+        if (!production) return res.status(404).json({ success: false, message: 'Production batch not found.' });
+
+        production.status = 'SENT_TO_QC';
+        production.sentToQcAt = new Date();
+        await production.save();
+
+        res.json({ success: true, message: `Batch ${production.productionNumber} sent to Finished Goods QC!`, data: production });
+    } catch (error) {
+        res.status(500).json({ success: false, message: error.message });
+    }
+};
+
+// @desc    Perform Finished Goods QC Inspection, Generate Per-Box QRs & Inward to Finished Goods Stock
+// @route   POST /api/v1/production/:id/approve-qc
+// @access  Private
+exports.approveFinishedGoodsQC = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { damagedPieces, damageReason, remarks } = req.body;
+
+        const prod = await Production.findById(id);
+        if (!prod) return res.status(404).json({ success: false, message: 'Production batch not found.' });
+
+        const fgProductObj = await Product.findById(prod.finishedGoodProduct);
+        if (!fgProductObj) return res.status(404).json({ success: false, message: 'Finished Good Product record not found.' });
+
+        const pPerBox = parseInt(prod.piecesPerBox) || 12;
+        const totalProduced = parseInt(prod.producedPieces) || parseInt(prod.totalPieces) || 0;
+        const dPcs = Math.max(0, parseInt(damagedPieces) || 0);
+        const passedPcs = Math.max(0, totalProduced - dPcs);
+        const passedBoxes = Math.floor(passedPcs / pPerBox);
+        const loosePcs = passedPcs % pPerBox;
+
+        const qcIdCode = `QC-${Date.now().toString().slice(-6)}`;
+        const prodIdCode = prod.productionNumber || `PR-${id.slice(-4)}`;
+
+        // 1. Inward Approved Passed Stock into Finished Goods Inventory
+        const fgSellingPrice = parseFloat(prod.sellingPrice) || fgProductObj.wholesalePrice || 0;
+        const fgMrp = parseFloat(prod.mrp) || fgProductObj.mrp || 0;
+
+        await Inventory.findOneAndUpdate(
+            {
+                product: fgProductObj._id || fgProductObj.id,
+                inventoryType: 'Finished Goods',
+                batchNumber: prod.batchNumber || 'BATCH-1'
+            },
+            {
+                $inc: { quantity: passedPcs },
+                $set: {
+                    purchasePrice: fgSellingPrice,
+                    mrp: fgMrp,
+                    temperature: prod.temperature || -18,
+                    lastUpdated: Date.now()
+                }
+            },
+            { new: true, upsert: true }
+        );
+
+        // 2. Log Finished Goods Inward Inventory Transaction
+        await InventoryTransaction.create({
+            branch: prod.branch,
+            product: fgProductObj._id || fgProductObj.id,
+            inventoryType: 'Finished Goods',
+            batchNumber: prod.batchNumber || 'BATCH-1',
+            transactionType: 'IN',
+            quantity: passedPcs,
+            referenceType: 'PRODUCTION_QC',
+            remarks: `QC Approved Finished Goods (${passedPcs} Pcs = ${passedBoxes} Boxes + ${loosePcs} Loose Pcs). Production ID: ${prodIdCode}, QC ID: ${qcIdCode}`,
+            performedBy: req.user?._id
+        });
+
+        // 3. Generate Per-Box QR Code Payloads List
+        const boxQrStickers = [];
+        const totalBoxesToGenerate = passedBoxes + (loosePcs > 0 ? 1 : 0);
+        for (let b = 1; b <= totalBoxesToGenerate; b++) {
+            const isPartialBox = b === totalBoxesToGenerate && loosePcs > 0;
+            const pcsInThisBox = isPartialBox ? loosePcs : pPerBox;
+            boxQrStickers.push({
+                boxIndex: b,
+                totalBoxes: totalBoxesToGenerate,
+                qrCodeText: JSON.stringify({
+                    brand: 'SRI SARAVANAA ERP',
+                    productionId: prodIdCode,
+                    qcId: qcIdCode,
+                    batchNumber: prod.batchNumber || 'BATCH-1',
+                    product: fgProductObj.name,
+                    itemCode: fgProductObj.itemCode,
+                    boxNumber: `${b} / ${totalBoxesToGenerate}`,
+                    piecesInBox: pcsInThisBox,
+                    mfgDate: new Date().toISOString().split('T')[0]
+                })
+            });
+        }
+
+        prod.qcId = qcIdCode;
+        prod.damagedPieces = dPcs;
+        prod.passedPieces = passedPcs;
+        prod.passedBoxes = passedBoxes;
+        prod.damageReason = damageReason || 'None';
+        prod.qcInspectorRemarks = remarks || 'QC Inspection Approved';
+        prod.qcStatus = 'PASSED';
+        prod.status = 'QC_APPROVED';
+        prod.qcApprovedAt = new Date();
+        prod.qcApprovedBy = req.user?._id;
+        prod.boxQrStickers = boxQrStickers;
+        await prod.save();
+
+        res.json({
+            success: true,
+            message: `QC Approved successfully for Production ID ${prodIdCode}! Inwarded ${passedPcs} Pcs to Finished Goods Inventory and generated ${boxQrStickers.length} Box QR stickers.`,
+            data: prod
+        });
+    } catch (error) {
+        console.error('Error approving QC', error);
+        res.status(500).json({ success: false, message: error.message });
+    }
+};
+
 // @desc    Perform Finished Goods QC Inspection (Supports Piece-level & Box-level damage precision)
 // @route   POST /api/v1/production/:id/qc
 // @access  Private
