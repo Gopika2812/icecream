@@ -5,6 +5,8 @@ import {
 } from 'lucide-react';
 
 const StoreRoomRequisitions = () => {
+  const [productions, setProductions] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [products, setProducts] = useState([]);
   const [dispatchingId, setDispatchingId] = useState(null);
 
