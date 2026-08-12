@@ -13,15 +13,61 @@ exports.getProductionBatches = async (req, res) => {
         let query = {};
         if (branchId) query.branch = branchId;
 
-        const productions = await Production.find(query)
-            .populate('branch', 'branchName branchCode')
-            .populate('finishedGoodProduct', 'name itemCode category unitOfMeasure piecesPerBox mrp wholesalePrice')
-            .populate('rawMaterialsUsed.product', 'name itemCode unitOfMeasure')
-            .populate('performedBy', 'name')
-            .populate('qcInspector', 'name')
-            .sort({ createdAt: -1 });
+        const productions = await Production.find(query);
+        const products = await Product.find({});
+        const productMap = {};
+        products.forEach(p => {
+            const pId = p._id || p.id;
+            if (pId) productMap[pId.toString()] = p;
+        });
 
-        res.json({ success: true, data: productions });
+        const enrichedProductions = productions.map(prod => {
+            const pObj = typeof prod.toObject === 'function' ? prod.toObject() : { ...prod };
+            
+            // Resolve finishedGoodProduct
+            const fgId = pObj.finishedGoodProduct?._id || pObj.finishedGoodProduct;
+            if (fgId && productMap[fgId.toString()]) {
+                pObj.finishedGoodProduct = productMap[fgId.toString()];
+            }
+            
+            // Resolve rawMaterialsUsed
+            if (Array.isArray(pObj.rawMaterialsUsed)) {
+                pObj.rawMaterialsUsed = pObj.rawMaterialsUsed.map(rm => {
+                    const prodId = rm.product?._id || rm.product;
+                    const prodDetails = prodId ? productMap[prodId.toString()] : null;
+                    return {
+                        ...rm,
+                        product: prodDetails ? { 
+                            _id: prodDetails._id, 
+                            name: prodDetails.name, 
+                            itemCode: prodDetails.itemCode, 
+                            unitOfMeasure: prodDetails.unitOfMeasure 
+                        } : (typeof rm.product === 'object' ? rm.product : { name: rm.productName || 'Raw Material' })
+                    };
+                });
+            }
+
+            // Resolve packagingMaterialsUsed
+            if (Array.isArray(pObj.packagingMaterialsUsed)) {
+                pObj.packagingMaterialsUsed = pObj.packagingMaterialsUsed.map(pkg => {
+                    const prodId = pkg.product?._id || pkg.product;
+                    const prodDetails = prodId ? productMap[prodId.toString()] : null;
+                    return {
+                        ...pkg,
+                        product: prodDetails ? { 
+                            _id: prodDetails._id, 
+                            name: prodDetails.name, 
+                            itemCode: prodDetails.itemCode, 
+                            unitOfMeasure: prodDetails.unitOfMeasure 
+                        } : (typeof pkg.product === 'object' ? pkg.product : { name: pkg.productName || 'Packaging Item' })
+                    };
+                });
+            }
+
+            return pObj;
+        });
+
+        res.json({ success: true, data: enrichedProductions });
     } catch (error) {
         res.status(500).json({ success: false, message: error.message });
     }
@@ -71,7 +117,7 @@ exports.createProductionBatch = async (req, res) => {
 
         // Auto-generate Production Number (e.g. PR-01, PR-02) & Batch Code
         const totalBatches = await Production.countDocuments();
-        const productionNumber = req.body.productionNumber || `PR-${(totalBatches + 1).toString().padStart(2, '0')}`;
+        const productionNumber = `PR-${(totalBatches + 1).toString().padStart(2, '0')}`;
         const batchNumber = req.body.batchNumber || `BATCH-${totalBatches + 1}`;
 
         // Verify Finished Good Product
@@ -87,6 +133,7 @@ exports.createProductionBatch = async (req, res) => {
                     const rmProd = await Product.findById(rm.product);
                     processedRawMaterials.push({
                         product: rm.product,
+                        productName: rmProd ? rmProd.name : '',
                         batchNumber: rm.batchNumber || 'STORE-RM',
                         quantityUsed: qtyUsed,
                         unitOfMeasure: rmProd ? rmProd.unitOfMeasure : 'Units'
@@ -104,6 +151,7 @@ exports.createProductionBatch = async (req, res) => {
                     const pkgProd = await Product.findById(pkg.product);
                     processedPackagingMaterials.push({
                         product: pkg.product,
+                        productName: pkgProd ? pkgProd.name : '',
                         quantityRequested: qtyReq,
                         unitOfMeasure: pkgProd ? pkgProd.unitOfMeasure : 'Pcs'
                     });

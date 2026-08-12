@@ -115,6 +115,14 @@ const ProductionList = () => {
     }
   };
 
+  const getProductName = (prodRef, defaultFallback) => {
+    if (!prodRef) return defaultFallback;
+    if (typeof prodRef === 'object' && prodRef.name) return prodRef.name;
+    const prodId = typeof prodRef === 'object' ? (prodRef._id || prodRef.id) : prodRef;
+    const found = products.find(p => (p._id || p.id) === prodId);
+    return found ? found.name : defaultFallback;
+  };
+
   useEffect(() => {
     fetchInitialData();
   }, []);
@@ -764,7 +772,7 @@ const ProductionList = () => {
                                 <ul className="space-y-1 text-xs">
                                   {p.rawMaterialsUsed?.map((rm, idx) => (
                                     <li key={idx} className="flex justify-between border-b border-gray-100 py-1">
-                                      <span className="font-semibold text-gray-800">{rm.product?.name || 'Raw Material'}</span>
+                                      <span className="font-extrabold text-purple-950">{getProductName(rm.product, rm.productName || 'Raw Material')}</span>
                                       <span className="font-mono font-bold text-purple-900">{rm.quantityUsed} {rm.unitOfMeasure}</span>
                                     </li>
                                   ))}
@@ -776,7 +784,7 @@ const ProductionList = () => {
                                 <ul className="space-y-1 text-xs">
                                   {p.packagingMaterialsUsed?.map((pkg, idx) => (
                                     <li key={idx} className="flex justify-between border-b border-gray-100 py-1">
-                                      <span className="font-semibold text-gray-800">{pkg.product?.name || 'Packaging Item'}</span>
+                                      <span className="font-extrabold text-indigo-950">{getProductName(pkg.product, pkg.productName || 'Packaging Item')}</span>
                                       <span className="font-mono font-bold text-indigo-900">{pkg.quantityRequested} {pkg.unitOfMeasure}</span>
                                     </li>
                                   ))}

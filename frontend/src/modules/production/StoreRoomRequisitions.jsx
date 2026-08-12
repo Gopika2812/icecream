@@ -5,8 +5,7 @@ import {
 } from 'lucide-react';
 
 const StoreRoomRequisitions = () => {
-  const [productions, setProductions] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [products, setProducts] = useState([]);
   const [dispatchingId, setDispatchingId] = useState(null);
 
   useEffect(() => {
@@ -16,13 +15,25 @@ const StoreRoomRequisitions = () => {
   const fetchRequisitions = async () => {
     try {
       setLoading(true);
-      const res = await api.get('/production');
-      setProductions(res.data?.data || []);
+      const [prodRes, productsRes] = await Promise.all([
+        api.get('/production'),
+        api.get('/products')
+      ]);
+      setProductions(prodRes.data?.data || []);
+      setProducts(productsRes.data?.data || []);
     } catch (err) {
       console.error('Failed to fetch store room requisitions', err);
     } finally {
       setLoading(false);
     }
+  };
+
+  const getProductName = (prodRef, defaultFallback) => {
+    if (!prodRef) return defaultFallback;
+    if (typeof prodRef === 'object' && prodRef.name) return prodRef.name;
+    const prodId = typeof prodRef === 'object' ? (prodRef._id || prodRef.id) : prodRef;
+    const found = products.find(p => (p._id || p.id) === prodId);
+    return found ? found.name : defaultFallback;
   };
 
   const handleDispatchStock = async (id, prodNumber) => {
@@ -140,9 +151,9 @@ const StoreRoomRequisitions = () => {
                     {prod.rawMaterialsUsed?.length > 0 ? (
                       <ul className="space-y-1.5 text-xs">
                         {prod.rawMaterialsUsed.map((rm, idx) => (
-                          <li key={idx} className="flex justify-between items-center bg-white p-2 rounded-xl border border-purple-100">
-                            <span className="font-bold text-gray-800">{rm.product?.name || 'Raw Material Item'}</span>
-                            <span className="font-mono font-extrabold text-purple-900">
+                          <li key={idx} className="flex justify-between items-center bg-white p-2.5 rounded-xl border border-purple-100 shadow-sm">
+                            <span className="font-extrabold text-purple-950">{getProductName(rm.product, rm.productName || 'Raw Material')}</span>
+                            <span className="font-mono font-black text-purple-900 bg-purple-50 px-2 py-0.5 rounded-lg border border-purple-200">
                               {rm.quantityUsed} {rm.unitOfMeasure || rm.product?.unitOfMeasure}
                             </span>
                           </li>
@@ -161,9 +172,9 @@ const StoreRoomRequisitions = () => {
                     {prod.packagingMaterialsUsed?.length > 0 ? (
                       <ul className="space-y-1.5 text-xs">
                         {prod.packagingMaterialsUsed.map((pkg, idx) => (
-                          <li key={idx} className="flex justify-between items-center bg-white p-2 rounded-xl border border-indigo-100">
-                            <span className="font-bold text-gray-800">{pkg.product?.name || 'Packaging Item'}</span>
-                            <span className="font-mono font-extrabold text-indigo-900">
+                          <li key={idx} className="flex justify-between items-center bg-white p-2.5 rounded-xl border border-indigo-100 shadow-sm">
+                            <span className="font-extrabold text-indigo-950">{getProductName(pkg.product, pkg.productName || 'Packaging Item')}</span>
+                            <span className="font-mono font-black text-indigo-900 bg-indigo-50 px-2 py-0.5 rounded-lg border border-indigo-200">
                               {pkg.quantityRequested} {pkg.unitOfMeasure || pkg.product?.unitOfMeasure}
                             </span>
                           </li>
