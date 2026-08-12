@@ -157,15 +157,31 @@ exports.createProductionBatch = async (req, res) => {
             if (totalPieces <= 0) return res.status(400).json({ success: false, message: 'Valid Target Output in Pcs is required.' });
         }
 
-        // Process Raw Materials Array
+        // STRICT STORE ROOM STOCK VALIDATION FOR RAW MATERIALS
         const processedRawMaterials = [];
         if (Array.isArray(rawMaterialsUsed)) {
             for (const rm of rawMaterialsUsed) {
                 const qtyUsed = parseFloat(rm.quantityUsed) || 0;
                 if (qtyUsed > 0 && rm.product) {
-                    const rmProd = await Product.findById(rm.product);
+                    const rmProdId = rm.product._id || rm.product;
+                    const rmProd = await Product.findById(rmProdId);
+                    const rmName = rmProd ? rmProd.name : 'Raw Material';
+
+                    const rmInv = await Inventory.findOne({
+                        product: rmProdId,
+                        inventoryType: 'Store Room'
+                    });
+
+                    const availQty = rmInv ? (parseFloat(rmInv.quantity) || 0) : 0;
+                    if (availQty < qtyUsed) {
+                        return res.status(400).json({
+                            success: false,
+                            message: `Cannot submit requisition: Raw Material "${rmName}" is OUT OF STOCK / Insufficient in Store Room! (Available Stock: ${availQty} ${rmProd?.unitOfMeasure || ''}, Requested: ${qtyUsed}). Submission blocked!`
+                        });
+                    }
+
                     processedRawMaterials.push({
-                        product: rm.product,
+                        product: rmProdId,
                         productName: rmProd ? rmProd.name : '',
                         batchNumber: rm.batchNumber || 'STORE-RM',
                         quantityUsed: qtyUsed,
@@ -175,15 +191,31 @@ exports.createProductionBatch = async (req, res) => {
             }
         }
 
-        // Process Packaging Materials Array
+        // STRICT STORE ROOM STOCK VALIDATION FOR PACKAGING MATERIALS
         const processedPackagingMaterials = [];
         if (Array.isArray(packagingMaterialsUsed)) {
             for (const pkg of packagingMaterialsUsed) {
                 const qtyReq = parseFloat(pkg.quantityRequested) || 0;
                 if (qtyReq > 0 && pkg.product) {
-                    const pkgProd = await Product.findById(pkg.product);
+                    const pkgProdId = pkg.product._id || pkg.product;
+                    const pkgProd = await Product.findById(pkgProdId);
+                    const pkgName = pkgProd ? pkgProd.name : 'Packaging Material';
+
+                    const pkgInv = await Inventory.findOne({
+                        product: pkgProdId,
+                        inventoryType: 'Store Room'
+                    });
+
+                    const availQty = pkgInv ? (parseFloat(pkgInv.quantity) || 0) : 0;
+                    if (availQty < qtyReq) {
+                        return res.status(400).json({
+                            success: false,
+                            message: `Cannot submit requisition: Packaging Material "${pkgName}" is OUT OF STOCK / Insufficient in Store Room! (Available Stock: ${availQty} ${pkgProd?.unitOfMeasure || ''}, Requested: ${qtyReq}). Submission blocked!`
+                        });
+                    }
+
                     processedPackagingMaterials.push({
-                        product: pkg.product,
+                        product: pkgProdId,
                         productName: pkgProd ? pkgProd.name : '',
                         quantityRequested: qtyReq,
                         unitOfMeasure: pkgProd ? pkgProd.unitOfMeasure : 'Pcs'
@@ -192,15 +224,31 @@ exports.createProductionBatch = async (req, res) => {
             }
         }
 
-        // Process Essence / Fruits / Nuts / Add-ons Array
+        // STRICT STORE ROOM STOCK VALIDATION FOR ESSENCE / INCLUSIONS
         const processedEssenceMaterials = [];
         if (Array.isArray(essenceMaterialsUsed)) {
             for (const ess of essenceMaterialsUsed) {
                 const qtyReq = parseFloat(ess.quantityRequested) || 0;
                 if (qtyReq > 0 && ess.product) {
-                    const essProd = await Product.findById(ess.product);
+                    const essProdId = ess.product._id || ess.product;
+                    const essProd = await Product.findById(essProdId);
+                    const essName = essProd ? essProd.name : 'Essence / Add-on Item';
+
+                    const essInv = await Inventory.findOne({
+                        product: essProdId,
+                        inventoryType: 'Store Room'
+                    });
+
+                    const availQty = essInv ? (parseFloat(essInv.quantity) || 0) : 0;
+                    if (availQty < qtyReq) {
+                        return res.status(400).json({
+                            success: false,
+                            message: `Cannot submit requisition: Item "${essName}" is OUT OF STOCK / Insufficient in Store Room! (Available Stock: ${availQty} ${essProd?.unitOfMeasure || ''}, Requested: ${qtyReq}). Submission blocked!`
+                        });
+                    }
+
                     processedEssenceMaterials.push({
-                        product: ess.product,
+                        product: essProdId,
                         productName: essProd ? essProd.name : '',
                         quantityRequested: qtyReq,
                         unitOfMeasure: essProd ? essProd.unitOfMeasure : 'Units'

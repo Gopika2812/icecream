@@ -159,6 +159,14 @@ const ProductionList = () => {
     const prodId = typeof prodRef === 'object' ? (prodRef._id || prodRef.id) : prodRef;
     const found = products.find(p => (p._id || p.id) === prodId);
     return found ? found.name : defaultFallback;
+  const getStoreRoomAvailableStock = (productId) => {
+    if (!productId) return 0;
+    const prodIdStr = typeof productId === 'object' ? (productId._id || productId.id) : productId.toString();
+    const inv = rawMaterialStock.find(i => {
+      const pId = typeof i.product === 'object' ? (i.product?._id || i.product?.id) : i.product;
+      return pId?.toString() === prodIdStr && (i.inventoryType === 'Store Room' || i.inventoryType === 'Factory');
+    });
+    return inv ? (parseFloat(inv.quantity) || 0) : 0;
   };
 
   useEffect(() => {
@@ -369,6 +377,21 @@ const ProductionList = () => {
     } else {
       if (!formData.finishedGoodProduct) return alert('Please select a finished good product.');
       if (!formData.quantityBoxes || parseFloat(formData.quantityBoxes) <= 0) return alert('Please enter target output in Pcs/Boxes.');
+    }
+
+    // STRICT STORE ROOM STOCK VALIDATION BEFORE SUBMISSION
+    if (Array.isArray(formData.rawMaterialsUsed)) {
+      for (const rm of formData.rawMaterialsUsed) {
+        const qtyNeeded = parseFloat(rm.quantityUsed) || 0;
+        if (qtyNeeded > 0 && rm.product) {
+          const avail = getStoreRoomAvailableStock(rm.product);
+          if (avail < qtyNeeded) {
+            const matObj = rawMaterials.find(m => m._id === rm.product);
+            const matName = matObj ? matObj.name : 'Raw Material';
+            return alert(`🔴 SUBMISSION BLOCKED: "${matName}" is OUT OF STOCK / Insufficient in Store Room! (Available Stock: ${avail} ${matObj?.unitOfMeasure || ''}, Requested: ${qtyNeeded}). Please send restock reminder to Super Admin & Purchase Team!`);
+          }
+        }
+      }
     }
 
     try {
@@ -627,7 +650,7 @@ const ProductionList = () => {
   };
 
   return (
-    <div>
+    <div className="p-6 space-y-6">
       {/* Header Bar */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
         <div>
@@ -1183,6 +1206,29 @@ const ProductionList = () => {
                         }))}
                         onChange={(val) => handleRawMaterialChange(idx, 'product', val)}
                       />
+                      {selectedMat && (() => {
+                        const availStock = getStoreRoomAvailableStock(rm.product);
+                        const isShortage = availStock < (parseFloat(rm.quantityUsed) || 0);
+
+                        return (
+                          <div className="mt-1 flex items-center justify-between text-[10px] font-bold">
+                            <span className="text-gray-500">Store Room Balance:</span>
+                            {availStock <= 0 ? (
+                              <span className="px-2 py-0.5 rounded-md bg-rose-100 text-rose-900 font-black border border-rose-300 flex items-center gap-1 animate-pulse">
+                                🔴 OUT OF STOCK (0 {uom})
+                              </span>
+                            ) : isShortage ? (
+                              <span className="px-2 py-0.5 rounded-md bg-amber-100 text-amber-900 font-black border border-amber-300 flex items-center gap-1">
+                                ⚠️ INSUFFICIENT (Avail: {availStock} {uom})
+                              </span>
+                            ) : (
+                              <span className="px-2 py-0.5 rounded-md bg-emerald-100 text-emerald-900 font-black border border-emerald-300">
+                                🟢 Available ({availStock} {uom})
+                              </span>
+                            )}
+                          </div>
+                        );
+                      })()}
                     </div>
 
                     <div className="w-48">
@@ -1558,6 +1604,7 @@ const ProductionList = () => {
       )}
     </div>
   );
+};
 };
 
 export default ProductionList;
