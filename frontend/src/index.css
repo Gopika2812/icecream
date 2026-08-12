@@ -115,15 +115,19 @@ thead th {
   scrollbar-width: none;
 }
 
-/* --- PRINT OPTIMIZATION FOR BOX QR CODE STICKER SHEETS --- */
+/* --- PRINT OPTIMIZATION FOR DEDICATED STICKER SHEETS --- */
 @media print {
-  body {
+  html, body {
+    overflow: visible !important;
+    height: auto !important;
+    min-height: 0 !important;
     background: #ffffff !important;
-    background-image: none !important;
-    color: #000000 !important;
+    margin: 0 !important;
+    padding: 0 !important;
   }
 
-  /* Hide all background elements, sidebars, modal headers, action buttons during printing */
+  /* Hide normal web app UI, sidebars, headers, modals, backdrops during printing */
+  #root,
   .no-print,
   button,
   header,
@@ -132,40 +136,35 @@ thead th {
     display: none !important;
   }
 
-  /* Modal container reset for printing */
-  .printable-qr-modal-wrapper {
-    position: static !important;
+  /* Display ONLY the dedicated printable sticker area */
+  #printable-sticker-area {
+    display: block !important;
+    position: absolute !important;
     top: 0 !important;
     left: 0 !important;
     width: 100% !important;
     height: auto !important;
-    max-height: none !important;
     overflow: visible !important;
-    background: white !important;
-    box-shadow: none !important;
-    border: none !important;
-    padding: 0 !important;
+    background: #ffffff !important;
+    padding: 10px !important;
     margin: 0 !important;
   }
 
-  .printable-qr-sheet-grid {
+  .printable-sticker-grid {
     display: grid !important;
     grid-template-columns: repeat(3, 1fr) !important;
     gap: 12px !important;
-    max-height: none !important;
+    width: 100% !important;
     height: auto !important;
     overflow: visible !important;
-    padding: 0 !important;
-    margin: 0 !important;
-    width: 100% !important;
   }
 
   .qr-sticker-card {
-    page-break-inside: avoid !important;
     break-inside: avoid !important;
-    border: 1.5px dashed #333333 !important;
-    box-shadow: none !important;
+    page-break-inside: avoid !important;
+    border: 1.5px dashed #000000 !important;
     background: #ffffff !important;
+    box-shadow: none !important;
     margin-bottom: 4px !important;
   }
 }
