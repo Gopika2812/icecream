@@ -55,6 +55,12 @@ const ProductionList = () => {
     remarks: ''
   });
 
+  // Production Execution & Completion Modal State
+  const [expandedRowId, setExpandedRowId] = useState(null);
+  const [isCompleteModalOpen, setIsCompleteModalOpen] = useState(false);
+  const [selectedProdForCompletion, setSelectedProdForCompletion] = useState(null);
+  const [actualProducedPieces, setActualProducedPieces] = useState('');
+
   // Box QR Generation Modal State
   const [isQrModalOpen, setIsQrModalOpen] = useState(false);
   const [currentQrStickers, setCurrentQrStickers] = useState([]);
