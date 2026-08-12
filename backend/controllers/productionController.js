@@ -331,22 +331,42 @@ exports.dispatchStock = async (req, res) => {
         const prodIdCode = production.productionNumber || `PR-${id.slice(-4)}`;
         const isMixReq = production.requisitionType === 'MIX_REQUISITION';
 
+        const allStoreInv = await Inventory.find({ inventoryType: 'Store Room' });
+        const deductStoreRoomStock = async (prodId, quantityToDeduct) => {
+            const idStr = (prodId?._id || prodId?.id || prodId || '').toString();
+            let remainingToDeduct = parseFloat(quantityToDeduct) || 0;
+            if (remainingToDeduct <= 0) return;
+
+            const matchingInvs = allStoreInv.filter(i => {
+                const pId = typeof i.product === 'object' ? (i.product._id || i.product.id) : i.product;
+                return pId?.toString() === idStr;
+            });
+
+            for (const inv of matchingInvs) {
+                if (remainingToDeduct <= 0) break;
+                const currentQty = parseFloat(inv.quantity) || 0;
+                if (currentQty <= 0) continue;
+
+                const deductFromThis = Math.min(currentQty, remainingToDeduct);
+                const newQty = currentQty - deductFromThis;
+                remainingToDeduct -= deductFromThis;
+
+                const invId = inv._id || inv.id;
+                await Inventory.findByIdAndUpdate(invId, {
+                    quantity: newQty,
+                    lastUpdated: Date.now()
+                });
+                inv.quantity = newQty;
+            }
+        };
+
         // 1. Deduct Raw Materials from Store Room Inventory
         if (Array.isArray(production.rawMaterialsUsed)) {
             for (const rm of production.rawMaterialsUsed) {
                 const qtyUsed = parseFloat(rm.quantityUsed) || 0;
                 if (qtyUsed > 0 && rm.product) {
                     const rmProdId = rm.product._id || rm.product;
-                    let rmInv = await Inventory.findOne({
-                        product: rmProdId,
-                        inventoryType: 'Store Room'
-                    });
-
-                    if (rmInv) {
-                        rmInv.quantity = Math.max(0, rmInv.quantity - qtyUsed);
-                        rmInv.lastUpdated = Date.now();
-                        await rmInv.save();
-                    }
+                    await deductStoreRoomStock(rmProdId, qtyUsed);
 
                     await InventoryTransaction.create({
                         branch: targetBranch,
@@ -369,16 +389,7 @@ exports.dispatchStock = async (req, res) => {
                 const qtyReq = parseFloat(pkg.quantityRequested) || 0;
                 if (qtyReq > 0 && pkg.product) {
                     const pkgProdId = pkg.product._id || pkg.product;
-                    let pkgInv = await Inventory.findOne({
-                        product: pkgProdId,
-                        inventoryType: 'Store Room'
-                    });
-
-                    if (pkgInv) {
-                        pkgInv.quantity = Math.max(0, pkgInv.quantity - qtyReq);
-                        pkgInv.lastUpdated = Date.now();
-                        await pkgInv.save();
-                    }
+                    await deductStoreRoomStock(pkgProdId, qtyReq);
 
                     await InventoryTransaction.create({
                         branch: targetBranch,
@@ -400,16 +411,7 @@ exports.dispatchStock = async (req, res) => {
                 const qtyReq = parseFloat(ess.quantityRequested) || 0;
                 if (qtyReq > 0 && ess.product) {
                     const essProdId = ess.product._id || ess.product;
-                    let essInv = await Inventory.findOne({
-                        product: essProdId,
-                        inventoryType: 'Store Room'
-                    });
-
-                    if (essInv) {
-                        essInv.quantity = Math.max(0, essInv.quantity - qtyReq);
-                        essInv.lastUpdated = Date.now();
-                        await essInv.save();
-                    }
+                    await deductStoreRoomStock(essProdId, qtyReq);
 
                     await InventoryTransaction.create({
                         branch: targetBranch,
@@ -430,17 +432,19 @@ exports.dispatchStock = async (req, res) => {
             const mixProdId = production.finishedGoodProduct._id || production.finishedGoodProduct;
             const mixLitersAdded = parseFloat(production.totalPieces) || parseFloat(production.mixLiters) || 1;
 
-            let mixInv = await Inventory.findOne({
-                product: mixProdId,
-                inventoryType: 'Store Room'
+            const existingMixInv = allStoreInv.find(i => {
+                const pId = typeof i.product === 'object' ? (i.product._id || i.product.id) : i.product;
+                return pId?.toString() === mixProdId?.toString();
             });
 
-            if (mixInv) {
-                mixInv.quantity = (mixInv.quantity || 0) + mixLitersAdded;
-                mixInv.lastUpdated = Date.now();
-                await mixInv.save();
+            if (existingMixInv) {
+                const invId = existingMixInv._id || existingMixInv.id;
+                await Inventory.findByIdAndUpdate(invId, {
+                    quantity: (parseFloat(existingMixInv.quantity) || 0) + mixLitersAdded,
+                    lastUpdated: Date.now()
+                });
             } else {
-                mixInv = await Inventory.create({
+                await Inventory.create({
                     branch: targetBranch,
                     product: mixProdId,
                     inventoryType: 'Store Room',
