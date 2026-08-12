@@ -176,7 +176,7 @@
           "S3Bucket": {
             "Ref": "ServerlessDeploymentBucket"
           },
-          "S3Key": "serverless/icecream-erp-backend/dev/1786516396899-2026-08-12T06:33:16.899Z/icecream-erp-backend.zip"
+          "S3Key": "serverless/icecream-erp-backend/dev/1786519936828-2026-08-12T07:32:16.828Z/icecream-erp-backend.zip"
         },
         "Handler": "handler.handler",
         "Runtime": "nodejs20.x",
@@ -205,7 +205,8 @@
             "AUTO_SALES_ENTRIES_TABLE": "icecream-erp-backend-auto-sales-entries-dev",
             "CUSTOMER_RECEIPTS_TABLE": "icecream-erp-backend-customer-receipts-dev",
             "VENDOR_PAYMENTS_TABLE": "icecream-erp-backend-vendor-payments-dev",
-            "COUNTERS_TABLE": "icecream-erp-backend-counters-dev"
+            "COUNTERS_TABLE": "icecream-erp-backend-counters-dev",
+            "PRODUCT_REQUISITION_TABLE": "icecream-erp-backend-product-requisition-dev"
           }
         },
         "Role": {
@@ -219,14 +220,14 @@
         "ApiLogGroup"
       ]
     },
-    "ApiLambdaVersionIOjRv1ahjmsFBzJ8PZy6cS1fKGfcadkkndeZTegA": {
+    "ApiLambdaVersionfJZwXBGIGBYGszm3zl7q3DN7vq1QQr9K0B5THgnnM": {
       "Type": "AWS::Lambda::Version",
       "DeletionPolicy": "Retain",
       "Properties": {
         "FunctionName": {
           "Ref": "ApiLambdaFunction"
         },
-        "CodeSha256": "LaY6OVnvKTJSWuGgPsJC5SB8pM+IjzGwvqQCzEU2nb0="
+        "CodeSha256": "Jmg2GgnOOwSPtsABjfjic8dT+yV6KjwtX2FQn2x8/SY="
       }
     },
     "HttpApi": {
@@ -705,6 +706,25 @@
           }
         ]
       }
+    },
+    "ProductRequisitionTable": {
+      "Type": "AWS::DynamoDB::Table",
+      "Properties": {
+        "TableName": "icecream-erp-backend-product-requisition-dev",
+        "BillingMode": "PAY_PER_REQUEST",
+        "AttributeDefinitions": [
+          {
+            "AttributeName": "id",
+            "AttributeType": "S"
+          }
+        ],
+        "KeySchema": [
+          {
+            "AttributeName": "id",
+            "KeyType": "HASH"
+          }
+        ]
+      }
     }
   },
   "Outputs": {
@@ -719,7 +739,7 @@
     "ApiLambdaFunctionQualifiedArn": {
       "Description": "Current Lambda function version",
       "Value": {
-        "Ref": "ApiLambdaVersionIOjRv1ahjmsFBzJ8PZy6cS1fKGfcadkkndeZTegA"
+        "Ref": "ApiLambdaVersionfJZwXBGIGBYGszm3zl7q3DN7vq1QQr9K0B5THgnnM"
       },
       "Export": {
         "Name": "sls-icecream-erp-backend-dev-ApiLambdaFunctionQualifiedArn"

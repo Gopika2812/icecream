@@ -2,7 +2,7 @@ const DynamoModel = require('./DynamoModel');
 
 class ProductRequisitionModel extends DynamoModel {
     constructor() {
-        super('PRODUCT_REQUISITION_TABLE', 'icecream-erp-backend-product-requisition-dev');
+        super('PURCHASE_ORDERS_TABLE', 'icecream-erp-backend-purchase-orders-dev');
     }
 }
 

@@ -7,14 +7,27 @@ const Branch = require('../models/Branch');
 // @access  Private
 exports.getProductRequisitions = async (req, res) => {
     try {
-        const requisitions = await ProductRequisition.find({})
-            .populate('requestedBy', 'name')
-            .populate('branch', 'branchName')
-            .populate('items.product', 'name itemCode unitOfMeasure currentStock category')
-            .sort({ createdAt: -1 });
+        const allItems = await ProductRequisition.find({});
+        const requisitions = allItems.filter(i => i.isRequisition === true || i.requisitionNumber);
+        
+        // Enrich items with Product details
+        const products = await Product.find({});
+        const prodMap = {};
+        products.forEach(p => { prodMap[p._id || p.id] = p; });
 
-        res.json({ success: true, data: requisitions });
+        const enriched = requisitions.map(r => ({
+            ...r,
+            items: (r.items || []).map(item => ({
+                ...item,
+                product: typeof item.product === 'object' ? item.product : (prodMap[item.product] || { name: 'Unknown Item', _id: item.product })
+            }))
+        }));
+
+        enriched.sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
+
+        res.json({ success: true, data: enriched });
     } catch (error) {
+        console.error('Error fetching product requisitions:', error);
         res.status(500).json({ success: false, message: error.message });
     }
 };
@@ -30,13 +43,15 @@ exports.createProductRequisition = async (req, res) => {
             return res.status(400).json({ success: false, message: 'Requisition must include at least one item.' });
         }
 
-        const totalCount = await ProductRequisition.countDocuments();
-        const reqNumber = `PR-${(totalCount + 1).toString().padStart(2, '0')}`;
+        const allItems = await ProductRequisition.find({});
+        const allReqs = allItems.filter(i => i.isRequisition === true || i.requisitionNumber);
+        const reqNumber = `PR-${(allReqs.length + 1).toString().padStart(2, '0')}`;
 
         const reqObj = await ProductRequisition.create({
+            isRequisition: true,
             requisitionNumber: reqNumber,
-            branch: req.user?.branch,
-            requestedBy: req.user?._id,
+            branch: req.user?.branch || 'Main Branch',
+            requestedBy: req.user?.name || req.user?._id || 'Production Staff',
             items: items.map(item => ({
                 product: item.product,
                 requestedQuantity: parseFloat(item.requestedQuantity) || 0,
@@ -50,7 +65,7 @@ exports.createProductRequisition = async (req, res) => {
 
         res.status(201).json({ success: true, message: `Purchase Indent ${reqNumber} sent to Purchase Team & Super Admin!`, data: reqObj });
     } catch (error) {
-        console.error('Error creating product requisition', error);
+        console.error('Error creating product requisition:', error);
         res.status(500).json({ success: false, message: error.message });
     }
 };
@@ -66,12 +81,14 @@ exports.updateRequisitionStatus = async (req, res) => {
         const reqObj = await ProductRequisition.findById(id);
         if (!reqObj) return res.status(404).json({ success: false, message: 'Requisition not found.' });
 
-        reqObj.status = status;
-        reqObj.updatedAt = new Date();
-        await reqObj.save();
+        const updated = await ProductRequisition.update(id, {
+            status,
+            updatedAt: new Date().toISOString()
+        });
 
-        res.json({ success: true, data: reqObj });
+        res.json({ success: true, message: `Requisition ${status} successfully!`, data: updated });
     } catch (error) {
+        console.error('Error updating requisition status:', error);
         res.status(500).json({ success: false, message: error.message });
     }
 };

@@ -29,6 +29,7 @@ provider:
     CUSTOMER_RECEIPTS_TABLE: ${self:service}-customer-receipts-${self:provider.stage}
     VENDOR_PAYMENTS_TABLE: ${self:service}-vendor-payments-${self:provider.stage}
     COUNTERS_TABLE: ${self:service}-counters-${self:provider.stage}
+    PRODUCT_REQUISITION_TABLE: ${self:service}-product-requisition-${self:provider.stage}
 
   iam:
     role:
@@ -278,6 +279,18 @@ resources:
       Type: AWS::DynamoDB::Table
       Properties:
         TableName: ${self:provider.environment.COUNTERS_TABLE}
+        BillingMode: PAY_PER_REQUEST
+        AttributeDefinitions:
+          - AttributeName: id
+            AttributeType: S
+        KeySchema:
+          - AttributeName: id
+            KeyType: HASH
+
+    ProductRequisitionTable:
+      Type: AWS::DynamoDB::Table
+      Properties:
+        TableName: ${self:provider.environment.PRODUCT_REQUISITION_TABLE}
         BillingMode: PAY_PER_REQUEST
         AttributeDefinitions:
           - AttributeName: id
