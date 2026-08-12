@@ -137,17 +137,20 @@ const DashboardLayout = () => {
             <NavItem to="/dashboard" icon={LayoutDashboard} title="Overview" />
           </NavGroup>
 
-          <NavGroup title="Procurement & Production">
+          <NavGroup title="Purchase Phase">
             <NavItem to="/purchase-orders" icon={ShoppingCart} title="Purchase Invoice" />
             <NavItem to="/qc" icon={ShieldCheck} title="Quality Control" />
             <NavItem to="/vendor-ledgers" icon={Building2} title="Vendor Ledgers & Payments" />
             <NavItem to="/raw-material-stock" icon={ArrowLeftRight} title="Raw Material Stock" />
-            <NavItem to="/store-room-requisitions" icon={Truck} title="Store Room Requisitions" />
-            <NavItem to="/production" icon={Factory} title="Production & Assembly" />
           </NavGroup>
 
-          <NavGroup title="Inventory & Sales">
+          <NavGroup title="Production Phase">
+            <NavItem to="/store-room-requisitions" icon={Truck} title="Store Room Requisitions" />
+            <NavItem to="/production" icon={Factory} title="Production & Assembly" />
             <NavItem to="/finished-goods-stock" icon={ThermometerSnowflake} title="Finished Goods Stock" />
+          </NavGroup>
+
+          <NavGroup title="Sales & Finance Phase">
             <NavItem to="/sales-invoices" icon={FileText} title="Sales Orders & Invoicing" />
             <NavItem to="/auto-sales-ledger" icon={Truck} title="Auto Sales Stock & Expenses" />
             <NavItem to="/customer-ledgers" icon={BookOpen} title="Customer Ledgers" />
