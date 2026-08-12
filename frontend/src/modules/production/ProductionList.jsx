@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import api from '../../services/api';
 import { 
   Factory, Plus, Search, Filter, Printer, Loader2, ThermometerSnowflake, 
-  Package, Calendar, CheckCircle2, QrCode, ArrowRight, ShieldCheck, Trash2, X, DollarSign, Box, ShieldAlert, AlertTriangle, Tag 
+  Package, Calendar, CheckCircle2, QrCode, ArrowRight, ShieldCheck, Trash2, X, DollarSign, Box, ShieldAlert, AlertTriangle, Tag, Clock 
 } from 'lucide-react';
 import Modal from '../../components/Modal';
 import SearchableSelect from '../../components/SearchableSelect';
