@@ -55,15 +55,65 @@ const ProductionList = () => {
     remarks: ''
   });
 
-  // Finished Goods QC Form State (Piece & Box precision)
-  const [qcForm, setQcForm] = useState({
-    passedPieces: 0,
-    damagedPieces: 0,
-    passedBoxes: 0,
-    damagedBoxes: 0,
-    damageReason: 'Melted / Temperature Fluctuated',
-    remarks: ''
-  });
+  // Production Execution & Completion Modal State
+  const [expandedRowId, setExpandedRowId] = useState(null);
+  const [isCompleteModalOpen, setIsCompleteModalOpen] = useState(false);
+  const [selectedProdForCompletion, setSelectedProdForCompletion] = useState(null);
+  const [actualProducedPieces, setActualProducedPieces] = useState('');
+
+  const handleStartProduction = async (id, code) => {
+    try {
+      setSubmitting(true);
+      const res = await api.post(`/production/${id}/start-production`);
+      alert(res.data?.message || `Production started for ${code}!`);
+      fetchInitialData();
+    } catch (err) {
+      console.error('Failed to start production', err);
+      alert(err.response?.data?.message || 'Error starting production');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleOpenCompleteModal = (prod) => {
+    setSelectedProdForCompletion(prod);
+    setActualProducedPieces(prod.totalPieces || '');
+    setIsCompleteModalOpen(true);
+  };
+
+  const handleSubmitCompletion = async (e) => {
+    e.preventDefault();
+    if (!selectedProdForCompletion) return;
+
+    try {
+      setSubmitting(true);
+      const res = await api.post(`/production/${selectedProdForCompletion._id}/complete-production`, {
+        actualProducedPieces: parseInt(actualProducedPieces) || selectedProdForCompletion.totalPieces
+      });
+      alert(res.data?.message || 'Production phase completed!');
+      setIsCompleteModalOpen(false);
+      fetchInitialData();
+    } catch (err) {
+      console.error('Failed to complete production', err);
+      alert(err.response?.data?.message || 'Error completing production');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleSendToQc = async (id, code) => {
+    try {
+      setSubmitting(true);
+      const res = await api.post(`/production/${id}/send-to-qc`);
+      alert(res.data?.message || `Batch ${code} sent to Finished Goods QC!`);
+      fetchInitialData();
+    } catch (err) {
+      console.error('Failed to send to QC', err);
+      alert(err.response?.data?.message || 'Error sending to QC');
+    } finally {
+      setSubmitting(false);
+    }
+  };
 
   useEffect(() => {
     fetchInitialData();
