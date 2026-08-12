@@ -157,26 +157,31 @@ exports.createProductionBatch = async (req, res) => {
 
             if (totalPieces <= 0) return res.status(400).json({ success: false, message: 'Valid Target Output in Pcs is required.' });
 
-            // STRICT PREPARED MIX STORE ROOM STOCK VALIDATION FOR FG ASSEMBLY
-            if (targetMixProduct) {
-                const mixId = typeof targetMixProduct === 'object' ? (targetMixProduct._id || targetMixProduct.id) : targetMixProduct;
-                const mixProdObj = await Product.findById(mixId);
-                const mixName = mixProdObj ? mixProdObj.name : 'Prepared Mix';
-                const neededLiters = parseFloat(mixLiters) || Number((totalPieces / (pPerBox || 12)).toFixed(2)) || 1;
-
-                const allStoreInv = await Inventory.find({ inventoryType: 'Store Room' });
-                const mixInvList = allStoreInv.filter(i => {
+        const allStoreInv = await Inventory.find({ inventoryType: 'Store Room' });
+        const getStoreRoomStockSum = (prodId) => {
+            const idStr = (prodId?._id || prodId?.id || prodId || '').toString();
+            return allStoreInv
+                .filter(i => {
                     const pId = typeof i.product === 'object' ? (i.product._id || i.product.id) : i.product;
-                    return pId?.toString() === mixId?.toString();
-                });
-                const availMixQty = mixInvList.reduce((sum, i) => sum + (parseFloat(i.quantity) || 0), 0);
+                    return pId?.toString() === idStr;
+                })
+                .reduce((sum, i) => sum + (parseFloat(i.quantity) || 0), 0);
+        };
 
-                if (availMixQty < neededLiters) {
-                    return res.status(400).json({
-                        success: false,
-                        message: `Cannot submit FG Assembly Requisition: Prepared Mix Product "${mixName}" is OUT OF STOCK / Insufficient in Store Room! (Available: ${availMixQty} Liters, Needed: ${neededLiters} Liters). Please run Mix Preparation first!`
-                    });
-                }
+        // STRICT PREPARED MIX STORE ROOM STOCK VALIDATION FOR FG ASSEMBLY
+        if (!isMixReq && targetMixProduct) {
+            const mixId = typeof targetMixProduct === 'object' ? (targetMixProduct._id || targetMixProduct.id) : targetMixProduct;
+            const mixProdObj = await Product.findById(mixId);
+            const mixName = mixProdObj ? mixProdObj.name : 'Prepared Mix';
+            const neededLiters = parseFloat(mixLiters) || Number((totalPieces / (pPerBox || 12)).toFixed(2)) || 1;
+
+            const availMixQty = getStoreRoomStockSum(mixId);
+
+            if (availMixQty < neededLiters) {
+                return res.status(400).json({
+                    success: false,
+                    message: `Cannot submit FG Assembly Requisition: Prepared Mix Product "${mixName}" is OUT OF STOCK / Insufficient in Store Room! (Available: ${availMixQty} Liters, Needed: ${neededLiters} Liters). Please run Mix Preparation first!`
+                });
             }
         }
 
@@ -190,12 +195,7 @@ exports.createProductionBatch = async (req, res) => {
                     const rmProd = await Product.findById(rmProdId);
                     const rmName = rmProd ? rmProd.name : 'Raw Material';
 
-                    const rmInv = await Inventory.findOne({
-                        product: rmProdId,
-                        inventoryType: 'Store Room'
-                    });
-
-                    const availQty = rmInv ? (parseFloat(rmInv.quantity) || 0) : 0;
+                    const availQty = getStoreRoomStockSum(rmProdId);
                     if (availQty < qtyUsed) {
                         return res.status(400).json({
                             success: false,
@@ -224,12 +224,7 @@ exports.createProductionBatch = async (req, res) => {
                     const pkgProd = await Product.findById(pkgProdId);
                     const pkgName = pkgProd ? pkgProd.name : 'Packaging Material';
 
-                    const pkgInv = await Inventory.findOne({
-                        product: pkgProdId,
-                        inventoryType: 'Store Room'
-                    });
-
-                    const availQty = pkgInv ? (parseFloat(pkgInv.quantity) || 0) : 0;
+                    const availQty = getStoreRoomStockSum(pkgProdId);
                     if (availQty < qtyReq) {
                         return res.status(400).json({
                             success: false,
@@ -257,12 +252,7 @@ exports.createProductionBatch = async (req, res) => {
                     const essProd = await Product.findById(essProdId);
                     const essName = essProd ? essProd.name : 'Essence / Add-on Item';
 
-                    const essInv = await Inventory.findOne({
-                        product: essProdId,
-                        inventoryType: 'Store Room'
-                    });
-
-                    const availQty = essInv ? (parseFloat(essInv.quantity) || 0) : 0;
+                    const availQty = getStoreRoomStockSum(essProdId);
                     if (availQty < qtyReq) {
                         return res.status(400).json({
                             success: false,
