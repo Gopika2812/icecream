@@ -14,9 +14,19 @@ provider:
         - 'http://localhost:5173'
         - 'http://localhost:3000'
       allowedHeaders:
-        - '*'
+        - 'Authorization'
+        - 'Content-Type'
+        - 'X-Requested-With'
+        - 'Accept'
+        - 'Origin'
       allowedMethods:
-        - '*'
+        - 'GET'
+        - 'POST'
+        - 'PUT'
+        - 'PATCH'
+        - 'DELETE'
+        - 'OPTIONS'
+        - 'HEAD'
       allowCredentials: true
   environment:
     NODE_ENV: production

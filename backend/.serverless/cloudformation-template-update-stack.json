@@ -176,7 +176,7 @@
           "S3Bucket": {
             "Ref": "ServerlessDeploymentBucket"
           },
-          "S3Key": "serverless/icecream-erp-backend/dev/1786522370460-2026-08-12T08:12:50.460Z/icecream-erp-backend.zip"
+          "S3Key": "serverless/icecream-erp-backend/dev/1786532749558-2026-08-12T11:05:49.558Z/icecream-erp-backend.zip"
         },
         "Handler": "handler.handler",
         "Runtime": "nodejs20.x",
@@ -220,14 +220,14 @@
         "ApiLogGroup"
       ]
     },
-    "ApiLambdaVersionjZCMSJq9HvyFUumUM7BqzQfMiBhxlRWaMqRoMuzJls": {
+    "ApiLambdaVersion8SWSurNBy8VKGX3nUhwkswdEGpMX3ZpE4NYVuJKs4uA": {
       "Type": "AWS::Lambda::Version",
       "DeletionPolicy": "Retain",
       "Properties": {
         "FunctionName": {
           "Ref": "ApiLambdaFunction"
         },
-        "CodeSha256": "Talq9Cgh3md4QdrXcmR4Rl1+ETqD0uYzwNkxY8rxyVo="
+        "CodeSha256": "yZp4P/2c0qJoA2xohYBJtvjUOCF5FSQcIGgwBQqnHtA="
       }
     },
     "HttpApi": {
@@ -238,10 +238,20 @@
         "CorsConfiguration": {
           "AllowCredentials": true,
           "AllowHeaders": [
-            "*"
+            "Authorization",
+            "Content-Type",
+            "X-Requested-With",
+            "Accept",
+            "Origin"
           ],
           "AllowMethods": [
-            "*"
+            "GET",
+            "POST",
+            "PUT",
+            "PATCH",
+            "DELETE",
+            "OPTIONS",
+            "HEAD"
           ],
           "AllowOrigins": [
             "https://saravanas-5c3bc.web.app",
@@ -753,7 +763,7 @@
     "ApiLambdaFunctionQualifiedArn": {
       "Description": "Current Lambda function version",
       "Value": {
-        "Ref": "ApiLambdaVersionjZCMSJq9HvyFUumUM7BqzQfMiBhxlRWaMqRoMuzJls"
+        "Ref": "ApiLambdaVersion8SWSurNBy8VKGX3nUhwkswdEGpMX3ZpE4NYVuJKs4uA"
       },
       "Export": {
         "Name": "sls-icecream-erp-backend-dev-ApiLambdaFunctionQualifiedArn"
