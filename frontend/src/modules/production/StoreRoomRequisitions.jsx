@@ -62,7 +62,7 @@ const StoreRoomRequisitions = () => {
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white p-6 rounded-3xl border border-gray-100 shadow-sm">
         <div>
           <h1 className="text-2xl font-bold text-gray-900 font-display flex items-center gap-2">
-            <Truck className="text-purple-600" size={26} />
+            <Truck className="text-rose-600" size={26} />
             Store Room Requisitions & Stock Issue
           </h1>
           <p className="text-xs text-gray-500 mt-1">
@@ -81,7 +81,7 @@ const StoreRoomRequisitions = () => {
       {/* Main Compact Table UI */}
       {loading ? (
         <div className="p-12 text-center text-gray-500 bg-white rounded-3xl border border-gray-100">
-          <Loader2 size={32} className="animate-spin mx-auto text-purple-600 mb-2" />
+          <Loader2 size={32} className="animate-spin mx-auto text-rose-600 mb-2" />
           <p className="text-xs font-extrabold">Loading Store Room Requisitions...</p>
         </div>
       ) : productions.length === 0 ? (
@@ -112,11 +112,11 @@ const StoreRoomRequisitions = () => {
 
                   return (
                     <React.Fragment key={prod._id}>
-                      <tr className="hover:bg-purple-50/30 transition-colors">
-                        <td className="px-6 py-4 font-mono text-xs font-black text-purple-900">{reqId}</td>
+                      <tr className="hover:bg-rose-50/30 transition-colors">
+                        <td className="px-6 py-4 font-mono text-xs font-black text-rose-900">{reqId}</td>
                         <td className="px-6 py-4">
                           {prod.requisitionType === 'MIX_REQUISITION' ? (
-                            <span className="px-2.5 py-1 rounded-lg bg-purple-100 text-purple-900 text-[10px] font-black uppercase tracking-wide border border-purple-300 inline-flex items-center gap-1">
+                            <span className="px-2.5 py-1 rounded-lg bg-rose-100 text-rose-900 text-[10px] font-black uppercase tracking-wide border border-rose-300 inline-flex items-center gap-1">
                               🥣 Mix Preparation
                             </span>
                           ) : (
@@ -129,18 +129,18 @@ const StoreRoomRequisitions = () => {
                           <button
                             type="button"
                             onClick={() => setExpandedRowId(isExpanded ? null : prod._id)}
-                            className="text-left font-extrabold text-purple-950 hover:text-purple-700 hover:underline flex items-center gap-1.5 cursor-pointer"
+                            className="text-left font-extrabold text-rose-950 hover:text-rose-700 hover:underline flex items-center gap-1.5 cursor-pointer"
                           >
-                            <Package size={16} className="text-purple-600 shrink-0" />
+                            <Package size={16} className="text-rose-600 shrink-0" />
                             {prod.finishedGoodProduct?.name || 'Finished Product'}
-                            <span className="text-[10px] text-purple-600 font-normal">
+                            <span className="text-[10px] text-rose-600 font-normal">
                               ({isExpanded ? '▲ hide materials' : '▼ view materials'})
                             </span>
                           </button>
                         </td>
                         <td className="px-6 py-4 text-center font-mono text-xs font-extrabold text-gray-800">
                           {prod.requisitionType === 'MIX_REQUISITION' ? (
-                            <span className="text-purple-900">{prod.totalPieces || prod.mixLiters} Liters</span>
+                            <span className="text-rose-900">{prod.totalPieces || prod.mixLiters} Liters</span>
                           ) : (
                             <span>{prod.totalPieces || prod.quantityBoxes * 12} Pcs ({prod.quantityBoxes} Boxes)</span>
                           )}
@@ -181,30 +181,30 @@ const StoreRoomRequisitions = () => {
 
                       {/* Expandable Materials Breakdown Drawer Row */}
                       {isExpanded && (
-                        <tr className="bg-purple-50/40">
+                        <tr className="bg-rose-50/40">
                           <td colSpan="6" className="px-6 py-4">
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                               {/* Requested Raw Materials */}
-                              <div className="bg-white p-4 rounded-2xl border border-purple-200 space-y-2 shadow-xs">
-                                <h4 className="text-xs font-extrabold text-purple-950 uppercase tracking-wider flex items-center gap-1.5">
-                                  <Package size={14} className="text-purple-600" /> Requested Raw Materials & Prepared Mix
+                              <div className="bg-white p-4 rounded-2xl border border-rose-200 space-y-2 shadow-xs">
+                                <h4 className="text-xs font-extrabold text-rose-950 uppercase tracking-wider flex items-center gap-1.5">
+                                  <Package size={14} className="text-rose-600" /> Requested Raw Materials & Prepared Mix
                                 </h4>
                                 {(prod.mixProduct || prod.rawMaterialsUsed?.length > 0) ? (
                                   <ul className="space-y-1.5 text-xs">
                                     {prod.mixProduct && (
-                                      <li className="flex justify-between items-center bg-purple-100/80 p-2 rounded-xl border border-purple-300 shadow-2xs">
-                                        <span className="font-extrabold text-purple-950 flex items-center gap-1">
+                                      <li className="flex justify-between items-center bg-rose-100/80 p-2 rounded-xl border border-rose-300 shadow-2xs">
+                                        <span className="font-extrabold text-rose-950 flex items-center gap-1">
                                           <span>🥣 Prepared Mix:</span> {getProductName(prod.mixProduct, 'Prepared Mix')}
                                         </span>
-                                        <span className="font-mono font-black text-purple-900 bg-white px-2 py-0.5 rounded-lg border border-purple-300">
+                                        <span className="font-mono font-black text-rose-900 bg-white px-2 py-0.5 rounded-lg border border-rose-300">
                                           {prod.mixLiters || Number(((prod.totalPieces || 12) / (prod.piecesPerBox || 12)).toFixed(2))} Liters
                                         </span>
                                       </li>
                                     )}
                                     {prod.rawMaterialsUsed?.map((rm, idx) => (
-                                      <li key={idx} className="flex justify-between items-center bg-purple-50/50 p-2 rounded-xl border border-purple-100">
-                                        <span className="font-extrabold text-purple-950">{getProductName(rm.product, rm.productName || 'Raw Material')}</span>
-                                        <span className="font-mono font-black text-purple-900 bg-white px-2 py-0.5 rounded-lg border border-purple-200">
+                                      <li key={idx} className="flex justify-between items-center bg-rose-50/50 p-2 rounded-xl border border-rose-100">
+                                        <span className="font-extrabold text-rose-950">{getProductName(rm.product, rm.productName || 'Raw Material')}</span>
+                                        <span className="font-mono font-black text-rose-900 bg-white px-2 py-0.5 rounded-lg border border-rose-200">
                                           {rm.quantityUsed} {rm.unitOfMeasure || rm.product?.unitOfMeasure}
                                         </span>
                                       </li>

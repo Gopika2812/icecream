@@ -153,7 +153,7 @@ const FinishedGoodsQC = () => {
                       <div className="grid grid-cols-2 gap-3 p-3 bg-gray-50 rounded-2xl text-xs font-semibold">
                         <div>
                           <span className="text-gray-500 text-[10px] block uppercase font-bold">Produced Pieces Output:</span>
-                          <span className="text-sm font-black font-mono text-purple-900">{totalProducedPcs} Pcs</span>
+                          <span className="text-sm font-black font-mono text-rose-900">{totalProducedPcs} Pcs</span>
                         </div>
                         <div>
                           <span className="text-gray-500 text-[10px] block uppercase font-bold">Calculated Box Count:</span>
@@ -203,7 +203,7 @@ const FinishedGoodsQC = () => {
 
                       return (
                         <tr key={prod._id} className="hover:bg-gray-50/60 transition-colors">
-                          <td className="px-6 py-4 font-mono font-extrabold text-purple-900">{reqId}</td>
+                          <td className="px-6 py-4 font-mono font-extrabold text-rose-900">{reqId}</td>
                           <td className="px-6 py-4 font-mono font-bold text-emerald-800">{qcCode}</td>
                           <td className="px-6 py-4 font-extrabold text-gray-900">{prod.finishedGoodProduct?.name}</td>
                           <td className="px-6 py-4 font-mono font-extrabold text-emerald-700">
@@ -219,7 +219,7 @@ const FinishedGoodsQC = () => {
                                   setCurrentQrStickers(prod.boxQrStickers);
                                   setIsQrModalOpen(true);
                                 }}
-                                className="px-3 py-1.5 bg-purple-50 text-purple-800 rounded-xl font-extrabold hover:bg-purple-100 border border-purple-200 flex items-center gap-1.5 cursor-pointer"
+                                className="px-3 py-1.5 bg-rose-50 text-rose-800 rounded-xl font-extrabold hover:bg-rose-100 border border-rose-200 flex items-center gap-1.5 cursor-pointer"
                               >
                                 <QrCode size={14} /> Print Box QRs
                               </button>
@@ -351,11 +351,11 @@ const FinishedGoodsQC = () => {
       {isQrModalOpen && currentQrStickers.length > 0 && (
         <Modal isOpen={isQrModalOpen} onClose={() => setIsQrModalOpen(false)} title="Printable Box QR Code Stickers" size="xl">
           <div className="space-y-4">
-            <div className="flex justify-between items-center bg-purple-50 p-3 rounded-2xl border border-purple-200 text-purple-950 text-xs font-bold">
+            <div className="flex justify-between items-center bg-rose-50 p-3 rounded-2xl border border-rose-200 text-rose-950 text-xs font-bold">
               <span>Generated <strong>{currentQrStickers.length} Box QR Stickers</strong> (1 Sticker per Box)</span>
               <button
                 onClick={() => window.print()}
-                className="bg-purple-600 hover:bg-purple-700 text-white px-4 py-1.5 rounded-xl text-xs font-extrabold shadow-sm flex items-center gap-1.5 cursor-pointer"
+                className="bg-rose-600 hover:bg-rose-700 text-white px-4 py-1.5 rounded-xl text-xs font-extrabold shadow-sm flex items-center gap-1.5 cursor-pointer"
               >
                 <Printer size={14} /> Print Sticker Sheet
               </button>
@@ -378,8 +378,8 @@ const FinishedGoodsQC = () => {
                 const qrString = typeof sticker.qrCodeText === 'string' ? sticker.qrCodeText : JSON.stringify(data, null, 2);
 
                 return (
-                  <div key={idx} className="bg-white p-3.5 rounded-2xl border-2 border-dashed border-purple-200 hover:border-purple-400 space-y-2 text-center text-[10px] shadow-xs transition-all flex flex-col items-center justify-between">
-                    <div className="font-black text-purple-950 border-b border-purple-100 pb-1 text-xs w-full uppercase tracking-wider">
+                  <div key={idx} className="bg-white p-3.5 rounded-2xl border-2 border-dashed border-rose-200 hover:border-rose-400 space-y-2 text-center text-[10px] shadow-xs transition-all flex flex-col items-center justify-between">
+                    <div className="font-black text-rose-950 border-b border-rose-100 pb-1 text-xs w-full uppercase tracking-wider">
                       {data.brand || 'SRI SARAVANAA ERP'}
                     </div>
 
@@ -392,9 +392,9 @@ const FinishedGoodsQC = () => {
                       />
                     </div>
 
-                    <div className="p-2 bg-purple-50/80 rounded-xl font-mono text-[9.5px] text-gray-800 font-bold space-y-0.5 w-full border border-purple-100">
-                      <div className="text-xs font-black text-purple-950">BOX {sticker.boxIndex} / {sticker.totalBoxes}</div>
-                      <div className="text-purple-900">PROD ID: {data.productionId || sticker.productionId}</div>
+                    <div className="p-2 bg-rose-50/80 rounded-xl font-mono text-[9.5px] text-gray-800 font-bold space-y-0.5 w-full border border-rose-100">
+                      <div className="text-xs font-black text-rose-950">BOX {sticker.boxIndex} / {sticker.totalBoxes}</div>
+                      <div className="text-rose-900">PROD ID: {data.productionId || sticker.productionId}</div>
                       <div className="text-emerald-700 font-bold">QC ID: {data.qcId || sticker.qcId}</div>
                       <div className="text-emerald-800 font-black">QTY: {data.piecesInBox || sticker.piecesInBox} Pcs</div>
                     </div>

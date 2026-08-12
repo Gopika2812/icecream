@@ -727,7 +727,7 @@ const ProductionList = () => {
         <div className="flex items-center gap-3">
           <button
             onClick={() => handleOpenNewBatchModal('MIX_REQUISITION')}
-            className="flex items-center gap-2 bg-purple-600 hover:bg-purple-700 text-white px-4 py-2.5 rounded-xl text-xs font-extrabold transition-all shadow-md cursor-pointer"
+            className="flex items-center gap-2 bg-rose-600 hover:bg-rose-700 text-white px-4 py-2.5 rounded-xl text-xs font-extrabold transition-all shadow-md cursor-pointer"
           >
             <Plus size={16} /> 🥣 Request Mix Preparation
           </button>
@@ -742,8 +742,8 @@ const ProductionList = () => {
 
       {/* Summary Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
-        <div className="glass-panel p-4 flex items-center gap-4 border-l-4 border-l-purple-500">
-          <div className="p-3 bg-purple-50 text-purple-600 rounded-xl">
+        <div className="glass-panel p-4 flex items-center gap-4 border-l-4 border-l-rose-500">
+          <div className="p-3 bg-rose-50 text-rose-600 rounded-xl">
             <Factory size={24} />
           </div>
           <div>
@@ -826,16 +826,16 @@ const ProductionList = () => {
                   return (
                     <React.Fragment key={p._id}>
                       <tr className="hover:bg-white/60 transition-colors">
-                        <td className="px-6 py-4 font-mono text-xs font-black text-purple-900">{reqId}</td>
+                        <td className="px-6 py-4 font-mono text-xs font-black text-rose-900">{reqId}</td>
                         <td className="px-6 py-4 font-bold text-gray-900">
                           <button
                             type="button"
                             onClick={() => setExpandedRowId(isExpanded ? null : p._id)}
-                            className="text-left font-extrabold text-purple-900 hover:text-purple-700 hover:underline flex items-center gap-1.5 cursor-pointer"
+                            className="text-left font-extrabold text-rose-900 hover:text-rose-700 hover:underline flex items-center gap-1.5 cursor-pointer"
                           >
-                            <Package size={16} className="text-purple-600 shrink-0" />
+                            <Package size={16} className="text-rose-600 shrink-0" />
                             {p.finishedGoodProduct?.name || 'Finished Product'}
-                            <span className="text-[10px] text-purple-600 font-normal">({isExpanded ? '▲ hide materials' : '▼ view materials'})</span>
+                            <span className="text-[10px] text-rose-600 font-normal">({isExpanded ? '▲ hide materials' : '▼ view materials'})</span>
                           </button>
                           <span className="block font-mono text-[10px] text-gray-400 font-normal ml-5">Code: {p.finishedGoodProduct?.itemCode}</span>
                         </td>
@@ -845,7 +845,7 @@ const ProductionList = () => {
                           </span>
                         </td>
                         <td className="px-6 py-4 text-right font-mono font-bold text-gray-900">
-                          <span className="text-sm font-black text-purple-900 block">{p.totalPieces || p.quantityBoxes * 12} Pcs</span>
+                          <span className="text-sm font-black text-rose-900 block">{p.totalPieces || p.quantityBoxes * 12} Pcs</span>
                           <span className="text-xs text-gray-500 font-semibold block">({p.quantityBoxes} Boxes)</span>
                         </td>
                         <td className="px-6 py-4 text-center">
@@ -860,8 +860,8 @@ const ProductionList = () => {
                             </span>
                           )}
                           {isInProduction && (
-                            <span className="px-3 py-1 rounded-full text-[11px] font-extrabold bg-purple-50 text-purple-800 border border-purple-300 inline-flex items-center gap-1 animate-pulse">
-                              <Factory size={12} className="text-purple-600" /> In Production Run
+                            <span className="px-3 py-1 rounded-full text-[11px] font-extrabold bg-rose-50 text-rose-800 border border-rose-300 inline-flex items-center gap-1 animate-pulse">
+                              <Factory size={12} className="text-rose-600" /> In Production Run
                             </span>
                           )}
                           {isCompleted && (
@@ -889,7 +889,7 @@ const ProductionList = () => {
                               <button
                                 onClick={() => handleStartProduction(p._id, reqId)}
                                 disabled={submitting}
-                                className="px-3 py-1.5 text-xs font-extrabold rounded-xl bg-purple-600 hover:bg-purple-700 text-white transition-all shadow-sm flex items-center gap-1.5 cursor-pointer"
+                                className="px-3 py-1.5 text-xs font-extrabold rounded-xl bg-rose-600 hover:bg-rose-700 text-white transition-all shadow-sm flex items-center gap-1.5 cursor-pointer"
                               >
                                 <Factory size={14} /> Start Production
                               </button>
@@ -897,7 +897,7 @@ const ProductionList = () => {
                               {p.requisitionType !== 'MIX_REQUISITION' && (
                                 <button
                                   onClick={() => handleOpenQrModal(p)}
-                                  className="px-2.5 py-1 text-[11px] font-extrabold rounded-lg bg-purple-50 text-purple-900 border border-purple-300 hover:bg-purple-100 transition-all flex items-center gap-1 cursor-pointer"
+                                  className="px-2.5 py-1 text-[11px] font-extrabold rounded-lg bg-rose-50 text-rose-900 border border-rose-300 hover:bg-rose-100 transition-all flex items-center gap-1 cursor-pointer"
                                 >
                                   <QrCode size={13} /> Print Box QRs
                                 </button>
@@ -930,16 +930,16 @@ const ProductionList = () => {
 
                       {/* Expandable Materials Breakdown Drawer */}
                       {isExpanded && (
-                        <tr className="bg-purple-50/40">
+                        <tr className="bg-rose-50/40">
                           <td colSpan="6" className="px-6 py-4">
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                              <div className="bg-white p-3 rounded-2xl border border-purple-200 space-y-1">
-                                <h5 className="text-[11px] font-black text-purple-950 uppercase tracking-wider">Allocated Raw Materials:</h5>
+                              <div className="bg-white p-3 rounded-2xl border border-rose-200 space-y-1">
+                                <h5 className="text-[11px] font-black text-rose-950 uppercase tracking-wider">Allocated Raw Materials:</h5>
                                 <ul className="space-y-1 text-xs">
                                   {p.rawMaterialsUsed?.map((rm, idx) => (
                                     <li key={idx} className="flex justify-between border-b border-gray-100 py-1">
-                                      <span className="font-extrabold text-purple-950">{getProductName(rm.product, rm.productName || 'Raw Material')}</span>
-                                      <span className="font-mono font-bold text-purple-900">{rm.quantityUsed} {rm.unitOfMeasure}</span>
+                                      <span className="font-extrabold text-rose-950">{getProductName(rm.product, rm.productName || 'Raw Material')}</span>
+                                      <span className="font-mono font-bold text-rose-900">{rm.quantityUsed} {rm.unitOfMeasure}</span>
                                     </li>
                                   ))}
                                 </ul>
@@ -993,7 +993,7 @@ const ProductionList = () => {
                 onClick={() => setWizardStep(1)}
                 className={`flex-1 px-3 py-2 rounded-lg transition-all border cursor-pointer ${
                   wizardStep === 1 
-                    ? 'bg-white text-purple-900 border-purple-400 shadow-md ring-2 ring-purple-500/20' 
+                    ? 'bg-white text-rose-900 border-rose-400 shadow-md ring-2 ring-rose-500/20' 
                     : 'bg-gray-100 text-gray-600 border-transparent hover:bg-gray-200'
                 }`}
               >
@@ -1030,14 +1030,14 @@ const ProductionList = () => {
               {activeReqType === 'MIX_REQUISITION' ? (
                 <>
                   {/* MIX PREPARATION: RECIPE SCALE & BASE RAW MATERIALS */}
-                  <div className="flex items-center gap-2 bg-purple-50 p-1.5 rounded-xl border border-purple-200">
+                  <div className="flex items-center gap-2 bg-rose-50 p-1.5 rounded-xl border border-rose-200">
                     <button
                       type="button"
                       onClick={() => setMixMode('EXISTING')}
                       className={`flex-1 py-1.5 px-3 rounded-lg text-xs font-bold transition-all cursor-pointer ${
                         mixMode === 'EXISTING'
-                          ? 'bg-purple-600 text-white shadow-xs'
-                          : 'text-purple-800 hover:bg-purple-100'
+                          ? 'bg-rose-600 text-white shadow-xs'
+                          : 'text-rose-800 hover:bg-rose-100'
                       }`}
                     >
                       Select Existing Mix Formula
@@ -1047,8 +1047,8 @@ const ProductionList = () => {
                       onClick={() => setMixMode('NEW')}
                       className={`flex-1 py-1.5 px-3 rounded-lg text-xs font-bold transition-all cursor-pointer ${
                         mixMode === 'NEW'
-                          ? 'bg-purple-600 text-white shadow-xs'
-                          : 'text-purple-800 hover:bg-purple-100'
+                          ? 'bg-rose-600 text-white shadow-xs'
+                          : 'text-rose-800 hover:bg-rose-100'
                       }`}
                     >
                       + Create New Mix Formula (1st Time)
@@ -1057,10 +1057,10 @@ const ProductionList = () => {
 
                   {/* OPTION A: EXISTING MIX FORMULA */}
                   {mixMode === 'EXISTING' ? (
-                    <div className="p-4 bg-purple-50/70 border border-purple-200 rounded-2xl space-y-3">
-                      <div className="flex justify-between items-center text-purple-950 font-extrabold text-xs uppercase tracking-wider">
+                    <div className="p-4 bg-rose-50/70 border border-rose-200 rounded-2xl space-y-3">
+                      <div className="flex justify-between items-center text-rose-950 font-extrabold text-xs uppercase tracking-wider">
                         <span className="flex items-center gap-2">
-                          <Package size={16} className="text-purple-600" />
+                          <Package size={16} className="text-rose-600" />
                           Select Mix Formula to Auto-Calculate Raw Materials (Scaled by Liters)
                         </span>
                       </div>
@@ -1089,7 +1089,7 @@ const ProductionList = () => {
                             value={mixCount}
                             onChange={(e) => setMixCount(e.target.value)}
                             placeholder="e.g. 250 L"
-                            className={`${customInputStyle} font-mono font-bold text-purple-900 border-purple-300`}
+                            className={`${customInputStyle} font-mono font-bold text-rose-900 border-rose-300`}
                           />
                         </div>
 
@@ -1097,7 +1097,7 @@ const ProductionList = () => {
                           <button
                             type="button"
                             onClick={handleApplyMixFormula}
-                            className="w-full bg-purple-600 hover:bg-purple-700 text-white py-2.5 px-3 rounded-xl text-xs font-extrabold shadow-sm transition-all flex items-center justify-center gap-1 cursor-pointer"
+                            className="w-full bg-rose-600 hover:bg-rose-700 text-white py-2.5 px-3 rounded-xl text-xs font-extrabold shadow-sm transition-all flex items-center justify-center gap-1 cursor-pointer"
                           >
                             Scale & Apply Recipe
                           </button>
@@ -1106,10 +1106,10 @@ const ProductionList = () => {
                     </div>
                   ) : (
                     /* OPTION B: CREATE NEW MIX FORMULA */
-                    <div className="p-4 bg-purple-50/90 border border-purple-300 rounded-2xl space-y-4 shadow-sm">
-                      <div className="flex justify-between items-center text-purple-950 font-extrabold text-xs uppercase tracking-wider">
+                    <div className="p-4 bg-rose-50/90 border border-rose-300 rounded-2xl space-y-4 shadow-sm">
+                      <div className="flex justify-between items-center text-rose-950 font-extrabold text-xs uppercase tracking-wider">
                         <span className="flex items-center gap-2">
-                          <Plus size={16} className="text-purple-600" />
+                          <Plus size={16} className="text-rose-600" />
                           Create New Mix Recipe Record (Saved to Master)
                         </span>
                       </div>
@@ -1142,7 +1142,7 @@ const ProductionList = () => {
                             value={newMixCode}
                             onChange={(e) => setNewMixCode(e.target.value)}
                             placeholder="e.g. MIX-POPCORN-001"
-                            className={`${customInputStyle} font-mono font-bold text-purple-950 bg-purple-50/50 border-purple-300`}
+                            className={`${customInputStyle} font-mono font-bold text-rose-950 bg-rose-50/50 border-rose-300`}
                           />
                         </div>
                         <div className="space-y-1">
@@ -1154,24 +1154,24 @@ const ProductionList = () => {
                             value={mixCount}
                             onChange={(e) => setMixCount(e.target.value)}
                             placeholder="e.g. 500 L"
-                            className={`${customInputStyle} font-mono font-bold text-purple-900 border-purple-300`}
+                            className={`${customInputStyle} font-mono font-bold text-rose-900 border-rose-300`}
                           />
                         </div>
                       </div>
 
-                      <div className="space-y-2 pt-2 border-t border-purple-200">
+                      <div className="space-y-2 pt-2 border-t border-rose-200">
                         <div className="flex justify-between items-center">
-                          <span className="text-[11px] font-extrabold text-purple-900 uppercase">Ingredients (per 1 Liter)</span>
+                          <span className="text-[11px] font-extrabold text-rose-900 uppercase">Ingredients (per 1 Liter)</span>
                           <button
                             type="button"
                             onClick={handleAddNewMixIngredientRow}
-                            className="text-xs font-bold text-purple-700 hover:underline flex items-center gap-1"
+                            className="text-xs font-bold text-rose-700 hover:underline flex items-center gap-1"
                           >
                             + Add Ingredient
                           </button>
                         </div>
                         {newMixIngredients.map((ing, idx) => (
-                          <div key={idx} className="flex items-center gap-3 bg-white p-2.5 rounded-xl border border-purple-200">
+                          <div key={idx} className="flex items-center gap-3 bg-white p-2.5 rounded-xl border border-rose-200">
                             <div className="flex-1">
                               <SearchableSelect
                                 placeholder="Select Raw Material..."
@@ -1211,7 +1211,7 @@ const ProductionList = () => {
                       <button
                         type="button"
                         onClick={handleCreateNewMixAndApply}
-                        className="w-full bg-purple-700 hover:bg-purple-800 text-white py-2.5 rounded-xl text-xs font-extrabold shadow-sm transition-all flex items-center justify-center gap-1 cursor-pointer"
+                        className="w-full bg-rose-700 hover:bg-rose-800 text-white py-2.5 rounded-xl text-xs font-extrabold shadow-sm transition-all flex items-center justify-center gap-1 cursor-pointer"
                       >
                         Save Mix Formula to Master & Apply Requisition
                       </button>
@@ -1249,7 +1249,7 @@ const ProductionList = () => {
 
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                     <div className="space-y-1">
-                      <label className="text-xs font-bold text-purple-900 block">Target Output (Pcs) *</label>
+                      <label className="text-xs font-bold text-rose-900 block">Target Output (Pcs) *</label>
                       <input
                         type="number"
                         min="1"
@@ -1262,7 +1262,7 @@ const ProductionList = () => {
                           setFormData({ ...formData, totalPieces: pcs, quantityBoxes: boxes });
                         }}
                         placeholder="e.g. 120 Pcs"
-                        className={`${customInputStyle} font-mono font-black text-purple-950 bg-white border-purple-300 text-base`}
+                        className={`${customInputStyle} font-mono font-black text-rose-950 bg-white border-rose-300 text-base`}
                       />
                     </div>
                     <div className="space-y-1">
@@ -1302,8 +1302,8 @@ const ProductionList = () => {
                   </div>
 
                   {/* SELECT PREPARED MIX FROM STORE ROOM STOCK */}
-                  <div className="p-4 bg-white rounded-2xl border border-purple-200 space-y-3 shadow-xs">
-                    <label className="text-xs font-extrabold text-purple-950 uppercase tracking-wider block">
+                  <div className="p-4 bg-white rounded-2xl border border-rose-200 space-y-3 shadow-xs">
+                    <label className="text-xs font-extrabold text-rose-950 uppercase tracking-wider block">
                       Select Prepared Mix Product (Issued from Store Room Stock) *
                     </label>
                     <div className="grid grid-cols-1 sm:grid-cols-12 gap-3 items-end">
@@ -1329,7 +1329,7 @@ const ProductionList = () => {
                           value={mixCount}
                           onChange={(e) => setMixCount(e.target.value)}
                           placeholder="e.g. 10 L"
-                          className={`${customInputStyle} font-mono font-black text-purple-950 border-purple-300`}
+                          className={`${customInputStyle} font-mono font-black text-rose-950 border-rose-300`}
                         />
                       </div>
                     </div>
@@ -1341,8 +1341,8 @@ const ProductionList = () => {
 
                       return (
                         <div className="space-y-2">
-                          <div className="p-2.5 rounded-xl bg-purple-50 border border-purple-200 flex items-center justify-between text-xs font-bold">
-                            <span className="text-purple-950">Store Room Prepared Mix Balance:</span>
+                          <div className="p-2.5 rounded-xl bg-rose-50 border border-rose-200 flex items-center justify-between text-xs font-bold">
+                            <span className="text-rose-950">Store Room Prepared Mix Balance:</span>
                             {availMix <= 0 ? (
                               <span className="px-3 py-1 rounded-lg bg-rose-100 text-rose-900 font-black border border-rose-300 animate-pulse">
                                 🔴 OUT OF STOCK (0 Liters) — Requisition Will Be Blocked!
@@ -1404,7 +1404,7 @@ const ProductionList = () => {
                     const uom = selectedMat?.unitOfMeasure || 'Units';
 
                     return (
-                      <div key={idx} className="flex items-center gap-4 p-4 rounded-2xl bg-purple-50/40 border border-purple-100 shadow-sm">
+                      <div key={idx} className="flex items-center gap-4 p-4 rounded-2xl bg-rose-50/40 border border-rose-100 shadow-sm">
                         <div className="flex-1">
                           <label className="text-[11px] font-bold text-gray-600 uppercase tracking-wider block mb-1">
                             Raw Material Item
@@ -1450,7 +1450,7 @@ const ProductionList = () => {
                           <label className="text-[11px] font-bold text-gray-600 uppercase tracking-wider flex items-center justify-between mb-1">
                             <span>Qty Needed *</span>
                             {selectedMat && (
-                              <span className="px-2 py-0.5 rounded-md bg-purple-100 text-purple-900 font-mono text-[10px] font-extrabold border border-purple-200">
+                              <span className="px-2 py-0.5 rounded-md bg-rose-100 text-rose-900 font-mono text-[10px] font-extrabold border border-rose-200">
                                 {uom}
                               </span>
                             )}
@@ -1467,7 +1467,7 @@ const ProductionList = () => {
                               className={`${customInputStyle} font-mono ${selectedMat ? 'pr-12' : ''}`}
                             />
                             {selectedMat && (
-                              <span className="absolute right-3 font-mono font-bold text-xs text-purple-900 pointer-events-none">
+                              <span className="absolute right-3 font-mono font-bold text-xs text-rose-900 pointer-events-none">
                                 {uom}
                               </span>
                             )}
@@ -1496,12 +1496,12 @@ const ProductionList = () => {
                 const isStep1MixShortage = activeReqType === 'FG_ASSEMBLY_REQUISITION' && (!selectedMixProduct || !formData.finishedGoodProduct || !formData.totalPieces || availMix < neededLiters);
 
                 return (
-                  <div className="flex justify-end pt-4 border-t border-purple-100">
+                  <div className="flex justify-end pt-4 border-t border-rose-100">
                     {activeReqType === 'MIX_REQUISITION' ? (
                       <button
                         type="submit"
                         disabled={submitting}
-                        className="bg-purple-600 hover:bg-purple-700 text-white px-6 py-2.5 rounded-xl text-sm font-extrabold transition-all shadow-md disabled:opacity-50 flex items-center gap-2 cursor-pointer"
+                        className="bg-rose-600 hover:bg-rose-700 text-white px-6 py-2.5 rounded-xl text-sm font-extrabold transition-all shadow-md disabled:opacity-50 flex items-center gap-2 cursor-pointer"
                       >
                         {submitting ? 'Submitting Requisition...' : 'Submit Mix Preparation Requisition to Store Room'}
                       </button>
@@ -1728,7 +1728,7 @@ const ProductionList = () => {
 
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <div className="space-y-1">
-                  <label className="text-xs font-bold font-mono text-purple-900 uppercase tracking-wider block mb-1">Target Output Quantity (Pcs) *</label>
+                  <label className="text-xs font-bold font-mono text-rose-900 uppercase tracking-wider block mb-1">Target Output Quantity (Pcs) *</label>
                   <input
                     type="number"
                     min="1"
@@ -1741,7 +1741,7 @@ const ProductionList = () => {
                       setFormData({ ...formData, totalPieces: pcs, quantityBoxes: boxes });
                     }}
                     placeholder="e.g. 240 Pcs"
-                    className={`${customInputStyle} font-mono font-black text-purple-950 border-purple-300 bg-purple-50/40 text-base`}
+                    className={`${customInputStyle} font-mono font-black text-rose-950 border-rose-300 bg-rose-50/40 text-base`}
                   />
                 </div>
 
@@ -1820,14 +1820,14 @@ const ProductionList = () => {
       {isCompleteModalOpen && selectedProdForCompletion && (
         <Modal isOpen={isCompleteModalOpen} onClose={() => setIsCompleteModalOpen(false)} title="Complete Production Phase" size="md">
           <form onSubmit={handleSubmitCompletion} className="space-y-4">
-            <div className="p-4 bg-purple-50 border border-purple-200 rounded-2xl space-y-1">
+            <div className="p-4 bg-rose-50 border border-rose-200 rounded-2xl space-y-1">
               <div className="flex justify-between items-center">
-                <span className="text-base font-extrabold text-purple-950">{selectedProdForCompletion.finishedGoodProduct?.name}</span>
-                <span className="font-mono text-xs font-black text-purple-900 bg-white px-2 py-0.5 rounded border border-purple-300">
+                <span className="text-base font-extrabold text-rose-950">{selectedProdForCompletion.finishedGoodProduct?.name}</span>
+                <span className="font-mono text-xs font-black text-rose-900 bg-white px-2 py-0.5 rounded border border-rose-300">
                   ID: {selectedProdForCompletion.productionNumber || `PR-${selectedProdForCompletion._id.slice(-4)}`}
                 </span>
               </div>
-              <p className="text-xs text-purple-800 font-semibold">
+              <p className="text-xs text-rose-800 font-semibold">
                 Batch Code: <strong>{selectedProdForCompletion.batchNumber || 'BATCH-1'}</strong>
               </p>
             </div>
@@ -1844,7 +1844,7 @@ const ProductionList = () => {
               </div>
 
               <div className="space-y-1">
-                <label className="text-xs font-bold text-purple-900 uppercase tracking-wider block mb-1">Actual Produced Pieces Count (Pcs) *</label>
+                <label className="text-xs font-bold text-rose-900 uppercase tracking-wider block mb-1">Actual Produced Pieces Count (Pcs) *</label>
                 <input
                   type="number"
                   min="1"
@@ -1852,7 +1852,7 @@ const ProductionList = () => {
                   value={actualProducedPieces}
                   onChange={(e) => setActualProducedPieces(e.target.value)}
                   placeholder="e.g. 480"
-                  className="w-full bg-white border-2 border-purple-300 rounded-xl px-3.5 py-2.5 text-sm font-mono font-black text-purple-950 focus:ring-2 focus:ring-purple-500/20"
+                  className="w-full bg-white border-2 border-rose-300 rounded-xl px-3.5 py-2.5 text-sm font-mono font-black text-rose-950 focus:ring-2 focus:ring-rose-500/20"
                 />
               </div>
             </div>
@@ -1881,11 +1881,11 @@ const ProductionList = () => {
       {isQrModalOpen && currentQrStickers.length > 0 && (
         <Modal isOpen={isQrModalOpen} onClose={() => setIsQrModalOpen(false)} title="Printable Box QR Code Stickers" size="xl">
           <div className="space-y-4">
-            <div className="flex justify-between items-center bg-purple-50 p-3 rounded-2xl border border-purple-200 text-purple-950 text-xs font-bold">
+            <div className="flex justify-between items-center bg-rose-50 p-3 rounded-2xl border border-rose-200 text-rose-950 text-xs font-bold">
               <span>Generated <strong>{currentQrStickers.length} Box QR Stickers</strong> (1 Sticker per Box based on Packaging Config)</span>
               <button
                 onClick={() => window.print()}
-                className="bg-purple-600 hover:bg-purple-700 text-white px-4 py-1.5 rounded-xl text-xs font-extrabold shadow-sm flex items-center gap-1.5 cursor-pointer"
+                className="bg-rose-600 hover:bg-rose-700 text-white px-4 py-1.5 rounded-xl text-xs font-extrabold shadow-sm flex items-center gap-1.5 cursor-pointer"
               >
                 <Printer size={14} /> Print Sticker Sheet
               </button>
@@ -1907,8 +1907,8 @@ const ProductionList = () => {
                 const qrString = typeof sticker.qrCodeText === 'string' ? sticker.qrCodeText : JSON.stringify(data, null, 2);
 
                 return (
-                  <div key={idx} className="bg-white p-3.5 rounded-2xl border-2 border-dashed border-purple-200 hover:border-purple-400 space-y-2 text-center text-[10px] shadow-xs transition-all flex flex-col items-center justify-between">
-                    <div className="font-black text-purple-950 border-b border-purple-100 pb-1 text-xs w-full uppercase tracking-wider">
+                  <div key={idx} className="bg-white p-3.5 rounded-2xl border-2 border-dashed border-rose-200 hover:border-rose-400 space-y-2 text-center text-[10px] shadow-xs transition-all flex flex-col items-center justify-between">
+                    <div className="font-black text-rose-950 border-b border-rose-100 pb-1 text-xs w-full uppercase tracking-wider">
                       {data.brand || 'SRI SARAVANAA ERP'}
                     </div>
 
@@ -1921,9 +1921,9 @@ const ProductionList = () => {
                       />
                     </div>
 
-                    <div className="p-2 bg-purple-50/80 rounded-xl font-mono text-[9.5px] text-gray-800 font-bold space-y-0.5 w-full border border-purple-100">
-                      <div className="text-xs font-black text-purple-950">BOX {sticker.boxIndex} / {sticker.totalBoxes}</div>
-                      <div className="text-purple-900">PROD ID: {data.productionId || sticker.productionId}</div>
+                    <div className="p-2 bg-rose-50/80 rounded-xl font-mono text-[9.5px] text-gray-800 font-bold space-y-0.5 w-full border border-rose-100">
+                      <div className="text-xs font-black text-rose-950">BOX {sticker.boxIndex} / {sticker.totalBoxes}</div>
+                      <div className="text-rose-900">PROD ID: {data.productionId || sticker.productionId}</div>
                       <div>BATCH: {data.batchNumber || sticker.batchNumber}</div>
                       <div className="text-emerald-700 font-black">QTY: {data.piecesInBox || sticker.piecesInBox} Pcs</div>
                     </div>
