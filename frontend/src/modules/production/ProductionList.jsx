@@ -55,11 +55,43 @@ const ProductionList = () => {
     remarks: ''
   });
 
-  // Production Execution & Completion Modal State
-  const [expandedRowId, setExpandedRowId] = useState(null);
-  const [isCompleteModalOpen, setIsCompleteModalOpen] = useState(false);
-  const [selectedProdForCompletion, setSelectedProdForCompletion] = useState(null);
-  const [actualProducedPieces, setActualProducedPieces] = useState('');
+  // Box QR Generation Modal State
+  const [isQrModalOpen, setIsQrModalOpen] = useState(false);
+  const [currentQrStickers, setCurrentQrStickers] = useState([]);
+
+  const handleOpenQrModal = (prod) => {
+    const pPerBox = parseInt(prod.piecesPerBox) || 12;
+    const totalPcs = parseInt(prod.totalPieces) || (parseInt(prod.quantityBoxes) * pPerBox) || 0;
+    const totalBoxes = Math.ceil(totalPcs / pPerBox) || 1;
+    const reqId = prod.productionNumber || `PR-${prod._id.slice(-4)}`;
+    const fgName = prod.finishedGoodProduct?.name || 'Finished Product';
+    const fgCode = prod.finishedGoodProduct?.itemCode || 'FG-ITEM';
+
+    const stickers = [];
+    for (let b = 1; b <= totalBoxes; b++) {
+      const isLastBox = b === totalBoxes;
+      const loosePcs = totalPcs % pPerBox;
+      const pcsInThisBox = (isLastBox && loosePcs > 0) ? loosePcs : pPerBox;
+
+      stickers.push({
+        boxIndex: b,
+        totalBoxes,
+        qrCodeText: JSON.stringify({
+          brand: 'SRI SARAVANAA ERP',
+          productionId: reqId,
+          batchNumber: prod.batchNumber || 'BATCH-1',
+          product: fgName,
+          itemCode: fgCode,
+          boxNumber: `${b} / ${totalBoxes}`,
+          piecesInBox: pcsInThisBox,
+          mfgDate: new Date().toISOString().split('T')[0]
+        })
+      });
+    }
+
+    setCurrentQrStickers(stickers);
+    setIsQrModalOpen(true);
+  };
 
   const handleStartProduction = async (id, code) => {
     try {
@@ -730,13 +762,22 @@ const ProductionList = () => {
                             <span className="text-xs text-amber-700 font-semibold italic">Awaiting Store Room Dispatch</span>
                           )}
                           {isDispatched && (
-                            <button
-                              onClick={() => handleStartProduction(p._id, reqId)}
-                              disabled={submitting}
-                              className="px-3 py-1.5 text-xs font-extrabold rounded-xl bg-purple-600 hover:bg-purple-700 text-white transition-all shadow-sm flex items-center gap-1.5 mx-auto cursor-pointer"
-                            >
-                              <Factory size={14} /> Start Production
-                            </button>
+                            <div className="flex flex-col items-center gap-1.5">
+                              <button
+                                onClick={() => handleStartProduction(p._id, reqId)}
+                                disabled={submitting}
+                                className="px-3 py-1.5 text-xs font-extrabold rounded-xl bg-purple-600 hover:bg-purple-700 text-white transition-all shadow-sm flex items-center gap-1.5 cursor-pointer"
+                              >
+                                <Factory size={14} /> Start Production
+                              </button>
+
+                              <button
+                                onClick={() => handleOpenQrModal(p)}
+                                className="px-2.5 py-1 text-[11px] font-extrabold rounded-lg bg-purple-50 text-purple-900 border border-purple-300 hover:bg-purple-100 transition-all flex items-center gap-1 cursor-pointer"
+                              >
+                                <QrCode size={13} /> Print Box QRs
+                              </button>
+                            </div>
                           )}
                           {isInProduction && (
                             <button
@@ -1419,6 +1460,44 @@ const ProductionList = () => {
               </button>
             </div>
           </form>
+        </Modal>
+      )}
+
+      {/* --- POPUP MODAL: PRINT PER-BOX QR STICKERS --- */}
+      {isQrModalOpen && currentQrStickers.length > 0 && (
+        <Modal isOpen={isQrModalOpen} onClose={() => setIsQrModalOpen(false)} title="Printable Box QR Code Stickers" size="xl">
+          <div className="space-y-4">
+            <div className="flex justify-between items-center bg-purple-50 p-3 rounded-2xl border border-purple-200 text-purple-950 text-xs font-bold">
+              <span>Generated <strong>{currentQrStickers.length} Box QR Stickers</strong> (1 Sticker per Box based on Packaging Config)</span>
+              <button
+                onClick={() => window.print()}
+                className="bg-purple-600 hover:bg-purple-700 text-white px-4 py-1.5 rounded-xl text-xs font-extrabold shadow-sm flex items-center gap-1.5 cursor-pointer"
+              >
+                <Printer size={14} /> Print Sticker Sheet
+              </button>
+            </div>
+
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 max-h-[60vh] overflow-y-auto p-2">
+              {currentQrStickers.map((sticker, idx) => {
+                const data = JSON.parse(sticker.qrCodeText || '{}');
+
+                return (
+                  <div key={idx} className="bg-white p-3 rounded-2xl border-2 border-dashed border-gray-300 space-y-2 text-center text-[10px]">
+                    <div className="font-extrabold text-purple-950 border-b border-gray-200 pb-1">
+                      {data.brand || 'SRI SARAVANAA ERP'}
+                    </div>
+                    <div className="p-2 bg-gray-50 rounded-xl font-mono text-[9px] text-gray-800 font-bold space-y-0.5">
+                      <div className="text-xs font-black text-purple-900">BOX {sticker.boxIndex} / {sticker.totalBoxes}</div>
+                      <div>PROD ID: {data.productionId}</div>
+                      <div>BATCH: {data.batchNumber}</div>
+                      <div>QTY: {data.piecesInBox} Pcs</div>
+                    </div>
+                    <div className="text-[9px] font-bold text-gray-500">{data.product}</div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
         </Modal>
       )}
     </div>
