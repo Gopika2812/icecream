@@ -242,15 +242,16 @@ exports.dispatchStock = async (req, res) => {
             }
         }
 
-        production.status = 'DISPATCHED_TO_PRODUCTION';
-        production.dispatchedAt = new Date();
-        production.dispatchedBy = req.user?._id;
-        await production.save();
+        const updatedProduction = await Production.findByIdAndUpdate(id, {
+            status: 'DISPATCHED_TO_PRODUCTION',
+            dispatchedAt: new Date(),
+            dispatchedBy: req.user?._id
+        }, { new: true });
 
         res.json({
             success: true,
             message: `Store Room Stock Dispatched successfully for Requisition ID ${prodIdCode}!`,
-            data: production
+            data: updatedProduction
         });
     } catch (error) {
         console.error('Error dispatching stock from Store Room', error);
@@ -267,12 +268,13 @@ exports.startProduction = async (req, res) => {
         const production = await Production.findById(id);
         if (!production) return res.status(404).json({ success: false, message: 'Production Requisition not found.' });
 
-        production.status = 'IN_PRODUCTION';
-        production.startedAt = new Date();
-        production.startedBy = req.user?._id;
-        await production.save();
+        const updatedProd = await Production.findByIdAndUpdate(id, {
+            status: 'IN_PRODUCTION',
+            startedAt: new Date(),
+            startedBy: req.user?._id
+        }, { new: true });
 
-        res.json({ success: true, message: `Production started for Batch ${production.productionNumber || 'PR-01'}!`, data: production });
+        res.json({ success: true, message: `Production started for Batch ${production.productionNumber || 'PR-01'}!`, data: updatedProd });
     } catch (error) {
         res.status(500).json({ success: false, message: error.message });
     }
@@ -293,14 +295,15 @@ exports.completeProduction = async (req, res) => {
         const pPerBox = parseInt(production.piecesPerBox) || 12;
         const pBoxes = Number((pPcs / pPerBox).toFixed(2));
 
-        production.producedPieces = pPcs;
-        production.producedBoxes = pBoxes;
-        production.status = 'PRODUCTION_COMPLETED';
-        production.completedAt = new Date();
-        production.completedBy = req.user?._id;
-        await production.save();
+        const updatedProd = await Production.findByIdAndUpdate(id, {
+            producedPieces: pPcs,
+            producedBoxes: pBoxes,
+            status: 'PRODUCTION_COMPLETED',
+            completedAt: new Date(),
+            completedBy: req.user?._id
+        }, { new: true });
 
-        res.json({ success: true, message: `Production completed with ${pPcs} Pcs output! Ready to send to QC.`, data: production });
+        res.json({ success: true, message: `Production completed with ${pPcs} Pcs output! Ready to send to QC.`, data: updatedProd });
     } catch (error) {
         res.status(500).json({ success: false, message: error.message });
     }
@@ -315,11 +318,12 @@ exports.sendToQc = async (req, res) => {
         const production = await Production.findById(id);
         if (!production) return res.status(404).json({ success: false, message: 'Production batch not found.' });
 
-        production.status = 'SENT_TO_QC';
-        production.sentToQcAt = new Date();
-        await production.save();
+        const updatedProd = await Production.findByIdAndUpdate(id, {
+            status: 'SENT_TO_QC',
+            sentToQcAt: new Date()
+        }, { new: true });
 
-        res.json({ success: true, message: `Batch ${production.productionNumber} sent to Finished Goods QC!`, data: production });
+        res.json({ success: true, message: `Batch ${production.productionNumber} sent to Finished Goods QC!`, data: updatedProd });
     } catch (error) {
         res.status(500).json({ success: false, message: error.message });
     }
@@ -407,23 +411,24 @@ exports.approveFinishedGoodsQC = async (req, res) => {
             });
         }
 
-        prod.qcId = qcIdCode;
-        prod.damagedPieces = dPcs;
-        prod.passedPieces = passedPcs;
-        prod.passedBoxes = passedBoxes;
-        prod.damageReason = damageReason || 'None';
-        prod.qcInspectorRemarks = remarks || 'QC Inspection Approved';
-        prod.qcStatus = 'PASSED';
-        prod.status = 'QC_APPROVED';
-        prod.qcApprovedAt = new Date();
-        prod.qcApprovedBy = req.user?._id;
-        prod.boxQrStickers = boxQrStickers;
-        await prod.save();
+        const updatedProd = await Production.findByIdAndUpdate(id, {
+            qcId: qcIdCode,
+            damagedPieces: dPcs,
+            passedPieces: passedPcs,
+            passedBoxes: passedBoxes,
+            damageReason: damageReason || 'None',
+            qcInspectorRemarks: remarks || 'QC Inspection Approved',
+            qcStatus: 'PASSED',
+            status: 'QC_APPROVED',
+            qcApprovedAt: new Date(),
+            qcApprovedBy: req.user?._id,
+            boxQrStickers: boxQrStickers
+        }, { new: true });
 
         res.json({
             success: true,
             message: `QC Approved successfully for Production ID ${prodIdCode}! Inwarded ${passedPcs} Pcs to Finished Goods Inventory and generated ${boxQrStickers.length} Box QR stickers.`,
-            data: prod
+            data: updatedProd
         });
     } catch (error) {
         console.error('Error approving QC', error);
@@ -580,22 +585,17 @@ exports.performFinishedGoodsQC = async (req, res) => {
             ? (pPcs > 0 ? 'QC_PARTIAL_DAMAGE' : 'QC_REJECTED')
             : 'QC_PASSED';
 
-        prod.qcStatus = finalQcStatus;
-        prod.passedBoxes = pBoxes;
-        prod.passedPieces = pPcs;
-        prod.damagedBoxes = dBoxes;
-        prod.damagedPieces = dPcs;
-        prod.damageReason = damageReason || '';
-        prod.qcInspector = req.user._id;
-        prod.qcInspectedAt = Date.now();
-        if (remarks) prod.remarks = `${prod.remarks} | QC Notes: ${remarks}`;
-        await prod.save();
-
-        const updatedProd = await Production.findById(prod._id)
-            .populate('branch', 'branchName')
-            .populate('finishedGoodProduct', 'name itemCode unitOfMeasure category')
-            .populate('rawMaterialsUsed.product', 'name itemCode unitOfMeasure')
-            .populate('qcInspector', 'name');
+        const updatedProd = await Production.findByIdAndUpdate(id, {
+            qcStatus: finalQcStatus,
+            passedBoxes: pBoxes,
+            passedPieces: pPcs,
+            damagedBoxes: dBoxes,
+            damagedPieces: dPcs,
+            damageReason: damageReason || '',
+            qcInspector: req.user?._id,
+            qcInspectedAt: Date.now(),
+            remarks: remarks ? `${prod.remarks || ''} | QC Notes: ${remarks}` : prod.remarks
+        }, { new: true });
 
         res.json({
             success: true,
