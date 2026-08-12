@@ -380,6 +380,17 @@ const ProductionList = () => {
     }
 
     // STRICT STORE ROOM STOCK VALIDATION BEFORE SUBMISSION
+    // 1. Prepared Mix Stock Check (for FG Assembly)
+    if (!isMix && selectedMixProduct) {
+      const availMix = getStoreRoomAvailableStock(selectedMixProduct);
+      const neededLiters = parseFloat(mixCount) || 1;
+      if (availMix < neededLiters) {
+        const mixObj = products.find(p => (p._id || p.id) === selectedMixProduct);
+        return alert(`🔴 SUBMISSION BLOCKED: Prepared Mix Product "${mixObj?.name || 'Selected Mix'}" is OUT OF STOCK / Insufficient in Store Room Inventory! (Available: ${availMix} Liters, Needed: ${neededLiters} Liters). Please request Mix Preparation first!`);
+      }
+    }
+
+    // 2. Extra Raw Materials / Add-ons Stock Check
     if (Array.isArray(formData.rawMaterialsUsed)) {
       for (const rm of formData.rawMaterialsUsed) {
         const qtyNeeded = parseFloat(rm.quantityUsed) || 0;
@@ -387,8 +398,23 @@ const ProductionList = () => {
           const avail = getStoreRoomAvailableStock(rm.product);
           if (avail < qtyNeeded) {
             const matObj = rawMaterials.find(m => m._id === rm.product);
-            const matName = matObj ? matObj.name : 'Raw Material';
-            return alert(`🔴 SUBMISSION BLOCKED: "${matName}" is OUT OF STOCK / Insufficient in Store Room! (Available Stock: ${avail} ${matObj?.unitOfMeasure || ''}, Requested: ${qtyNeeded}). Please send restock reminder to Super Admin & Purchase Team!`);
+            const matName = matObj ? matObj.name : 'Extra Raw Material';
+            return alert(`🔴 SUBMISSION BLOCKED: Extra Raw Material / Add-on "${matName}" is OUT OF STOCK / Insufficient in Store Room! (Available Stock: ${avail} ${matObj?.unitOfMeasure || ''}, Requested: ${qtyNeeded}). Please send restock reminder to Purchase Team!`);
+          }
+        }
+      }
+    }
+
+    // 3. Packaging Materials Stock Check
+    if (Array.isArray(packagingMaterialsUsed)) {
+      for (const pkg of packagingMaterialsUsed) {
+        const qtyReq = parseFloat(pkg.quantityRequested) || 0;
+        if (qtyReq > 0 && pkg.product) {
+          const avail = getStoreRoomAvailableStock(pkg.product);
+          if (avail < qtyReq) {
+            const pkgObj = packagingMaterials.find(m => m._id === pkg.product);
+            const pkgName = pkgObj ? pkgObj.name : 'Packaging Material';
+            return alert(`🔴 SUBMISSION BLOCKED: Packaging Material "${pkgName}" is OUT OF STOCK / Insufficient in Store Room! (Available Stock: ${avail} ${pkgObj?.unitOfMeasure || 'Pcs'}, Requested: ${qtyReq}). Please send restock reminder to Purchase Team!`);
           }
         }
       }
@@ -1017,6 +1043,30 @@ const ProductionList = () => {
                         }))}
                         onChange={(val) => setSelectedMixProduct(val)}
                       />
+                      {selectedMixProduct && (() => {
+                        const availMix = getStoreRoomAvailableStock(selectedMixProduct);
+                        const neededLiters = parseFloat(mixCount) || 1;
+                        const isShortage = availMix < neededLiters;
+
+                        return (
+                          <div className="mt-1.5 flex items-center justify-between text-[11px] font-bold">
+                            <span className="text-purple-900">Store Room Prepared Mix Stock:</span>
+                            {availMix <= 0 ? (
+                              <span className="px-2.5 py-0.5 rounded-md bg-rose-100 text-rose-900 font-black border border-rose-300 animate-pulse">
+                                🔴 OUT OF STOCK (0 Liters)
+                              </span>
+                            ) : isShortage ? (
+                              <span className="px-2.5 py-0.5 rounded-md bg-amber-100 text-amber-900 font-black border border-amber-300">
+                                ⚠️ INSUFFICIENT STOCK (Avail: {availMix} L, Needed: {neededLiters} L)
+                              </span>
+                            ) : (
+                              <span className="px-2.5 py-0.5 rounded-md bg-emerald-100 text-emerald-900 font-black border border-emerald-300">
+                                🟢 Prepared Mix Available ({availMix} Liters)
+                              </span>
+                            )}
+                          </div>
+                        );
+                      })()}
                     </div>
 
                     <div className="sm:col-span-3 space-y-1">
@@ -1336,6 +1386,29 @@ const ProductionList = () => {
                         }))}
                         onChange={(val) => handlePackagingChange(idx, 'product', val)}
                       />
+                      {selectedPkg && (() => {
+                        const availStock = getStoreRoomAvailableStock(pkg.product);
+                        const isShortage = availStock < (parseFloat(pkg.quantityRequested) || 0);
+
+                        return (
+                          <div className="mt-1 flex items-center justify-between text-[10px] font-bold">
+                            <span className="text-gray-500">Store Room Balance:</span>
+                            {availStock <= 0 ? (
+                              <span className="px-2 py-0.5 rounded-md bg-rose-100 text-rose-900 font-black border border-rose-300 flex items-center gap-1 animate-pulse">
+                                🔴 OUT OF STOCK (0 {uom})
+                              </span>
+                            ) : isShortage ? (
+                              <span className="px-2 py-0.5 rounded-md bg-amber-100 text-amber-900 font-black border border-amber-300 flex items-center gap-1">
+                                ⚠️ INSUFFICIENT (Avail: {availStock} {uom})
+                              </span>
+                            ) : (
+                              <span className="px-2 py-0.5 rounded-md bg-emerald-100 text-emerald-900 font-black border border-emerald-300">
+                                🟢 Available ({availStock} {uom})
+                              </span>
+                            )}
+                          </div>
+                        );
+                      })()}
                     </div>
 
                     <div className="w-48">

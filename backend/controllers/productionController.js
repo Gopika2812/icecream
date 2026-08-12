@@ -155,6 +155,26 @@ exports.createProductionBatch = async (req, res) => {
             }
 
             if (totalPieces <= 0) return res.status(400).json({ success: false, message: 'Valid Target Output in Pcs is required.' });
+
+            // STRICT PREPARED MIX STORE ROOM STOCK VALIDATION FOR FG ASSEMBLY
+            if (targetMixProduct) {
+                const mixProdObj = await Product.findById(targetMixProduct);
+                const mixName = mixProdObj ? mixProdObj.name : 'Prepared Mix';
+                const neededLiters = parseFloat(mixLiters) || Number((totalPieces / (pPerBox || 12)).toFixed(2)) || 1;
+
+                const mixInv = await Inventory.findOne({
+                    product: targetMixProduct,
+                    inventoryType: 'Store Room'
+                });
+
+                const availMixQty = mixInv ? (parseFloat(mixInv.quantity) || 0) : 0;
+                if (availMixQty < neededLiters) {
+                    return res.status(400).json({
+                        success: false,
+                        message: `Cannot submit FG Assembly Requisition: Prepared Mix Product "${mixName}" is OUT OF STOCK / Insufficient in Store Room! (Available: ${availMixQty} Liters, Needed: ${neededLiters} Liters). Please run Mix Preparation first!`
+                    });
+                }
+            }
         }
 
         // STRICT STORE ROOM STOCK VALIDATION FOR RAW MATERIALS
