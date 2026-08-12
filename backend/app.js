@@ -20,7 +20,6 @@ app.use(cors({
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept', 'Origin']
 }));
-app.options('*', cors());
 app.use(helmet({ crossOriginResourcePolicy: false }));
 if (process.env.NODE_ENV !== 'production') {
     app.use(morgan('dev'));

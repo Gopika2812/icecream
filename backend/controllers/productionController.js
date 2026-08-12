@@ -156,6 +156,7 @@ exports.createProductionBatch = async (req, res) => {
             }
 
             if (totalPieces <= 0) return res.status(400).json({ success: false, message: 'Valid Target Output in Pcs is required.' });
+        }
 
         const allStoreInv = await Inventory.find({ inventoryType: 'Store Room' });
         const getStoreRoomStockSum = (prodId) => {
