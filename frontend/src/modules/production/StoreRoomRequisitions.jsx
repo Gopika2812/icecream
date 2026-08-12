@@ -187,11 +187,21 @@ const StoreRoomRequisitions = () => {
                               {/* Requested Raw Materials */}
                               <div className="bg-white p-4 rounded-2xl border border-purple-200 space-y-2 shadow-xs">
                                 <h4 className="text-xs font-extrabold text-purple-950 uppercase tracking-wider flex items-center gap-1.5">
-                                  <Package size={14} className="text-purple-600" /> Requested Raw Materials
+                                  <Package size={14} className="text-purple-600" /> Requested Raw Materials & Prepared Mix
                                 </h4>
-                                {prod.rawMaterialsUsed?.length > 0 ? (
+                                {(prod.mixProduct || prod.rawMaterialsUsed?.length > 0) ? (
                                   <ul className="space-y-1.5 text-xs">
-                                    {prod.rawMaterialsUsed.map((rm, idx) => (
+                                    {prod.mixProduct && (
+                                      <li className="flex justify-between items-center bg-purple-100/80 p-2 rounded-xl border border-purple-300 shadow-2xs">
+                                        <span className="font-extrabold text-purple-950 flex items-center gap-1">
+                                          <span>🥣 Prepared Mix:</span> {getProductName(prod.mixProduct, 'Prepared Mix')}
+                                        </span>
+                                        <span className="font-mono font-black text-purple-900 bg-white px-2 py-0.5 rounded-lg border border-purple-300">
+                                          {prod.mixLiters || Number(((prod.totalPieces || 12) / (prod.piecesPerBox || 12)).toFixed(2))} Liters
+                                        </span>
+                                      </li>
+                                    )}
+                                    {prod.rawMaterialsUsed?.map((rm, idx) => (
                                       <li key={idx} className="flex justify-between items-center bg-purple-50/50 p-2 rounded-xl border border-purple-100">
                                         <span className="font-extrabold text-purple-950">{getProductName(rm.product, rm.productName || 'Raw Material')}</span>
                                         <span className="font-mono font-black text-purple-900 bg-white px-2 py-0.5 rounded-lg border border-purple-200">

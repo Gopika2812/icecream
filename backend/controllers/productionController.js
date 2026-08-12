@@ -427,7 +427,7 @@ exports.dispatchStock = async (req, res) => {
             }
         }
 
-        // 4. AUTOMATIC STOCK CREATION FOR MIX PREPARATION REQUISITIONS!
+        // 4. AUTOMATIC STOCK CREATION FOR MIX PREPARATION / DEDUCTION FOR FG ASSEMBLY!
         if (isMixReq && production.finishedGoodProduct) {
             const mixProdId = production.finishedGoodProduct._id || production.finishedGoodProduct;
             const mixLitersAdded = parseFloat(production.totalPieces) || parseFloat(production.mixLiters) || 1;
@@ -463,6 +463,23 @@ exports.dispatchStock = async (req, res) => {
                 quantity: mixLitersAdded,
                 referenceType: 'PRODUCTION_MIX',
                 remarks: `Prepared Mix Inwarded to Store Room Inventory (${mixLitersAdded} Liters) for Requisition ${prodIdCode}`,
+                performedBy: req.user?._id
+            });
+        } else if (!isMixReq && production.mixProduct) {
+            // Deduct Prepared Mix from Store Room Inventory for FG Assembly Requisition
+            const mixProdId = production.mixProduct._id || production.mixProduct;
+            const neededLiters = parseFloat(production.mixLiters) || Number(((production.totalPieces || 12) / (production.piecesPerBox || 12)).toFixed(2)) || 1;
+
+            await deductStoreRoomStock(mixProdId, neededLiters);
+
+            await InventoryTransaction.create({
+                branch: targetBranch,
+                product: mixProdId,
+                inventoryType: 'Store Room',
+                transactionType: 'OUT',
+                quantity: neededLiters,
+                referenceType: 'PRODUCTION',
+                remarks: `Issued Prepared Mix to Production for Requisition ${prodIdCode}`,
                 performedBy: req.user?._id
             });
         }

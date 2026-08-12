@@ -468,7 +468,7 @@ const ProductionList = () => {
         mrp: parseFloat(formData.mrp) || 0,
         temperature: parseFloat(formData.temperature) || -18,
         packagingMaterialsUsed,
-        essenceMaterialsUsed: packagingMaterialsUsed // reused add-on materials
+        essenceMaterialsUsed: []
       };
 
       const response = await api.post('/production', payload);

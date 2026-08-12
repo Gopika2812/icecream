@@ -249,7 +249,7 @@
                 "S3Bucket": {
                   "Ref": "ServerlessDeploymentBucket"
                 },
-                "S3Key": "serverless/icecream-erp-backend/dev/1786533263104-2026-08-12T11:14:23.104Z/icecream-erp-backend.zip"
+                "S3Key": "serverless/icecream-erp-backend/dev/1786535419557-2026-08-12T11:50:19.557Z/icecream-erp-backend.zip"
               },
               "Handler": "handler.handler",
               "Runtime": "nodejs20.x",
@@ -293,14 +293,14 @@
               "ApiLogGroup"
             ]
           },
-          "ApiLambdaVersionLd49nXaRLmY7rMq4AEes74CE2TtDD0MaCEuPj7cC4": {
+          "ApiLambdaVersionMVEDFncpZlrFiYI3AVx92lSjfEjjCxlclOdoGIYOTQY": {
             "Type": "AWS::Lambda::Version",
             "DeletionPolicy": "Retain",
             "Properties": {
               "FunctionName": {
                 "Ref": "ApiLambdaFunction"
               },
-              "CodeSha256": "eyYiwt0uj/Sn3Yue6Nn1uKbaetLDW97ZwWx6Y/qO0ro="
+              "CodeSha256": "8eWAFtQfA0o2IXWPPiZF66CoKWPROePKzy6IRFGWX4Q="
             }
           },
           "HttpApi": {
@@ -833,7 +833,7 @@
           "ApiLambdaFunctionQualifiedArn": {
             "Description": "Current Lambda function version",
             "Value": {
-              "Ref": "ApiLambdaVersionLd49nXaRLmY7rMq4AEes74CE2TtDD0MaCEuPj7cC4"
+              "Ref": "ApiLambdaVersionMVEDFncpZlrFiYI3AVx92lSjfEjjCxlclOdoGIYOTQY"
             },
             "Export": {
               "Name": "sls-icecream-erp-backend-dev-ApiLambdaFunctionQualifiedArn"
@@ -987,7 +987,7 @@
         "timeout": 29,
         "runtime": "nodejs20.x",
         "vpc": {},
-        "versionLogicalId": "ApiLambdaVersionLd49nXaRLmY7rMq4AEes74CE2TtDD0MaCEuPj7cC4"
+        "versionLogicalId": "ApiLambdaVersionMVEDFncpZlrFiYI3AVx92lSjfEjjCxlclOdoGIYOTQY"
       }
     },
     "resources": {
@@ -1394,7 +1394,7 @@
     "artifact": "E:\\icecream\\backend\\.serverless\\icecream-erp-backend.zip"
   },
   "package": {
-    "artifactDirectoryName": "serverless/icecream-erp-backend/dev/1786533263104-2026-08-12T11:14:23.104Z",
+    "artifactDirectoryName": "serverless/icecream-erp-backend/dev/1786535419557-2026-08-12T11:50:19.557Z",
     "artifact": "icecream-erp-backend.zip"
   }
 }
