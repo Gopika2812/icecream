@@ -37,9 +37,13 @@ const loginUser = async (req, res) => {
             if (user.role) {
                 if (typeof user.role === 'object' && user.role.name) {
                     roleName = user.role.name;
-                } else {
-                    const roleObj = await Role.findById(user.role);
-                    if (roleObj) roleName = roleObj.name;
+                } else if (typeof user.role === 'string') {
+                    if (user.role.length > 20) {
+                        const roleObj = await Role.findById(user.role);
+                        if (roleObj) roleName = roleObj.name;
+                    } else {
+                        roleName = user.role;
+                    }
                 }
             }
 
@@ -52,6 +56,7 @@ const loginUser = async (req, res) => {
                 name: user.name,
                 username: user.username,
                 role: roleName,
+                allowedPages: user.allowedPages || [],
                 accessToken,
             });
         } else {

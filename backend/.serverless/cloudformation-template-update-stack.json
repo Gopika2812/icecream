@@ -176,7 +176,7 @@
           "S3Bucket": {
             "Ref": "ServerlessDeploymentBucket"
           },
-          "S3Key": "serverless/icecream-erp-backend/dev/1786546303479-2026-08-12T14:51:43.479Z/icecream-erp-backend.zip"
+          "S3Key": "serverless/icecream-erp-backend/dev/1786580638741-2026-08-13T00:23:58.741Z/icecream-erp-backend.zip"
         },
         "Handler": "handler.handler",
         "Runtime": "nodejs20.x",
@@ -220,14 +220,14 @@
         "ApiLogGroup"
       ]
     },
-    "ApiLambdaVersionp8ypAniJ1VQVy5qbskUCmtfsr6zpu8Hd26QiwGjw8k": {
+    "ApiLambdaVersion8f00Z59pCtsw8mog3bRgPFaPrSypStgDXVCBgYaHA": {
       "Type": "AWS::Lambda::Version",
       "DeletionPolicy": "Retain",
       "Properties": {
         "FunctionName": {
           "Ref": "ApiLambdaFunction"
         },
-        "CodeSha256": "W7dmT+pO1nL2O5Rp4maFZTfaXsVSy2+L3EABlt63CkE="
+        "CodeSha256": "9PsVEIkaO4w76rR932cBXZE8FEuVs4W17G8K54IP8AA="
       }
     },
     "HttpApi": {
@@ -763,7 +763,7 @@
     "ApiLambdaFunctionQualifiedArn": {
       "Description": "Current Lambda function version",
       "Value": {
-        "Ref": "ApiLambdaVersionp8ypAniJ1VQVy5qbskUCmtfsr6zpu8Hd26QiwGjw8k"
+        "Ref": "ApiLambdaVersion8f00Z59pCtsw8mog3bRgPFaPrSypStgDXVCBgYaHA"
       },
       "Export": {
         "Name": "sls-icecream-erp-backend-dev-ApiLambdaFunctionQualifiedArn"
