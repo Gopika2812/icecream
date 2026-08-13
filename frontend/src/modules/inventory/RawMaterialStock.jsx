@@ -189,6 +189,9 @@ const RawMaterialStock = () => {
         
         if (tx.transactionType === 'IN') {
           productMap[pId].inwardQty += qty;
+          if (tx.requestedQuantity && tx.requestedQuantity !== qty) {
+            productMap[pId].requestedInwardQty = tx.requestedQuantity;
+          }
         } else if (tx.transactionType === 'OUT') {
           productMap[pId].outwardQty += qty;
         }
@@ -718,13 +721,17 @@ const RawMaterialStock = () => {
                           </td>
                           <td className="px-5 py-3.5 font-semibold text-slate-600 text-xs">{p.category}</td>
                           <td className="px-5 py-3.5 text-right font-mono font-bold text-emerald-600">
-                            + {p.inwardQty.toLocaleString()}
+                            + {p.inwardQty.toLocaleString()} {p.requestedInwardQty && p.requestedInwardQty !== p.inwardQty ? (
+                              <span className="text-slate-500 font-extrabold text-xs font-mono ml-0.5">({p.requestedInwardQty})</span>
+                            ) : null}
                           </td>
                           <td className="px-5 py-3.5 text-right font-mono font-bold text-rose-600">
                             - {p.outwardQty.toLocaleString()}
                           </td>
                           <td className="px-5 py-3.5 text-right font-mono font-extrabold text-slate-900 text-base">
-                            {p.currentStock.toLocaleString()} <span className="text-xs font-semibold text-slate-500">{p.unitOfMeasure}</span>
+                            {p.currentStock.toLocaleString()} {p.requestedInwardQty && p.requestedInwardQty !== p.currentStock ? (
+                              <span className="text-slate-500 font-extrabold text-xs font-mono ml-0.5">({p.requestedInwardQty})</span>
+                            ) : null} <span className="text-xs font-semibold text-slate-500">{p.unitOfMeasure}</span>
                           </td>
                           <td className="px-5 py-3.5 text-center">
                             <span className={`px-2.5 py-1 rounded-full text-xs font-bold inline-flex items-center gap-1.5 ${

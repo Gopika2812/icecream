@@ -439,45 +439,8 @@ exports.dispatchStock = async (req, res) => {
             }
         }
 
-        // 4. AUTOMATIC STOCK CREATION FOR MIX PREPARATION / DEDUCTION FOR FG ASSEMBLY!
-        if (isMixReq && production.finishedGoodProduct) {
-            const mixProdId = production.finishedGoodProduct._id || production.finishedGoodProduct;
-            const mixLitersAdded = parseFloat(production.totalPieces) || parseFloat(production.mixLiters) || 1;
-
-            const existingMixInv = allStoreInv.find(i => {
-                const pId = typeof i.product === 'object' ? (i.product._id || i.product.id) : i.product;
-                return pId?.toString() === mixProdId?.toString();
-            });
-
-            if (existingMixInv) {
-                const invId = existingMixInv._id || existingMixInv.id;
-                await Inventory.findByIdAndUpdate(invId, {
-                    quantity: (parseFloat(existingMixInv.quantity) || 0) + mixLitersAdded,
-                    lastUpdated: Date.now()
-                });
-            } else {
-                await Inventory.create({
-                    branch: targetBranch,
-                    product: mixProdId,
-                    inventoryType: 'Store Room',
-                    quantity: mixLitersAdded,
-                    batchNumber: production.batchNumber || 'MIX-BATCH-1',
-                    lastUpdated: Date.now()
-                });
-            }
-
-            await InventoryTransaction.create({
-                branch: targetBranch,
-                product: mixProdId,
-                inventoryType: 'Store Room',
-                batchNumber: production.batchNumber || 'MIX-BATCH-1',
-                transactionType: 'IN',
-                quantity: mixLitersAdded,
-                referenceType: 'PRODUCTION_MIX',
-                remarks: `Prepared Mix Inwarded to Store Room Inventory (${mixLitersAdded} Liters) for Requisition ${prodIdCode}`,
-                performedBy: req.user?._id
-            });
-        } else if (!isMixReq && production.mixProduct) {
+        // 4. DEDUCT PREPARED MIX FOR FG ASSEMBLY REQUISITION
+        if (!isMixReq && production.mixProduct) {
             // Deduct Prepared Mix from Store Room Inventory for FG Assembly Requisition
             const mixProdId = production.mixProduct._id || production.mixProduct;
             const neededLiters = parseFloat(production.mixLiters) || Number(((production.totalPieces || 12) / (production.piecesPerBox || 12)).toFixed(2)) || 1;
