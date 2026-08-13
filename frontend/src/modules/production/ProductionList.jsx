@@ -86,6 +86,7 @@ const ProductionList = () => {
       stickers.push({
         boxIndex: b,
         totalBoxes,
+        piecesInBox: pcsInThisBox,
         qrCodeText: JSON.stringify({
           brand: 'SRI SARAVANAA ERP',
           productionId: reqId,
@@ -2168,7 +2169,7 @@ const ProductionList = () => {
                     batchNumber: parsed.batchNumber || sticker.batchNumber || 'BATCH-1',
                     boxNumber: sticker.boxIndex,
                     totalBoxes: sticker.totalBoxes,
-                    piecesInBox: sticker.piecesInBox,
+                    piecesInBox: parsed.piecesInBox !== undefined ? parsed.piecesInBox : (sticker.piecesInBox !== undefined ? sticker.piecesInBox : 12),
                     manufacturingDate: parsed.mfgDate || new Date().toISOString().split('T')[0],
                     expiryDate: parsed.expDate || ''
                   };
@@ -2223,7 +2224,7 @@ const ProductionList = () => {
                     batchNumber: parsed.batchNumber || sticker.batchNumber || 'BATCH-1',
                     boxNumber: sticker.boxIndex,
                     totalBoxes: sticker.totalBoxes,
-                    piecesInBox: sticker.piecesInBox,
+                    piecesInBox: parsed.piecesInBox !== undefined ? parsed.piecesInBox : (sticker.piecesInBox !== undefined ? sticker.piecesInBox : 12),
                     manufacturingDate: parsed.mfgDate || new Date().toISOString().split('T')[0],
                     expiryDate: parsed.expDate || ''
                   };
