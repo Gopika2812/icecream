@@ -62,15 +62,8 @@ const ProductionList = () => {
     remarks: ''
   });
 
-  // Production Execution & Completion Modal State
+  // Production Execution & Row State
   const [expandedRowId, setExpandedRowId] = useState(null);
-  const [isCompleteModalOpen, setIsCompleteModalOpen] = useState(false);
-  const [selectedProdForCompletion, setSelectedProdForCompletion] = useState(null);
-  const [completionForm, setCompletionForm] = useState({
-    piecesPerBox: 12,
-    actualProducedBoxes: '',
-    actualProducedPieces: ''
-  });
 
   // Box QR Generation Modal State
   const [isQrModalOpen, setIsQrModalOpen] = useState(false);
@@ -124,40 +117,7 @@ const ProductionList = () => {
     }
   };
 
-  const handleOpenCompleteModal = (prod) => {
-    const ppb = prod.piecesPerBox || 12;
-    const boxes = prod.quantityBoxes || (prod.totalPieces ? Number((prod.totalPieces / ppb).toFixed(2)) : '');
-    const pcs = prod.totalPieces || (prod.quantityBoxes ? (prod.quantityBoxes * ppb) : '');
 
-    setSelectedProdForCompletion(prod);
-    setCompletionForm({
-      piecesPerBox: ppb,
-      actualProducedBoxes: boxes,
-      actualProducedPieces: pcs
-    });
-    setIsCompleteModalOpen(true);
-  };
-
-  const handleSubmitCompletion = async (e) => {
-    e.preventDefault();
-    if (!selectedProdForCompletion) return;
-
-    try {
-      setSubmitting(true);
-      const res = await api.post(`/production/${selectedProdForCompletion._id}/complete-production`, {
-        actualProducedPieces: parseInt(completionForm.actualProducedPieces) || selectedProdForCompletion.totalPieces,
-        piecesPerBox: parseInt(completionForm.piecesPerBox) || selectedProdForCompletion.piecesPerBox || 12
-      });
-      alert(res.data?.message || 'Production completed & stock inwarded!');
-      setIsCompleteModalOpen(false);
-      fetchInitialData();
-    } catch (err) {
-      console.error('Failed to complete production', err);
-      alert(err.response?.data?.message || 'Error completing production');
-    } finally {
-      setSubmitting(false);
-    }
-  };
 
   const handleSendToQc = async (id, code) => {
     try {
@@ -516,6 +476,48 @@ const ProductionList = () => {
       remarks: ''
     });
     setIsQcModalOpen(true);
+  };
+
+  // Complete Production Yield Modal State
+  const [isCompleteModalOpen, setIsCompleteModalOpen] = useState(false);
+  const [selectedProdForComplete, setSelectedProdForComplete] = useState(null);
+  const [producedYield, setProducedYield] = useState('');
+  const [completeRemarks, setCompleteRemarks] = useState('');
+
+  const handleOpenCompleteModal = (prod) => {
+    setSelectedProdForComplete(prod);
+    const isMix = prod.requisitionType === 'MIX_REQUISITION';
+    const targetQty = isMix ? (prod.mixLiters || prod.totalPieces || 0) : (prod.totalPieces || 0);
+    setProducedYield(targetQty);
+    setCompleteRemarks('');
+    setIsCompleteModalOpen(true);
+  };
+
+  const handleCompleteProductionSubmit = async (e) => {
+    e.preventDefault();
+    if (!selectedProdForComplete) return;
+
+    try {
+      setSubmitting(true);
+      const isMix = selectedProdForComplete.requisitionType === 'MIX_REQUISITION';
+      const reqTargetQty = isMix ? (selectedProdForComplete.mixLiters || selectedProdForComplete.totalPieces || 0) : (selectedProdForComplete.totalPieces || 0);
+      const yieldVal = parseFloat(producedYield);
+      
+      const response = await api.post(`/production/${selectedProdForComplete._id}/complete-production`, {
+        actualProducedPieces: yieldVal >= 0 ? yieldVal : reqTargetQty,
+        remarks: completeRemarks
+      });
+
+      alert(response.data.message || `Production Run Completed! Yield: ${yieldVal} (${reqTargetQty} Requested) recorded.`);
+      setIsCompleteModalOpen(false);
+      setSelectedProdForComplete(null);
+      fetchInitialData();
+    } catch (error) {
+      console.error('Failed to complete production run', error);
+      alert(error.response?.data?.message || 'Error completing production run');
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   // Submit Finished Goods QC Inspection
@@ -899,8 +901,33 @@ const ProductionList = () => {
                           </span>
                         </td>
                         <td className="px-6 py-4 text-right font-mono font-bold text-gray-900">
-                          <span className="text-sm font-black text-rose-900 block">{p.totalPieces || p.quantityBoxes * 12} Pcs</span>
-                          <span className="text-xs text-gray-500 font-semibold block">({p.quantityBoxes} Boxes)</span>
+                          {(() => {
+                            const isMix = p.requisitionType === 'MIX_REQUISITION';
+                            const uom = isMix ? 'Ltr' : 'Pcs';
+                            const reqQty = isMix ? (p.mixLiters || p.totalPieces || 0) : (p.totalPieces || (p.quantityBoxes * 12));
+                            const hasProduced = p.producedPieces !== undefined && p.producedPieces !== null;
+                            const prodQty = hasProduced ? p.producedPieces : reqQty;
+
+                            if (hasProduced || p.status === 'QC_PASSED' || p.status === 'COMPLETED' || p.status === 'PRODUCTION_COMPLETED') {
+                              return (
+                                <div>
+                                  <span className="text-sm font-black text-emerald-700 block font-mono">
+                                    {prodQty} {uom} <span className="text-slate-500 font-extrabold text-xs font-mono">({reqQty} {uom})</span>
+                                  </span>
+                                  <span className="text-[10px] text-slate-500 font-bold block">
+                                    Produced {prodQty} ({reqQty} Req)
+                                  </span>
+                                </div>
+                              );
+                            }
+
+                            return (
+                              <div>
+                                <span className="text-sm font-black text-rose-900 block font-mono">{reqQty} {uom}</span>
+                                <span className="text-xs text-gray-500 font-semibold block">Requested Output</span>
+                              </div>
+                            );
+                          })()}
                         </td>
                         <td className="px-6 py-4 text-center">
                           {isPendingStoreRoom && (
@@ -2209,6 +2236,82 @@ const ProductionList = () => {
             document.body
           )}
         </>
+      )}
+
+      {/* --- COMPLETE PRODUCTION YIELD MODAL --- */}
+      {isCompleteModalOpen && selectedProdForComplete && (
+        <Modal isOpen={isCompleteModalOpen} onClose={() => setIsCompleteModalOpen(false)} title={`Complete Production Run: ${selectedProdForComplete.productionNumber || 'PR-01'}`} size="md">
+          <form onSubmit={handleCompleteProductionSubmit} className="space-y-4">
+            {(() => {
+              const isMix = selectedProdForComplete.requisitionType === 'MIX_REQUISITION';
+              const uom = isMix ? 'Ltr' : 'Pcs';
+              const targetReq = isMix ? (selectedProdForComplete.mixLiters || selectedProdForComplete.totalPieces || 0) : (selectedProdForComplete.totalPieces || 0);
+              const pName = selectedProdForComplete.finishedGoodProduct?.name || selectedProdForComplete.mixProduct?.name || 'Production Item';
+
+              return (
+                <>
+                  <div className="p-3.5 bg-emerald-50/80 rounded-2xl border border-emerald-200 text-emerald-950 text-xs font-bold space-y-1.5">
+                    <div className="flex justify-between items-center">
+                      <span className="font-extrabold text-sm text-slate-900">{pName}</span>
+                      <span className="px-2.5 py-0.5 rounded-full bg-emerald-700 text-white font-mono text-xs font-black">
+                        {selectedProdForComplete.batchNumber || 'BATCH-1'}
+                      </span>
+                    </div>
+                    <div className="flex justify-between text-xs text-emerald-900 pt-1 border-t border-emerald-200/60 font-mono">
+                      <span>Target Requested Qty: <strong>{targetReq} {uom}</strong></span>
+                      <span>Format Preview: <strong>{producedYield || targetReq} ({targetReq}) {uom}</strong></span>
+                    </div>
+                    <p className="text-[11px] text-emerald-800 font-semibold italic">
+                      ℹ️ Enter actual produced yield. Actual stock in Store Room will be inwarded as <strong>{producedYield || targetReq} {uom}</strong> (Only actual yield is added to inventory, requested shown in brackets).
+                    </p>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-gray-700 mb-1">Actual Completed Produced Quantity ({uom}) *</label>
+                    <input
+                      type="number"
+                      step="any"
+                      min="0"
+                      required
+                      value={producedYield}
+                      onChange={(e) => setProducedYield(e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-xl text-sm font-mono font-bold text-gray-900 focus:outline-none focus:border-emerald-500"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-gray-700 mb-1">Production Notes / Variance Remarks</label>
+                    <textarea
+                      rows="2"
+                      placeholder="e.g. Yield variance notes (Target: 5 Ltr, Actual Yield: 4 Ltr due to evaporation/filtration)"
+                      value={completeRemarks}
+                      onChange={(e) => setCompleteRemarks(e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-xl text-xs font-medium text-gray-900 focus:outline-none focus:border-emerald-500"
+                    ></textarea>
+                  </div>
+
+                  <div className="flex justify-end gap-3 border-t border-gray-200 pt-3">
+                    <button
+                      type="button"
+                      onClick={() => setIsCompleteModalOpen(false)}
+                      className="px-4 py-2 rounded-xl border border-gray-300 text-xs font-bold text-gray-700 hover:bg-gray-50"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={submitting}
+                      className="px-5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xs shadow-md transition-all cursor-pointer flex items-center gap-1.5"
+                    >
+                      <CheckCircle2 size={14} />
+                      {submitting ? 'Inwarding Yield...' : `Complete & Inward ${producedYield || targetReq} (${targetReq}) ${uom}`}
+                    </button>
+                  </div>
+                </>
+              );
+            })()}
+          </form>
+        </Modal>
       )}
     </div>
   );

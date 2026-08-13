@@ -802,7 +802,11 @@ const RawMaterialStock = () => {
                           </span>
                         </td>
                         <td className="px-6 py-4 text-right font-mono font-bold text-emerald-600">
-                          {tx.type === 'IN' ? `+ ${tx.quantity} ${tx.unitOfMeasure}` : '-'}
+                          {tx.type === 'IN' ? (
+                            <span>
+                              + {tx.quantity} {tx.requestedQuantity && tx.requestedQuantity !== tx.quantity ? <span className="text-slate-500 font-extrabold text-xs">({tx.requestedQuantity})</span> : null} {tx.unitOfMeasure}
+                            </span>
+                          ) : '-'}
                         </td>
                         <td className="px-6 py-4 text-right font-mono font-bold text-rose-600">
                           {tx.type === 'OUT' ? `- ${tx.quantity} ${tx.unitOfMeasure}` : '-'}

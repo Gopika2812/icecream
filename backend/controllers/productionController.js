@@ -540,19 +540,62 @@ exports.startProduction = async (req, res) => {
 exports.completeProduction = async (req, res) => {
     try {
         const { id } = req.params;
-        const { actualProducedPieces, piecesPerBox } = req.body;
+        const { actualProducedPieces, piecesPerBox, remarks } = req.body;
 
         const production = await Production.findById(id);
         if (!production) return res.status(404).json({ success: false, message: 'Production batch not found.' });
 
-        const pPcs = parseInt(actualProducedPieces) || production.totalPieces || 0;
+        const isMixReq = production.requisitionType === 'MIX_REQUISITION';
+        const reqTargetQty = isMixReq ? (production.mixLiters || production.totalPieces || 0) : (production.totalPieces || 0);
+        const pPcs = parseFloat(actualProducedPieces) !== undefined && parseFloat(actualProducedPieces) >= 0 
+            ? parseFloat(actualProducedPieces) 
+            : reqTargetQty;
+
         const pPerBox = parseInt(piecesPerBox) || parseInt(production.piecesPerBox) || 12;
         const passedBoxes = Math.floor(pPcs / pPerBox);
         const loosePcs = pPcs % pPerBox;
         const prodIdCode = production.productionNumber || `PR-${id.slice(-4)}`;
 
-        // 1. Inward Finished Goods to Stock (if FG Assembly Requisition)
-        if (production.requisitionType !== 'MIX_REQUISITION' && production.finishedGoodProduct) {
+        // 1. Inward Stock based on Actual Produced Quantity!
+        if (isMixReq && production.finishedGoodProduct) {
+            // Mix Preparation Yield Inwarding
+            const mixProdId = production.finishedGoodProduct._id || production.finishedGoodProduct;
+            
+            const existingMixInv = await Inventory.findOne({
+                product: mixProdId,
+                inventoryType: 'Store Room'
+            });
+
+            if (existingMixInv) {
+                await Inventory.findByIdAndUpdate(existingMixInv._id || existingMixInv.id, {
+                    quantity: pPcs, // Store actual produced stock!
+                    lastUpdated: Date.now()
+                });
+            } else {
+                await Inventory.create({
+                    branch: production.branch,
+                    product: mixProdId,
+                    inventoryType: 'Store Room',
+                    quantity: pPcs,
+                    batchNumber: production.batchNumber || 'MIX-BATCH-1',
+                    lastUpdated: Date.now()
+                });
+            }
+
+            await InventoryTransaction.create({
+                branch: production.branch,
+                product: mixProdId,
+                inventoryType: 'Store Room',
+                batchNumber: production.batchNumber || 'MIX-BATCH-1',
+                transactionType: 'IN',
+                quantity: pPcs,
+                requestedQuantity: reqTargetQty,
+                referenceType: 'PRODUCTION_MIX',
+                remarks: `Prepared Mix Inwarded: ${pPcs} Liters (${reqTargetQty} Liters Requested) for Requisition ${prodIdCode}`,
+                performedBy: req.user?._id
+            });
+        } else if (!isMixReq && production.finishedGoodProduct) {
+            // Finished Goods Assembly Inwarding
             const fgProductObj = await Product.findById(production.finishedGoodProduct);
             const fgSellingPrice = parseFloat(production.sellingPrice) || fgProductObj?.wholesalePrice || 0;
             const fgMrp = parseFloat(production.mrp) || fgProductObj?.mrp || 0;
@@ -565,8 +608,8 @@ exports.completeProduction = async (req, res) => {
                         batchNumber: production.batchNumber || 'BATCH-1'
                     },
                     {
-                        $inc: { quantity: pPcs },
                         $set: {
+                            quantity: pPcs,
                             purchasePrice: fgSellingPrice,
                             mrp: fgMrp,
                             temperature: production.temperature || -18,
@@ -583,8 +626,9 @@ exports.completeProduction = async (req, res) => {
                     batchNumber: production.batchNumber || 'BATCH-1',
                     transactionType: 'IN',
                     quantity: pPcs,
+                    requestedQuantity: reqTargetQty,
                     referenceType: 'PRODUCTION',
-                    remarks: `Inwarded Finished Goods (${pPcs} Pcs = ${passedBoxes} Boxes + ${loosePcs} Loose Pcs). Production ID: ${prodIdCode}`,
+                    remarks: `Inwarded Finished Goods (${pPcs} Pcs = ${passedBoxes} Boxes + ${loosePcs} Loose Pcs, Requested: ${reqTargetQty}). Production ID: ${prodIdCode}`,
                     performedBy: req.user?._id
                 });
             }
@@ -612,7 +656,7 @@ exports.completeProduction = async (req, res) => {
 
         const updatedProd = await Production.findByIdAndUpdate(id, {
             producedPieces: pPcs,
-            producedBoxes: Number((pPcs / pPerBox).toFixed(2)),
+            producedBoxes: Number((pPcs / (pPerBox || 1)).toFixed(2)),
             piecesPerBox: pPerBox,
             passedPieces: pPcs,
             passedBoxes: passedBoxes,
@@ -620,7 +664,8 @@ exports.completeProduction = async (req, res) => {
             qcStatus: 'PASSED',
             completedAt: new Date(),
             completedBy: req.user?._id,
-            boxQrStickers: boxQrStickers
+            boxQrStickers: boxQrStickers,
+            remarks: remarks || production.remarks
         }, { new: true });
 
         res.json({
