@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import api from '../services/api';
-import { Bell, AlertTriangle, Send, CheckCircle2, EyeOff, Package, X, RefreshCw, Sparkles } from 'lucide-react';
+import { Bell, AlertTriangle, Send, CheckCircle2, EyeOff, Package, X, RefreshCw, Sparkles, Search } from 'lucide-react';
 import Modal from './Modal';
 
 const TopBarNotifications = ({ currentUser }) => {
@@ -9,6 +9,7 @@ const TopBarNotifications = ({ currentUser }) => {
   const [inventory, setInventory] = useState([]);
   const [requisitions, setRequisitions] = useState([]);
   const [dismissedIds, setDismissedIds] = useState([]);
+  const [searchTerm, setSearchTerm] = useState('');
   const [loading, setLoading] = useState(false);
 
   // Quick Requisition Modal State
@@ -104,6 +105,16 @@ const TopBarNotifications = ({ currentUser }) => {
   // Active non-dismissed alerts count
   const activeAlerts = lowStockItems.filter(item => !dismissedIds.includes(item.id));
 
+  // Search filtered alerts
+  const filteredAlerts = activeAlerts.filter(item => {
+    if (!searchTerm.trim()) return true;
+    const q = searchTerm.toLowerCase();
+    const matchName = (item.name || '').toLowerCase().includes(q);
+    const matchCode = (item.itemCode || '').toLowerCase().includes(q);
+    const matchCat = (item.category || '').toLowerCase().includes(q);
+    return matchName || matchCode || matchCat;
+  });
+
   // Find if a purchase requisition is already pending for a product
   const getPendingRequisition = (productId) => {
     return requisitions.find(r => {
@@ -196,16 +207,51 @@ const TopBarNotifications = ({ currentUser }) => {
             </button>
           </div>
 
+          {/* Search Bar */}
+          {activeAlerts.length > 0 && (
+            <div className="p-2.5 bg-rose-50/50 border-b border-rose-100 flex items-center">
+              <div className="relative w-full">
+                <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                <input
+                  type="text"
+                  placeholder="Search alert by name, code, category..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="w-full pl-8 pr-7 py-1.5 bg-white border border-rose-200 rounded-xl text-xs text-slate-900 focus:outline-none focus:border-rose-500 font-medium"
+                />
+                {searchTerm && (
+                  <button
+                    type="button"
+                    onClick={() => setSearchTerm('')}
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700 text-xs font-bold"
+                  >
+                    ✕
+                  </button>
+                )}
+              </div>
+            </div>
+          )}
+
           {/* List of Low Stock Items */}
-          <div className="max-h-[65vh] overflow-y-auto p-3 space-y-3 custom-scrollbar">
-            {activeAlerts.length === 0 ? (
+          <div className="max-h-[60vh] overflow-y-auto p-3 space-y-3 custom-scrollbar">
+            {filteredAlerts.length === 0 ? (
               <div className="text-center py-8 px-4 space-y-2">
-                <CheckCircle2 size={36} className="mx-auto text-emerald-500" />
-                <h4 className="font-extrabold text-slate-800 text-sm">All Materials Healthy!</h4>
-                <p className="text-xs text-slate-500">No input materials or mixes are currently below 5 units stock.</p>
+                {activeAlerts.length === 0 ? (
+                  <>
+                    <CheckCircle2 size={36} className="mx-auto text-emerald-500" />
+                    <h4 className="font-extrabold text-slate-800 text-sm">All Materials Healthy!</h4>
+                    <p className="text-xs text-slate-500">No input materials or mixes are currently below 5 units stock.</p>
+                  </>
+                ) : (
+                  <>
+                    <AlertTriangle size={32} className="mx-auto text-amber-500" />
+                    <h4 className="font-extrabold text-slate-800 text-sm">No Matching Alerts Found</h4>
+                    <p className="text-xs text-slate-500">No low-stock items match "{searchTerm}".</p>
+                  </>
+                )}
               </div>
             ) : (
-              activeAlerts.map((item) => {
+              filteredAlerts.map((item) => {
                 const pendingReq = getPendingRequisition(item.id);
 
                 return (
