@@ -1017,28 +1017,54 @@ const ProductionList = () => {
                         <tr className="bg-rose-50/40">
                           <td colSpan="6" className="px-6 py-4">
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                              <div className="bg-white p-3 rounded-2xl border border-rose-200 space-y-1">
-                                <h5 className="text-[11px] font-black text-rose-950 uppercase tracking-wider">Allocated Raw Materials:</h5>
-                                <ul className="space-y-1 text-xs">
-                                  {p.rawMaterialsUsed?.map((rm, idx) => (
-                                    <li key={idx} className="flex justify-between border-b border-gray-100 py-1">
-                                      <span className="font-extrabold text-rose-950">{getProductName(rm.product, rm.productName || 'Raw Material')}</span>
-                                      <span className="font-mono font-bold text-rose-900">{rm.quantityUsed} {rm.unitOfMeasure}</span>
-                                    </li>
-                                  ))}
-                                </ul>
+                              <div className="bg-white p-3.5 rounded-2xl border border-rose-200 space-y-2 shadow-xs">
+                                <h5 className="text-[11px] font-black text-rose-950 uppercase tracking-wider flex items-center gap-1.5">
+                                  <Package size={14} className="text-rose-600" /> ALLOCATED RAW MATERIALS & PREPARED MIX:
+                                </h5>
+                                {(p.mixProduct || p.rawMaterialsUsed?.length > 0) ? (
+                                  <ul className="space-y-1.5 text-xs">
+                                    {p.mixProduct && (
+                                      <li className="flex justify-between items-center bg-rose-100/80 p-2 rounded-xl border border-rose-300 shadow-2xs">
+                                        <span className="font-extrabold text-rose-950 flex items-center gap-1">
+                                          <span>🥣 Prepared Mix:</span> {getProductName(p.mixProduct, 'Prepared Mix')}
+                                        </span>
+                                        <span className="font-mono font-black text-rose-900 bg-white px-2 py-0.5 rounded-lg border border-rose-300">
+                                          {p.mixLiters || Number(((p.totalPieces || 12) / (p.piecesPerBox || 12)).toFixed(2))} Liters
+                                        </span>
+                                      </li>
+                                    )}
+                                    {p.rawMaterialsUsed?.map((rm, idx) => (
+                                      <li key={idx} className="flex justify-between items-center bg-rose-50/50 p-2 rounded-xl border border-rose-100">
+                                        <span className="font-extrabold text-rose-950">{getProductName(rm.product, rm.productName || 'Raw Material')}</span>
+                                        <span className="font-mono font-black text-rose-900 bg-white px-2 py-0.5 rounded-lg border border-rose-200">
+                                          {rm.quantityUsed} {rm.unitOfMeasure || rm.product?.unitOfMeasure || 'Units'}
+                                        </span>
+                                      </li>
+                                    ))}
+                                  </ul>
+                                ) : (
+                                  <p className="text-xs text-gray-500 italic">No raw material or prepared mix items allocated.</p>
+                                )}
                               </div>
 
-                              <div className="bg-white p-3 rounded-2xl border border-indigo-200 space-y-1">
-                                <h5 className="text-[11px] font-black text-indigo-950 uppercase tracking-wider">Allocated Packaging Materials:</h5>
-                                <ul className="space-y-1 text-xs">
-                                  {p.packagingMaterialsUsed?.map((pkg, idx) => (
-                                    <li key={idx} className="flex justify-between border-b border-gray-100 py-1">
-                                      <span className="font-extrabold text-indigo-950">{getProductName(pkg.product, pkg.productName || 'Packaging Item')}</span>
-                                      <span className="font-mono font-bold text-indigo-900">{pkg.quantityRequested} {pkg.unitOfMeasure}</span>
-                                    </li>
-                                  ))}
-                                </ul>
+                              <div className="bg-white p-3.5 rounded-2xl border border-indigo-200 space-y-2 shadow-xs">
+                                <h5 className="text-[11px] font-black text-indigo-950 uppercase tracking-wider flex items-center gap-1.5">
+                                  <Box size={14} className="text-indigo-600" /> ALLOCATED PACKAGING MATERIALS:
+                                </h5>
+                                {p.packagingMaterialsUsed?.length > 0 ? (
+                                  <ul className="space-y-1.5 text-xs">
+                                    {p.packagingMaterialsUsed?.map((pkg, idx) => (
+                                      <li key={idx} className="flex justify-between items-center bg-indigo-50/50 p-2 rounded-xl border border-indigo-100">
+                                        <span className="font-extrabold text-indigo-950">{getProductName(pkg.product, pkg.productName || 'Packaging Item')}</span>
+                                        <span className="font-mono font-black text-indigo-900 bg-white px-2 py-0.5 rounded-lg border border-indigo-200">
+                                          {pkg.quantityRequested} {pkg.unitOfMeasure || pkg.product?.unitOfMeasure || 'Pcs'}
+                                        </span>
+                                      </li>
+                                    ))}
+                                  </ul>
+                                ) : (
+                                  <p className="text-xs text-gray-500 italic">No packaging items allocated.</p>
+                                )}
                               </div>
                             </div>
                           </td>
