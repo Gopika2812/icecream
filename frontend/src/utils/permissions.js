@@ -8,7 +8,7 @@ export const ALL_SYSTEM_PAGES = [
   { path: '/raw-material-stock', label: 'Raw Material Stock', group: 'Purchase Phase' },
   { path: '/store-room-requisitions', label: 'Store Room Requisitions', group: 'Production Phase' },
   { path: '/production', label: 'Production & Assembly', group: 'Production Phase' },
-  { path: '/finished-goods-stock', label: 'Finished Goods Stock', group: 'Production Phase' },
+  { path: '/finished-goods-stock', label: 'Finished Goods Stock (Cold Room)', group: 'Production Phase' },
   { path: '/sales-invoices', label: 'Sales Orders & Invoicing', group: 'Sales & Finance Phase' },
   { path: '/auto-sales-ledger', label: 'Auto Sales Stock & Expenses', group: 'Sales & Finance Phase' },
   { path: '/customer-ledgers', label: 'Customer Ledgers', group: 'Sales & Finance Phase' },

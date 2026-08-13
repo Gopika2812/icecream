@@ -162,7 +162,7 @@ const DashboardLayout = () => {
           <NavGroup title="Production Phase">
             <NavItem to="/store-room-requisitions" icon={Truck} title="Store Room Requisitions" />
             <NavItem to="/production" icon={Factory} title="Production & Assembly" />
-            <NavItem to="/finished-goods-stock" icon={ThermometerSnowflake} title="Finished Goods Stock" />
+            <NavItem to="/finished-goods-stock" icon={ThermometerSnowflake} title="Finished Goods Stock (Cold Room)" />
           </NavGroup>
 
           <NavGroup title="Sales & Finance Phase">
