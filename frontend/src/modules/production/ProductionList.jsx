@@ -495,7 +495,7 @@ const ProductionList = () => {
       prod.rawMaterialsUsed.forEach(rm => {
         const pId = rm.product?._id || rm.product;
         const pObj = products.find(p => p._id === pId || p.id === pId);
-        const price = pObj?.purchasePrice || pObj?.costPrice || 0;
+        const price = pObj?.purchasePrice || pObj?.costPrice || pObj?.wholesalePrice || 0;
         totalCost += (parseFloat(rm.quantityUsed || 0) * parseFloat(price));
       });
     }
@@ -504,9 +504,17 @@ const ProductionList = () => {
       prod.packagingMaterialsUsed.forEach(pkg => {
         const pId = pkg.product?._id || pkg.product;
         const pObj = products.find(p => p._id === pId || p.id === pId);
-        const price = pObj?.purchasePrice || pObj?.costPrice || 0;
+        const price = pObj?.purchasePrice || pObj?.costPrice || pObj?.wholesalePrice || 0;
         totalCost += (parseFloat(pkg.quantityRequested || 0) * parseFloat(price));
       });
+    }
+
+    if (prod.mixProduct) {
+      const pId = prod.mixProduct._id || prod.mixProduct;
+      const pObj = products.find(p => p._id === pId || p.id === pId);
+      const mixPrice = pObj?.costPrice || pObj?.wholesalePrice || pObj?.purchasePrice || 0;
+      const mixLiters = parseFloat(prod.mixLiters || 4);
+      totalCost += (mixLiters * parseFloat(mixPrice));
     }
 
     return yVal > 0 ? (totalCost / yVal).toFixed(2) : '0.00';

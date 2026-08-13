@@ -2,7 +2,7 @@ const Product = require('../models/Product');
 
 exports.getProducts = async (req, res) => {
     try {
-        const products = await Product.find().populate('rawMaterials.product', 'name itemCode unitOfMeasure category purchasePrice costPrice');
+        const products = await Product.find().populate('rawMaterials.product', 'name itemCode unitOfMeasure category purchasePrice costPrice wholesalePrice');
         
         // Auto-calculate costPrice for Mix & Finished Goods if not manually set
         const enriched = products.map(prod => {
@@ -10,7 +10,7 @@ exports.getProducts = async (req, res) => {
             if (Array.isArray(pObj.rawMaterials) && pObj.rawMaterials.length > 0) {
                 const recipeCost = pObj.rawMaterials.reduce((sum, rm) => {
                     const rmProd = rm.product;
-                    const rmPrice = rmProd?.purchasePrice || rmProd?.costPrice || 0;
+                    const rmPrice = rmProd?.purchasePrice || rmProd?.costPrice || rmProd?.wholesalePrice || 0;
                     return sum + (parseFloat(rm.quantity || 0) * parseFloat(rmPrice));
                 }, 0);
 

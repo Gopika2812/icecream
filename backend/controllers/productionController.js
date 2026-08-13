@@ -529,7 +529,7 @@ exports.completeProduction = async (req, res) => {
             production.rawMaterialsUsed.forEach(rm => {
                 const pId = (rm.product?._id || rm.product || '').toString();
                 const pObj = productMap[pId];
-                const price = pObj?.purchasePrice || pObj?.costPrice || 0;
+                const price = pObj?.purchasePrice || pObj?.costPrice || pObj?.wholesalePrice || 0;
                 totalBatchMaterialCost += (parseFloat(rm.quantityUsed || 0) * parseFloat(price));
             });
         }
@@ -537,9 +537,16 @@ exports.completeProduction = async (req, res) => {
             production.packagingMaterialsUsed.forEach(pkg => {
                 const pId = (pkg.product?._id || pkg.product || '').toString();
                 const pObj = productMap[pId];
-                const price = pObj?.purchasePrice || pObj?.costPrice || 0;
+                const price = pObj?.purchasePrice || pObj?.costPrice || pObj?.wholesalePrice || 0;
                 totalBatchMaterialCost += (parseFloat(pkg.quantityRequested || 0) * parseFloat(price));
             });
+        }
+        if (production.mixProduct) {
+            const mixId = (production.mixProduct._id || production.mixProduct).toString();
+            const mixObj = productMap[mixId];
+            const mixPrice = mixObj?.costPrice || mixObj?.wholesalePrice || mixObj?.purchasePrice || 0;
+            const mixLiters = parseFloat(production.mixLiters || 4);
+            totalBatchMaterialCost += (mixLiters * parseFloat(mixPrice));
         }
 
         const calculatedUnitCost = pPcs > 0 ? Number((totalBatchMaterialCost / pPcs).toFixed(2)) : 0;
