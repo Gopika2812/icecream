@@ -518,7 +518,7 @@ const UsersList = () => {
       {/* --- EDIT USER ROLE & PERMISSIONS MODAL --- */}
       {isEditModalOpen && selectedUser && (
         <Modal isOpen={isEditModalOpen} onClose={() => setIsEditModalOpen(false)} title={`Configure Role & Permissions: ${selectedUser.name}`} size="lg">
-          <form onSubmit={handleEditSubmit} className="space-y-4">
+          <form onSubmit={handleEditSubmit} className="space-y-4 max-h-[75vh] overflow-y-auto p-1 custom-scrollbar">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <label className="block text-xs font-bold text-gray-700 mb-1">Employee Name</label>
