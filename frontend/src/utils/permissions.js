@@ -24,7 +24,8 @@ export const SYSTEM_ROLES = [
   'Purchase Team',
   'QC Team',
   'Production Team',
-  'Sales Team'
+  'Sales Team',
+  'Store Room Team'
 ];
 
 export const DEFAULT_ROLE_PERMISSIONS = {
@@ -59,6 +60,11 @@ export const DEFAULT_ROLE_PERMISSIONS = {
     '/customer-ledgers',
     '/customers',
     '/products'
+  ],
+  'Store Room Team': [
+    '/dashboard',
+    '/store-room-requisitions',
+    '/raw-material-stock'
   ]
 };
 
