@@ -12,6 +12,8 @@ export const ALL_SYSTEM_PAGES = [
   { path: '/sales-invoices', label: 'Sales Orders & Invoicing', group: 'Sales & Finance Phase' },
   { path: '/auto-sales-ledger', label: 'Auto Sales Stock & Expenses', group: 'Sales & Finance Phase' },
   { path: '/customer-ledgers', label: 'Customer Ledgers', group: 'Sales & Finance Phase' },
+  { path: '/assets', label: 'Assets & Equipment (A001)', group: 'Operations & Fleet Phase' },
+  { path: '/vehicles', label: 'Vehicle Fleet & Maintenance (VECH001)', group: 'Operations & Fleet Phase' },
   { path: '/vendors', label: 'Vendors Master', group: 'Master Hub' },
   { path: '/customers', label: 'Customers Master', group: 'Master Hub' },
   { path: '/products', label: 'Products Master', group: 'Master Hub' },

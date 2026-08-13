@@ -19,6 +19,8 @@ import FinishedGoodsStock from './modules/inventory/FinishedGoodsStock';
 import SalesInvoice from './modules/inventory/SalesInvoice';
 import AutoSalesLedger from './modules/inventory/AutoSalesLedger';
 import CustomerLedgers from './modules/inventory/CustomerLedgers';
+import AssetsList from './modules/assets/AssetsList';
+import VehiclesList from './modules/vehicles/VehiclesList';
 
 const queryClient = new QueryClient();
 
@@ -38,6 +40,10 @@ function App() {
             <Route path="customers" element={<CustomerList />} />
             <Route path="products" element={<ProductList />} />
             
+            {/* Operations & Fleet Phase */}
+            <Route path="assets" element={<AssetsList />} />
+            <Route path="vehicles" element={<VehiclesList />} />
+
             {/* Procurement & Production */}
             <Route path="purchase-orders" element={<PurchaseOrderList />} />
             <Route path="qc" element={<QCList />} />

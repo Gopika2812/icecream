@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Outlet, Navigate, useNavigate, Link, useLocation } from 'react-router-dom';
 import {
   LogOut, LayoutDashboard, Building2, Users, Menu, X, ChevronDown,
-  Package, ShoppingCart, ShieldCheck, GitBranch, ChevronLeft, ChevronRight, PanelLeft, ArrowLeftRight, Factory, ThermometerSnowflake, FileText, Truck, BookOpen, ShieldAlert
+  Package, ShoppingCart, ShieldCheck, GitBranch, ChevronLeft, ChevronRight, PanelLeft, ArrowLeftRight, Factory, ThermometerSnowflake, FileText, Truck, BookOpen, ShieldAlert, PackageCheck, Wrench
 } from 'lucide-react';
 import api from '../services/api';
 import { hasPageAccess } from '../utils/permissions';
@@ -169,6 +169,11 @@ const DashboardLayout = () => {
             <NavItem to="/sales-invoices" icon={FileText} title="Sales Orders & Invoicing" />
             <NavItem to="/auto-sales-ledger" icon={Truck} title="Auto Sales Stock & Expenses" />
             <NavItem to="/customer-ledgers" icon={BookOpen} title="Customer Ledgers" />
+          </NavGroup>
+
+          <NavGroup title="Operations & Fleet Phase">
+            <NavItem to="/assets" icon={PackageCheck} title="Assets & Equipment (A001)" />
+            <NavItem to="/vehicles" icon={Truck} title="Vehicle Fleet & Maintenance (VECH001)" />
           </NavGroup>
 
           <NavGroup title="Master Hub">

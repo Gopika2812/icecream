@@ -58,6 +58,8 @@ app.use('/api/v1/sales-orders', require('./routes/salesOrderRoutes'));
 app.use('/api/v1/auto-sales', require('./routes/autoSalesRoutes'));
 app.use('/api/v1/customer-ledger', require('./routes/customerLedgerRoutes'));
 app.use('/api/v1/vendor-ledger', require('./routes/vendorLedgerRoutes'));
+app.use('/api/v1/assets', require('./routes/assetRoutes'));
+app.use('/api/v1/vehicles', require('./routes/vehicleRoutes'));
 app.use('/api/v1/categories', require('./routes/categoryRoutes'));
 app.use('/api/v1/item-types', require('./routes/itemTypeRoutes'));
 app.use('/api/v1/product-requisitions', require('./routes/productRequisitionRoutes'));
