@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import api from '../services/api';
 import { hasPageAccess } from '../utils/permissions';
+import TopBarNotifications from '../components/TopBarNotifications';
 
 const DashboardLayout = () => {
   const navigate = useNavigate();
@@ -247,6 +248,7 @@ const DashboardLayout = () => {
           </div>
 
           <div className="flex items-center gap-2 sm:gap-4">
+            <TopBarNotifications currentUser={user} />
             <span className="text-xs sm:text-sm text-gray-600 hidden sm:inline font-medium">Current Branch:</span>
             <div className="px-3 py-1 bg-white/80 border border-[var(--color-glass-border)] rounded-lg text-xs sm:text-sm font-semibold text-gray-900 shadow-sm truncate max-w-[140px] sm:max-w-xs">
               Main Branch
