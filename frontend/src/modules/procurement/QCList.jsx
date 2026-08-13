@@ -974,7 +974,7 @@ const QCList = () => {
       </div>
 
       <div className="glass-panel overflow-hidden">
-        {loading ? (
+{loading ? (
           <div className="p-8 text-center text-gray-600 flex justify-center items-center gap-2">
             <Loader2 className="animate-spin text-[var(--color-primary)]" size={20} />
             Loading...
@@ -982,66 +982,150 @@ const QCList = () => {
         ) : (
           <div>
             {activeTab === 'QC Check' && (
-              <div className="overflow-x-auto">
-                <table className="w-full text-left text-sm text-gray-700">
-                  <thead className="bg-[rgba(255,255,255,0.02)] border-b border-[var(--color-glass-border)] text-gray-600 font-semibold">
-                    <tr>
-                      <th className="px-6 py-4">QC Report No</th>
-                      <th className="px-6 py-4">Vendor Name</th>
-                      <th className="px-6 py-4">GRN Ref</th>
-                      <th className="px-6 py-4">Branch</th>
-                      <th className="px-6 py-4">Checked Date</th>
-                      <th className="px-6 py-4">QC Status</th>
-                      <th className="px-6 py-4 text-center">Action</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-[var(--color-glass-border)]">
-                    {qcs.map((qc) => (
-                      <tr 
-                        key={qc._id} 
-                        onClick={() => setSelectedQcDetails(qc)}
-                        className="hover:bg-pink-50/40 transition-colors cursor-pointer"
-                      >
-                        <td className="px-6 py-4 font-mono text-xs font-bold text-pink-700 flex items-center gap-2">
-                          <FileText size={14} className="text-pink-500" />
-                          {qc.qcNumber}
-                        </td>
-                        <td className="px-6 py-4 font-medium text-gray-900">
-                          {qc.grnReference?.poReference?.vendor?.name || qc.vendor?.name || 'N/A'}
-                        </td>
-                        <td className="px-6 py-4 font-mono text-xs">{qc.grnReference?.grnNumber || (typeof qc.grnReference === 'string' ? qc.grnReference : 'N/A')}</td>
-                        <td className="px-6 py-4">{qc.branch?.branchName || qc.branch?.name || qc.branchName || 'Main Branch'}</td>
-                        <td className="px-6 py-4 text-xs font-semibold">
-                          {qc.checkedDate || qc.createdAt ? new Date(qc.checkedDate || qc.createdAt).toLocaleString() : 'N/A'}
-                        </td>
-                        <td className="px-6 py-4">
-                          <span className={`px-2.5 py-1 rounded-full text-xs font-semibold inline-flex items-center gap-1 ${
-                            qc.status === 'Passed' ? 'bg-green-50 text-green-700 border border-green-200' :
-                            qc.status === 'Partial' ? 'bg-amber-50 text-amber-700 border border-amber-200' :
-                            'bg-red-50 text-red-700 border border-red-200'
-                          }`}>
-                            {qc.status}
-                          </span>
-                        </td>
-                        <td className="px-6 py-4 text-center">
-                          <button
-                            onClick={(e) => { e.stopPropagation(); setSelectedQcDetails(qc); }}
-                            className="px-3 py-1 bg-pink-50 hover:bg-pink-100 text-pink-700 border border-pink-200 rounded-lg text-xs font-semibold transition-colors inline-flex items-center gap-1"
+              <div className="space-y-6 p-4 sm:p-6">
+                {/* --- PENDING PURCHASE ORDERS AWAITING QC BANNER --- */}
+                {pendingPOs.length > 0 && (
+                  <div className="bg-gradient-to-r from-amber-500/10 via-rose-500/10 to-amber-500/10 rounded-2xl border-2 border-amber-400/40 p-4 sm:p-5 space-y-3 shadow-md">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-amber-300/30 pb-3">
+                      <div className="flex items-center gap-2.5">
+                        <div className="p-2 bg-amber-500 text-white rounded-xl shadow-xs">
+                          <Package size={20} />
+                        </div>
+                        <div>
+                          <h3 className="text-sm font-extrabold text-slate-900 tracking-wide uppercase">
+                            Incoming Purchase Orders Awaiting Quality Inspection
+                          </h3>
+                          <p className="text-xs text-slate-600 font-medium">
+                            {pendingPOs.length} Issued Purchase Order(s) ready for physical QC check &amp; Store Room receiving
+                          </p>
+                        </div>
+                      </div>
+
+                      <span className="self-start sm:self-auto bg-amber-500 text-white px-3 py-1 rounded-full text-xs font-black font-mono shadow-xs">
+                        {pendingPOs.length} PO Pending Inspection
+                      </span>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                      {pendingPOs.map((po) => {
+                        const poId = po._id || po.id;
+                        const vName = po.vendor?.name || 'Vendor';
+                        const bName = po.branch?.branchName || po.branch?.name || po.branch || 'Main Branch';
+                        const itemCount = (po.items || []).length;
+
+                        return (
+                          <div key={poId} className="bg-white p-4 rounded-2xl border border-amber-200 hover:border-amber-400 transition-all shadow-xs space-y-3 flex flex-col justify-between">
+                            <div className="space-y-2">
+                              <div className="flex justify-between items-start">
+                                <div>
+                                  <span className="font-mono text-xs font-black text-rose-900 bg-rose-50 border border-rose-200 px-2.5 py-1 rounded-xl block w-fit">
+                                    {po.poNumber || 'PO-Indent'}
+                                  </span>
+                                  <h4 className="font-extrabold text-sm text-slate-900 mt-1">{vName}</h4>
+                                </div>
+                                <span className="text-xs font-mono font-black text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-lg border border-emerald-200">
+                                  ₹{po.totalAmount ? Number(po.totalAmount).toLocaleString('en-IN') : '0'}
+                                </span>
+                              </div>
+
+                              <div className="text-xs text-slate-600 space-y-1 font-medium bg-slate-50 p-2.5 rounded-xl border border-slate-200">
+                                <div className="flex justify-between">
+                                  <span>Branch: <strong>{bName}</strong></span>
+                                  <span className="font-mono text-[11px] text-slate-500">{new Date(po.orderDate || po.createdAt || Date.now()).toLocaleDateString('en-IN')}</span>
+                                </div>
+                                <div className="text-[11px] text-slate-700 font-semibold truncate">
+                                  Items ({itemCount}): {(po.items || []).map(i => i.product?.name || 'Product').slice(0, 3).join(', ')}{itemCount > 3 ? '...' : ''}
+                                </div>
+                              </div>
+                            </div>
+
+                            <button
+                              onClick={() => {
+                                setIsCreating(true);
+                                handlePOChange(poId);
+                              }}
+                              className="w-full bg-gradient-to-r from-amber-500 to-rose-600 hover:from-amber-600 hover:to-rose-700 text-white py-2.5 px-4 rounded-xl text-xs font-black shadow-md flex items-center justify-center gap-2 transition-all cursor-pointer"
+                            >
+                              <ShieldCheck size={16} /> Perform QC Check &amp; Stock In
+                            </button>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                {/* --- COMPLETED QC LOGS TABLE --- */}
+                <div className="space-y-2">
+                  <h3 className="font-extrabold text-xs text-slate-500 uppercase tracking-wider px-1">
+                    Completed Quality Control History Logs
+                  </h3>
+                  <div className="overflow-x-auto border border-gray-200 rounded-2xl">
+                    <table className="w-full text-left text-sm text-gray-700">
+                      <thead className="bg-[rgba(255,255,255,0.02)] border-b border-[var(--color-glass-border)] text-gray-600 font-semibold">
+                        <tr>
+                          <th className="px-6 py-4">QC Report No</th>
+                          <th className="px-6 py-4">Vendor Name</th>
+                          <th className="px-6 py-4">GRN Ref</th>
+                          <th className="px-6 py-4">Branch</th>
+                          <th className="px-6 py-4">Checked Date</th>
+                          <th className="px-6 py-4">QC Status</th>
+                          <th className="px-6 py-4 text-center">Action</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-[var(--color-glass-border)]">
+                        {qcs.map((qc) => (
+                          <tr 
+                            key={qc._id} 
+                            onClick={() => setSelectedQcDetails(qc)}
+                            className="hover:bg-pink-50/40 transition-colors cursor-pointer"
                           >
-                            <Eye size={12} /> View Breakdown
-                          </button>
-                        </td>
-                      </tr>
-                    ))}
-                    {qcs.length === 0 && (
-                      <tr>
-                        <td colSpan="7" className="px-6 py-8 text-center text-gray-600">
-                          No QC logs found.
-                        </td>
-                      </tr>
-                    )}
-                  </tbody>
-                </table>
+                            <td className="px-6 py-4 font-mono text-xs font-bold text-pink-700 flex items-center gap-2">
+                              <FileText size={14} className="text-pink-500" />
+                              {qc.qcNumber}
+                            </td>
+                            <td className="px-6 py-4 font-medium text-gray-900">
+                              {qc.grnReference?.poReference?.vendor?.name || qc.vendor?.name || 'N/A'}
+                            </td>
+                            <td className="px-6 py-4 font-mono text-xs">{qc.grnReference?.grnNumber || (typeof qc.grnReference === 'string' ? qc.grnReference : 'N/A')}</td>
+                            <td className="px-6 py-4">{qc.branch?.branchName || qc.branch?.name || qc.branchName || 'Main Branch'}</td>
+                            <td className="px-6 py-4 text-xs font-semibold">
+                              {qc.checkedDate || qc.createdAt ? new Date(qc.checkedDate || qc.createdAt).toLocaleString() : 'N/A'}
+                            </td>
+                            <td className="px-6 py-4">
+                              <span className={`px-2.5 py-1 rounded-full text-xs font-semibold inline-flex items-center gap-1 ${
+                                qc.status === 'Passed' ? 'bg-green-50 text-green-700 border border-green-200' :
+                                qc.status === 'Partial' ? 'bg-amber-50 text-amber-700 border border-amber-200' :
+                                'bg-red-50 text-red-700 border border-red-200'
+                              }`}>
+                                {qc.status === 'Passed' ? <CheckCircle2 size={12} /> : <AlertTriangle size={12} />}
+                                {qc.status}
+                              </span>
+                            </td>
+                            <td className="px-6 py-4 text-center">
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setSelectedQcDetails(qc);
+                                }}
+                                className="px-3 py-1 bg-pink-50 text-pink-700 hover:bg-pink-100 rounded-lg text-xs font-bold transition-colors inline-flex items-center gap-1"
+                              >
+                                <Eye size={12} /> View Breakdown
+                              </button>
+                            </td>
+                          </tr>
+                        ))}
+                        {qcs.length === 0 && (
+                          <tr>
+                            <td colSpan="7" className="px-6 py-8 text-center text-gray-600">
+                              No completed QC logs found yet. Perform a QC check on incoming POs above.
+                            </td>
+                          </tr>
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
               </div>
             )}
 
