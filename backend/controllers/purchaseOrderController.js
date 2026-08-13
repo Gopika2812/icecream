@@ -61,7 +61,9 @@ exports.getPurchaseOrders = async (req, res) => {
         }
 
         const rawPos = await PurchaseOrder.find(filter).sort({ createdAt: -1 });
-        const populatedPOs = await populatePOReferences(rawPos);
+        // Filter OUT unfulfilled requisition indents (isRequisition: true or status: PENDING_PURCHASE without poNumber)
+        const filteredPOs = (rawPos || []).filter(po => !po.isRequisition && po.poNumber && po.status !== 'PENDING_PURCHASE');
+        const populatedPOs = await populatePOReferences(filteredPOs);
         res.json({ success: true, data: populatedPOs });
     } catch (error) {
         res.status(500).json({ success: false, message: error.message });

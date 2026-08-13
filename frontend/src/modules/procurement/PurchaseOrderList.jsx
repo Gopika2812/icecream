@@ -58,6 +58,8 @@ const PurchaseOrderList = () => {
   const [productRequisitions, setProductRequisitions] = useState([]);
   const [isReqModalOpen, setIsReqModalOpen] = useState(false);
   const [activeRequisitionId, setActiveRequisitionId] = useState(null);
+  const [activeRequisitionIds, setActiveRequisitionIds] = useState([]);
+  const [selectedReqIds, setSelectedReqIds] = useState([]);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
@@ -309,27 +311,55 @@ const PurchaseOrderList = () => {
   };
 
   const handleFulfillRequisition = (reqObj, reqItem) => {
-    const prodId = typeof reqItem.product === 'object' ? (reqItem.product._id || reqItem.product.id) : reqItem.product;
-    const foundProduct = products.find(p => (p._id || p.id) === prodId);
+    handleFulfillSelectedRequisitions([reqObj]);
+  };
 
-    const unitPrice = foundProduct ? (parseFloat(foundProduct.costPrice) || parseFloat(foundProduct.wholesalePrice) || 0) : 0;
-    const qty = parseFloat(reqItem.requestedQuantity) || 1;
+  const handleFulfillSelectedRequisitions = (reqObjsToFulfill) => {
+    if (!reqObjsToFulfill || reqObjsToFulfill.length === 0) return;
 
-    setItems([
-      {
-        product: prodId,
-        orderedQty: qty,
-        unitPrice: unitPrice,
-        totalPrice: Number((qty * unitPrice).toFixed(2))
+    const mergedItemsMap = {};
+    const reqIds = [];
+
+    reqObjsToFulfill.forEach(req => {
+      const rId = req._id || req.id;
+      if (rId && !reqIds.includes(rId)) reqIds.push(rId);
+
+      (req.items || []).forEach(item => {
+        const prodId = typeof item.product === 'object' ? (item.product._id || item.product.id) : item.product;
+        const qty = parseFloat(item.requestedQuantity) || 1;
+
+        if (mergedItemsMap[prodId]) {
+          mergedItemsMap[prodId].orderedQty += qty;
+        } else {
+          const foundProduct = products.find(p => (p._id || p.id) === prodId);
+          const unitPrice = foundProduct ? (parseFloat(foundProduct.costPrice) || parseFloat(foundProduct.wholesalePrice) || 0) : 0;
+          mergedItemsMap[prodId] = {
+            product: prodId,
+            orderedQty: qty,
+            unitPrice: unitPrice
+          };
+        }
+      });
+    });
+
+    const newItems = Object.values(mergedItemsMap).map(item => ({
+      ...item,
+      totalPrice: Number((item.orderedQty * item.unitPrice).toFixed(2))
+    }));
+
+    if (newItems.length > 0) {
+      setItems(newItems);
+
+      const firstProdId = newItems[0].product;
+      const foundProduct = products.find(p => (p._id || p.id) === firstProdId);
+      if (foundProduct?.defaultVendor) {
+        const vId = typeof foundProduct.defaultVendor === 'object' ? (foundProduct.defaultVendor._id || foundProduct.defaultVendor.id) : foundProduct.defaultVendor;
+        setSelectedVendor(vId);
       }
-    ]);
-
-    if (foundProduct?.defaultVendor) {
-      const vId = typeof foundProduct.defaultVendor === 'object' ? (foundProduct.defaultVendor._id || foundProduct.defaultVendor.id) : foundProduct.defaultVendor;
-      setSelectedVendor(vId);
     }
 
-    setActiveRequisitionId(reqObj._id || reqObj.id);
+    setActiveRequisitionIds(reqIds);
+    if (reqIds.length > 0) setActiveRequisitionId(reqIds[0]);
     setIsReqModalOpen(false);
     setIsCreating(true);
   };
@@ -391,9 +421,12 @@ const PurchaseOrderList = () => {
 
       await api.post('/purchase-orders', payload);
 
-      if (activeRequisitionId) {
+      const idsToFulfill = [...new Set([...(activeRequisitionIds || []), activeRequisitionId].filter(Boolean))];
+      if (idsToFulfill.length > 0) {
         try {
-          await api.patch(`/product-requisitions/${activeRequisitionId}/status`, { status: 'FULFILLED' });
+          await Promise.all(idsToFulfill.map(rId => 
+            api.patch(`/product-requisitions/${rId}/status`, { status: 'FULFILLED' })
+          ));
         } catch (err) {
           console.error('Error fulfilling requisition status', err);
         }
@@ -818,71 +851,154 @@ const PurchaseOrderList = () => {
       {/* --- POPUP MODAL: PENDING PRODUCT PURCHASE INDENTS --- */}
       {isReqModalOpen && (
         <Modal isOpen={isReqModalOpen} onClose={() => setIsReqModalOpen(false)} title="Pending Product Purchase Indents" size="lg">
-          <div className="space-y-4">
-            <div className="p-3 bg-amber-50 rounded-2xl border border-amber-200 text-amber-950 text-xs font-bold flex items-center justify-between">
-              <span>Low-stock & out-of-stock indents requested by Production & Store Room Team</span>
-              <span className="bg-amber-200 text-amber-900 px-2.5 py-0.5 rounded-xl text-[11px] font-black">
-                {productRequisitions.filter(r => r.status === 'PENDING_PURCHASE' || r.status === 'PENDING' || !r.status).length} Indents Pending
-              </span>
-            </div>
+          {(() => {
+            const pendingReqs = productRequisitions.filter(r => r.status === 'PENDING_PURCHASE' || r.status === 'PENDING' || !r.status);
+            const allPendingIds = pendingReqs.map(r => r._id || r.id);
+            const isAllSelected = allPendingIds.length > 0 && allPendingIds.every(id => selectedReqIds.includes(id));
 
-            {productRequisitions.filter(r => r.status === 'PENDING_PURCHASE' || r.status === 'PENDING' || !r.status).length === 0 ? (
-              <div className="text-center py-8 text-gray-500 space-y-2 bg-gray-50 rounded-2xl border border-dashed border-gray-200">
-                <CheckCircle2 size={32} className="mx-auto text-emerald-500" />
-                <p className="font-extrabold text-sm text-gray-800">All Stock Levels Healthy!</p>
-                <p className="text-xs">No pending purchase indents from the production floor.</p>
-              </div>
-            ) : (
-              <div className="space-y-3 max-h-[60vh] overflow-y-auto p-1">
-                {productRequisitions.filter(r => r.status === 'PENDING_PURCHASE' || r.status === 'PENDING' || !r.status).map((req, idx) => (
-                  <div key={idx} className="bg-white p-4 rounded-2xl border border-gray-200 hover:border-amber-400 transition-all shadow-xs space-y-3">
-                    <div className="flex justify-between items-center border-b border-gray-100 pb-2">
-                      <div className="flex items-center gap-2">
-                        <span className="font-mono text-xs font-black text-rose-900 bg-rose-50 border border-rose-200 px-2.5 py-1 rounded-xl">
-                          {req.requisitionNumber || `PR-${req._id?.slice(-4)}`}
-                        </span>
-                        <span className="text-xs font-bold text-gray-600">Branch: <strong>{req.branch || 'Main Branch'}</strong></span>
-                      </div>
-                      <span className="text-[11px] font-mono text-gray-400">
-                        {new Date(req.createdAt || Date.now()).toLocaleString('en-IN')}
-                      </span>
-                    </div>
+            const toggleSelectAll = () => {
+              if (isAllSelected) {
+                setSelectedReqIds([]);
+              } else {
+                setSelectedReqIds(allPendingIds);
+              }
+            };
 
-                    <div className="space-y-2">
-                      {(req.items || []).map((item, itemIdx) => {
-                        const pName = typeof item.product === 'object' ? item.product.name : (products.find(p => (p._id || p.id) === item.product)?.name || 'Item');
-                        const pCode = typeof item.product === 'object' ? item.product.itemCode : (products.find(p => (p._id || p.id) === item.product)?.itemCode || 'N/A');
-                        const uom = item.unitOfMeasure || 'Units';
+            const toggleSelectReq = (id) => {
+              if (selectedReqIds.includes(id)) {
+                setSelectedReqIds(selectedReqIds.filter(i => i !== id));
+              } else {
+                setSelectedReqIds([...selectedReqIds, id]);
+              }
+            };
 
-                        return (
-                          <div key={itemIdx} className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3 bg-slate-50 rounded-xl border border-slate-200">
-                            <div>
-                              <div className="text-sm font-extrabold text-slate-900">{pName}</div>
-                              <div className="text-xs font-mono text-slate-500 font-bold">Code: {pCode || 'N/A'} | Current Stock: {item.currentStock || 0} {uom}</div>
-                            </div>
+            const handleTakeActionOnSelected = () => {
+              const selectedObjs = pendingReqs.filter(r => selectedReqIds.includes(r._id || r.id));
+              if (selectedObjs.length === 0) {
+                alert('Please select at least one purchase indent checkbox to take action.');
+                return;
+              }
+              handleFulfillSelectedRequisitions(selectedObjs);
+            };
 
-                            <div className="flex items-center gap-4 justify-between sm:justify-end">
-                              <div className="text-right">
-                                <span className="text-[10px] text-gray-500 uppercase font-extrabold block">Requested Qty</span>
-                                <span className="text-sm font-mono font-black text-rose-950">{item.requestedQuantity} {uom}</span>
-                              </div>
+            const handleTakeActionOnAll = () => {
+              handleFulfillSelectedRequisitions(pendingReqs);
+            };
 
-                              <button
-                                onClick={() => handleFulfillRequisition(req, item)}
-                                className="bg-emerald-600 hover:bg-emerald-700 text-white px-3.5 py-2 rounded-xl text-xs font-extrabold transition-all shadow-sm flex items-center gap-1.5 cursor-pointer shrink-0"
-                              >
-                                <Zap size={14} /> Take Action
-                              </button>
-                            </div>
-                          </div>
-                        );
-                      })}
+            return (
+              <div className="space-y-4">
+                <div className="p-3 bg-amber-50 rounded-2xl border border-amber-200 text-amber-950 text-xs font-bold flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                  <span>Low-stock & out-of-stock indents requested by Production & Store Room Team</span>
+                  <span className="bg-amber-200 text-amber-900 px-2.5 py-0.5 rounded-xl text-[11px] font-black shrink-0">
+                    {pendingReqs.length} Indents Pending
+                  </span>
+                </div>
+
+                {pendingReqs.length > 0 && (
+                  <div className="p-3 bg-rose-950 text-white rounded-2xl flex flex-wrap items-center justify-between gap-3 shadow-md">
+                    <label className="flex items-center gap-2 cursor-pointer text-xs font-black select-none">
+                      <input
+                        type="checkbox"
+                        checked={isAllSelected}
+                        onChange={toggleSelectAll}
+                        className="w-4 h-4 rounded text-amber-500 focus:ring-amber-500 cursor-pointer accent-amber-500"
+                      />
+                      <span>Select All ({pendingReqs.length} Indents)</span>
+                    </label>
+
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={handleTakeActionOnAll}
+                        className="bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-rose-950 px-3.5 py-1.5 rounded-xl text-xs font-black shadow-sm flex items-center gap-1.5 cursor-pointer transition-all"
+                      >
+                        <Zap size={14} /> Take Action on ALL ({pendingReqs.length})
+                      </button>
+
+                      {selectedReqIds.length > 0 && (
+                        <button
+                          type="button"
+                          onClick={handleTakeActionOnSelected}
+                          className="bg-emerald-500 hover:bg-emerald-600 text-white px-3.5 py-1.5 rounded-xl text-xs font-black shadow-sm flex items-center gap-1.5 cursor-pointer transition-all"
+                        >
+                          <Zap size={14} /> Combine & Action Selected ({selectedReqIds.length})
+                        </button>
+                      )}
                     </div>
                   </div>
-                ))}
+                )}
+
+                {pendingReqs.length === 0 ? (
+                  <div className="text-center py-8 text-gray-500 space-y-2 bg-gray-50 rounded-2xl border border-dashed border-gray-200">
+                    <CheckCircle2 size={32} className="mx-auto text-emerald-500" />
+                    <p className="font-extrabold text-sm text-gray-800">All Stock Levels Healthy!</p>
+                    <p className="text-xs">No pending purchase indents from the production floor.</p>
+                  </div>
+                ) : (
+                  <div className="space-y-3 max-h-[55vh] overflow-y-auto p-1 custom-scrollbar">
+                    {pendingReqs.map((req, idx) => {
+                      const reqId = req._id || req.id;
+                      const isChecked = selectedReqIds.includes(reqId);
+
+                      return (
+                        <div key={idx} className={`bg-white p-4 rounded-2xl border transition-all shadow-xs space-y-3 ${isChecked ? 'border-amber-500 ring-2 ring-amber-300/50 bg-amber-50/20' : 'border-gray-200 hover:border-amber-400'}`}>
+                          <div className="flex justify-between items-center border-b border-gray-100 pb-2">
+                            <div className="flex items-center gap-3">
+                              <input
+                                type="checkbox"
+                                checked={isChecked}
+                                onChange={() => toggleSelectReq(reqId)}
+                                className="w-4 h-4 rounded text-rose-600 focus:ring-rose-500 cursor-pointer accent-rose-600"
+                              />
+                              <span className="font-mono text-xs font-black text-rose-900 bg-rose-50 border border-rose-200 px-2.5 py-1 rounded-xl">
+                                {req.requisitionNumber || `PR-${req._id?.slice(-4)}`}
+                              </span>
+                              <span className="text-xs font-bold text-gray-600">Branch: <strong>{req.branch || 'Main Branch'}</strong></span>
+                            </div>
+                            <span className="text-[11px] font-mono text-gray-400">
+                              {new Date(req.createdAt || Date.now()).toLocaleString('en-IN')}
+                            </span>
+                          </div>
+
+                          <div className="space-y-2">
+                            {(req.items || []).map((item, itemIdx) => {
+                              const pName = typeof item.product === 'object' ? item.product.name : (products.find(p => (p._id || p.id) === item.product)?.name || 'Item');
+                              const pCode = typeof item.product === 'object' ? item.product.itemCode : (products.find(p => (p._id || p.id) === item.product)?.itemCode || 'N/A');
+                              const uom = item.unitOfMeasure || 'Units';
+
+                              return (
+                                <div key={itemIdx} className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3 bg-slate-50 rounded-xl border border-slate-200">
+                                  <div>
+                                    <div className="text-sm font-extrabold text-slate-900">{pName}</div>
+                                    <div className="text-xs font-mono text-slate-500 font-bold">Code: {pCode || 'N/A'} | Current Stock: {item.currentStock || 0} {uom}</div>
+                                  </div>
+
+                                  <div className="flex items-center gap-4 justify-between sm:justify-end">
+                                    <div className="text-right">
+                                      <span className="text-[10px] text-gray-500 uppercase font-extrabold block">Requested Qty</span>
+                                      <span className="text-sm font-mono font-black text-rose-950">{item.requestedQuantity} {uom}</span>
+                                    </div>
+
+                                    <button
+                                      type="button"
+                                      onClick={() => handleFulfillRequisition(req, item)}
+                                      className="bg-emerald-600 hover:bg-emerald-700 text-white px-3.5 py-2 rounded-xl text-xs font-extrabold transition-all shadow-sm flex items-center gap-1.5 cursor-pointer shrink-0"
+                                    >
+                                      <Zap size={14} /> Take Action
+                                    </button>
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
-            )}
-          </div>
+            );
+          })()}
         </Modal>
       )}
     </div>
