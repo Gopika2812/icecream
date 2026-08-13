@@ -5,9 +5,15 @@ const User = require('../models/User');
 // @access  Private
 const getUsers = async (req, res) => {
     try {
-        const users = await User.find().select('-password').populate('role').populate('primaryBranch');
+        const rawUsers = await User.find();
+        const users = (rawUsers || []).map(u => {
+            const copy = { ...u };
+            delete copy.password;
+            return copy;
+        });
         res.json({ success: true, count: users.length, data: users });
     } catch (error) {
+        console.error('Failed to get users:', error);
         res.status(500).json({ success: false, message: error.message });
     }
 };
@@ -17,13 +23,15 @@ const getUsers = async (req, res) => {
 // @access  Private
 const getUser = async (req, res) => {
     try {
-        const user = await User.findById(req.params.id).select('-password').populate('role').populate('primaryBranch').populate('assignedBranches');
+        const user = await User.findById(req.params.id);
         
         if (!user) {
             return res.status(404).json({ success: false, message: 'User not found' });
         }
         
-        res.json({ success: true, data: user });
+        const copy = { ...user };
+        delete copy.password;
+        res.json({ success: true, data: copy });
     } catch (error) {
         res.status(500).json({ success: false, message: error.message });
     }
@@ -34,10 +42,11 @@ const getUser = async (req, res) => {
 // @access  Private
 const createUser = async (req, res) => {
     try {
-        req.body.createdBy = req.user._id;
+        req.body.createdBy = req.user ? req.user._id : undefined;
         const user = await User.create(req.body);
-        user.password = undefined; // Do not return password
-        res.status(201).json({ success: true, data: user });
+        const copy = { ...user };
+        delete copy.password;
+        res.status(201).json({ success: true, data: copy });
     } catch (error) {
         res.status(400).json({ success: false, message: error.message });
     }
@@ -48,23 +57,17 @@ const createUser = async (req, res) => {
 // @access  Private
 const updateUser = async (req, res) => {
     try {
-        req.body.updatedBy = req.user._id;
-        
-        // Ensure password is not updated here, create separate route if needed
-        if (req.body.password) {
-            delete req.body.password;
-        }
+        req.body.updatedBy = req.user ? req.user._id : undefined;
 
-        const user = await User.findByIdAndUpdate(req.params.id, req.body, {
-            new: true,
-            runValidators: true
-        }).select('-password');
+        const user = await User.findByIdAndUpdate(req.params.id, req.body);
 
         if (!user) {
             return res.status(404).json({ success: false, message: 'User not found' });
         }
 
-        res.json({ success: true, data: user });
+        const copy = { ...user };
+        delete copy.password;
+        res.json({ success: true, data: copy });
     } catch (error) {
         res.status(400).json({ success: false, message: error.message });
     }
@@ -77,8 +80,8 @@ const deleteUser = async (req, res) => {
     try {
         const user = await User.findByIdAndUpdate(req.params.id, {
             status: 'Inactive',
-            updatedBy: req.user._id
-        }, { new: true });
+            updatedBy: req.user ? req.user._id : undefined
+        });
 
         if (!user) {
             return res.status(404).json({ success: false, message: 'User not found' });
