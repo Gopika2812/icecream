@@ -26,70 +26,75 @@ async function recalculate() {
       return parseFloat(pObj.purchasePrice || pObj.costPrice || pObj.wholesalePrice || 0);
     };
 
-    // 1. Recalculate Recipe Cost for all Mix Products
+    // 1. Recalculate Recipe Cost for all Mix Products (Raw materials cost per 1 Liter Mix)
     for (const prod of products) {
       if (Array.isArray(prod.rawMaterials) && prod.rawMaterials.length > 0) {
-        let recipeCost = 0;
+        let recipeCostPerLiter = 0;
         prod.rawMaterials.forEach(rm => {
           const rmId = (rm.product?._id || rm.product || '').toString();
           const rmObj = prodMap[rmId];
           const price = getPrice(rmObj);
-          recipeCost += (parseFloat(rm.quantity || 0) * price);
+          recipeCostPerLiter += (parseFloat(rm.quantity || 0) * price);
         });
 
-        if (recipeCost > 0) {
-          await Product.findByIdAndUpdate(prod._id, { costPrice: Number(recipeCost.toFixed(2)) });
-          console.log(`Updated Mix Product [${prod.name}] costPrice -> ₹${recipeCost.toFixed(2)}`);
-          prod.costPrice = Number(recipeCost.toFixed(2));
-          prodMap[(prod._id || prod.id).toString()].costPrice = Number(recipeCost.toFixed(2));
+        if (recipeCostPerLiter > 0) {
+          const formatted = Number(recipeCostPerLiter.toFixed(2));
+          await Product.findByIdAndUpdate(prod._id, { costPrice: formatted });
+          console.log(`Updated Mix Product [${prod.name}] costPrice -> ₹${formatted} / Ltr`);
+          prod.costPrice = formatted;
+          prodMap[(prod._id || prod.id).toString()].costPrice = formatted;
         }
       }
     }
 
-    // 2. Recalculate Production Unit Cost for all Completed Production Runs
+    // 2. Recalculate Unit Cost for Completed Production Runs (Mix Raw Materials Cost + Packaging Material Cost / Produced Yield)
     const completedRuns = await Production.find({ status: { $in: ['QC_PASSED', 'COMPLETED'] } });
     console.log(`Found ${completedRuns.length} completed production runs.`);
 
     for (const run of completedRuns) {
-      let totalMaterialCost = 0;
+      let totalMixRawMaterialCost = 0;
+      let totalPackagingMaterialCost = 0;
 
+      // Raw materials used directly in run
       if (Array.isArray(run.rawMaterialsUsed)) {
         run.rawMaterialsUsed.forEach(rm => {
           const rmId = (rm.product?._id || rm.product || '').toString();
           const rmObj = prodMap[rmId];
           const price = getPrice(rmObj);
-          totalMaterialCost += (parseFloat(rm.quantityUsed || 0) * price);
+          totalMixRawMaterialCost += (parseFloat(rm.quantityUsed || 0) * price);
         });
       }
 
+      // Prepared mix allocated to run
+      if (run.mixProduct) {
+        const mixId = (run.mixProduct._id || run.mixProduct).toString();
+        const mixObj = prodMap[mixId];
+        const mixPricePerLiter = getPrice(mixObj);
+        const mixLiters = parseFloat(run.mixLiters || 4);
+        totalMixRawMaterialCost += (mixLiters * mixPricePerLiter);
+      }
+
+      // Packaging materials used in run
       if (Array.isArray(run.packagingMaterialsUsed)) {
         run.packagingMaterialsUsed.forEach(pkg => {
           const pkgId = (pkg.product?._id || pkg.product || '').toString();
           const pkgObj = prodMap[pkgId];
           const price = getPrice(pkgObj);
-          totalMaterialCost += (parseFloat(pkg.quantityRequested || 0) * price);
+          totalPackagingMaterialCost += (parseFloat(pkg.quantityRequested || 0) * price);
         });
       }
 
-      // If finished goods uses mix product:
-      if (run.mixProduct) {
-        const mixId = (run.mixProduct._id || run.mixProduct).toString();
-        const mixObj = prodMap[mixId];
-        const mixPrice = getPrice(mixObj);
-        const mixLiters = parseFloat(run.mixLiters || 4);
-        totalMaterialCost += (mixLiters * mixPrice);
-      }
-
+      const totalBatchCost = totalMixRawMaterialCost + totalPackagingMaterialCost;
       const yieldVal = parseFloat(run.producedPieces || run.passedPieces || run.totalPieces || 1);
-      const unitCost = yieldVal > 0 ? Number((totalMaterialCost / yieldVal).toFixed(2)) : 0;
+      const unitCostPerPiece = yieldVal > 0 ? Number((totalBatchCost / yieldVal).toFixed(2)) : 0;
 
-      await Production.findByIdAndUpdate(run._id, { productionUnitCost: unitCost });
-      console.log(`Updated Production Run [${run.productionNumber || run._id}] -> Unit Cost: ₹${unitCost}`);
+      await Production.findByIdAndUpdate(run._id, { productionUnitCost: unitCostPerPiece });
+      console.log(`Updated Production Run [${run.productionNumber || run._id}] -> Mix Raw Material Cost: ₹${totalMixRawMaterialCost.toFixed(2)}, Packaging Cost: ₹${totalPackagingMaterialCost.toFixed(2)} | Unit Cost: ₹${unitCostPerPiece} / Pcs`);
 
       const targetProdId = run.finishedGoodProduct?._id || run.finishedGoodProduct || run.mixProduct?._id || run.mixProduct;
       if (targetProdId) {
-        await Product.findByIdAndUpdate(targetProdId, { costPrice: unitCost });
-        console.log(`Updated Target Product [${targetProdId}] costPrice -> ₹${unitCost}`);
+        await Product.findByIdAndUpdate(targetProdId, { costPrice: unitCostPerPiece });
+        console.log(`Updated Target Product [${targetProdId}] costPrice -> ₹${unitCostPerPiece} / Pcs`);
       }
     }
 

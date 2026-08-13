@@ -756,6 +756,9 @@ const ProductList = () => {
                           </span>
                         )}
                       </div>
+                      <span className="text-[10px] text-gray-500 font-semibold block pt-0.5">
+                        💡 <strong>Formula:</strong> Mix Raw Materials Cost / Piece + Packaging Material Cost / Piece
+                      </span>
                     </div>
 
                     {/* MRP */}
