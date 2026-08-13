@@ -2,8 +2,27 @@ const Product = require('../models/Product');
 
 exports.getProducts = async (req, res) => {
     try {
-        const products = await Product.find().populate('rawMaterials.product', 'name itemCode unitOfMeasure category');
-        res.json({ success: true, data: products });
+        const products = await Product.find().populate('rawMaterials.product', 'name itemCode unitOfMeasure category purchasePrice costPrice');
+        
+        // Auto-calculate costPrice for Mix & Finished Goods if not manually set
+        const enriched = products.map(prod => {
+            const pObj = typeof prod.toObject === 'function' ? prod.toObject() : { ...prod };
+            if (Array.isArray(pObj.rawMaterials) && pObj.rawMaterials.length > 0) {
+                const recipeCost = pObj.rawMaterials.reduce((sum, rm) => {
+                    const rmProd = rm.product;
+                    const rmPrice = rmProd?.purchasePrice || rmProd?.costPrice || 0;
+                    return sum + (parseFloat(rm.quantity || 0) * parseFloat(rmPrice));
+                }, 0);
+
+                if (!pObj.costPrice || pObj.costPrice === 0) {
+                    pObj.costPrice = Number(recipeCost.toFixed(2));
+                }
+                pObj.recipeCalculatedCost = Number(recipeCost.toFixed(2));
+            }
+            return pObj;
+        });
+
+        res.json({ success: true, data: enriched });
     } catch (error) {
         res.status(500).json({ success: false, message: error.message });
     }

@@ -483,13 +483,41 @@ const ProductionList = () => {
   const [isCompleteModalOpen, setIsCompleteModalOpen] = useState(false);
   const [selectedProdForComplete, setSelectedProdForComplete] = useState(null);
   const [producedYield, setProducedYield] = useState('');
+  const [productionUnitCost, setProductionUnitCost] = useState('');
   const [completeRemarks, setCompleteRemarks] = useState('');
+
+  const calculateAutoBatchUnitCost = (prod, yieldVal) => {
+    if (!prod) return '0.00';
+    let totalCost = 0;
+    const yVal = parseFloat(yieldVal) || 1;
+
+    if (Array.isArray(prod.rawMaterialsUsed)) {
+      prod.rawMaterialsUsed.forEach(rm => {
+        const pId = rm.product?._id || rm.product;
+        const pObj = products.find(p => p._id === pId || p.id === pId);
+        const price = pObj?.purchasePrice || pObj?.costPrice || 0;
+        totalCost += (parseFloat(rm.quantityUsed || 0) * parseFloat(price));
+      });
+    }
+
+    if (Array.isArray(prod.packagingMaterialsUsed)) {
+      prod.packagingMaterialsUsed.forEach(pkg => {
+        const pId = pkg.product?._id || pkg.product;
+        const pObj = products.find(p => p._id === pId || p.id === pId);
+        const price = pObj?.purchasePrice || pObj?.costPrice || 0;
+        totalCost += (parseFloat(pkg.quantityRequested || 0) * parseFloat(price));
+      });
+    }
+
+    return yVal > 0 ? (totalCost / yVal).toFixed(2) : '0.00';
+  };
 
   const handleOpenCompleteModal = (prod) => {
     setSelectedProdForComplete(prod);
     const isMix = prod.requisitionType === 'MIX_REQUISITION';
     const targetQty = isMix ? (prod.mixLiters || prod.totalPieces || 0) : (prod.totalPieces || 0);
     setProducedYield(targetQty);
+    setProductionUnitCost(calculateAutoBatchUnitCost(prod, targetQty));
     setCompleteRemarks('');
     setIsCompleteModalOpen(true);
   };
@@ -503,13 +531,15 @@ const ProductionList = () => {
       const isMix = selectedProdForComplete.requisitionType === 'MIX_REQUISITION';
       const reqTargetQty = isMix ? (selectedProdForComplete.mixLiters || selectedProdForComplete.totalPieces || 0) : (selectedProdForComplete.totalPieces || 0);
       const yieldVal = parseFloat(producedYield);
-      
+      const uCost = parseFloat(productionUnitCost) || 0;
+
       const response = await api.post(`/production/${selectedProdForComplete._id}/complete-production`, {
         actualProducedPieces: yieldVal >= 0 ? yieldVal : reqTargetQty,
+        productionUnitCost: uCost,
         remarks: completeRemarks
       });
 
-      alert(response.data.message || `Production Run Completed! Yield: ${yieldVal} (${reqTargetQty} Requested) recorded.`);
+      alert(response.data.message || `Production Run Completed! Yield: ${yieldVal} (${reqTargetQty} Requested), Unit Cost: ₹${uCost} recorded.`);
       setIsCompleteModalOpen(false);
       setSelectedProdForComplete(null);
       fetchInitialData();
@@ -2135,17 +2165,44 @@ const ProductionList = () => {
                     </p>
                   </div>
 
-                  <div>
-                    <label className="block text-xs font-bold text-gray-700 mb-1">Actual Completed Produced Quantity ({uom}) *</label>
-                    <input
-                      type="number"
-                      step="any"
-                      min="0"
-                      required
-                      value={producedYield}
-                      onChange={(e) => setProducedYield(e.target.value)}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-xl text-sm font-mono font-bold text-gray-900 focus:outline-none focus:border-emerald-500"
-                    />
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-xs font-bold text-gray-700 mb-1">Actual Completed Output ({uom}) *</label>
+                      <input
+                        type="number"
+                        step="any"
+                        min="0"
+                        required
+                        value={producedYield}
+                        onChange={(e) => {
+                          const newYield = e.target.value;
+                          setProducedYield(newYield);
+                          setProductionUnitCost(calculateAutoBatchUnitCost(selectedProdForComplete, newYield));
+                        }}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-xl text-sm font-mono font-bold text-gray-900 focus:outline-none focus:border-emerald-500"
+                      />
+                    </div>
+
+                    <div>
+                      <div className="flex justify-between items-center mb-1">
+                        <label className="block text-xs font-bold text-gray-700">Cost Price (₹ per {uom}) *</label>
+                        <span className="text-[9px] font-extrabold text-purple-700 bg-purple-50 px-1.5 py-0.5 rounded border border-purple-200">
+                          ✨ Auto-Calculated
+                        </span>
+                      </div>
+                      <input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        required
+                        value={productionUnitCost}
+                        onChange={(e) => setProductionUnitCost(e.target.value)}
+                        className="w-full px-3 py-2 border border-purple-300 bg-purple-50/50 rounded-xl text-sm font-mono font-black text-purple-950 focus:outline-none focus:border-purple-500"
+                      />
+                      <span className="text-[10px] text-gray-500 font-semibold block mt-0.5">
+                        Updates Products Master Cost Price (₹) automatically
+                      </span>
+                    </div>
                   </div>
 
                   <div>

@@ -503,7 +503,7 @@ exports.startProduction = async (req, res) => {
 exports.completeProduction = async (req, res) => {
     try {
         const { id } = req.params;
-        const { actualProducedPieces, piecesPerBox, remarks } = req.body;
+        const { actualProducedPieces, piecesPerBox, remarks, productionUnitCost } = req.body;
 
         const production = await Production.findById(id);
         if (!production) return res.status(404).json({ success: false, message: 'Production batch not found.' });
@@ -518,6 +518,42 @@ exports.completeProduction = async (req, res) => {
         const passedBoxes = Math.floor(pPcs / pPerBox);
         const loosePcs = pPcs % pPerBox;
         const prodIdCode = production.productionNumber || `PR-${id.slice(-4)}`;
+
+        // Calculate Total Batch Cost & Unit Production Cost from Raw Materials & Packaging
+        const allProducts = await Product.find({});
+        const productMap = {};
+        allProducts.forEach(p => { productMap[(p._id || p.id).toString()] = p; });
+
+        let totalBatchMaterialCost = 0;
+        if (Array.isArray(production.rawMaterialsUsed)) {
+            production.rawMaterialsUsed.forEach(rm => {
+                const pId = (rm.product?._id || rm.product || '').toString();
+                const pObj = productMap[pId];
+                const price = pObj?.purchasePrice || pObj?.costPrice || 0;
+                totalBatchMaterialCost += (parseFloat(rm.quantityUsed || 0) * parseFloat(price));
+            });
+        }
+        if (Array.isArray(production.packagingMaterialsUsed)) {
+            production.packagingMaterialsUsed.forEach(pkg => {
+                const pId = (pkg.product?._id || pkg.product || '').toString();
+                const pObj = productMap[pId];
+                const price = pObj?.purchasePrice || pObj?.costPrice || 0;
+                totalBatchMaterialCost += (parseFloat(pkg.quantityRequested || 0) * parseFloat(price));
+            });
+        }
+
+        const calculatedUnitCost = pPcs > 0 ? Number((totalBatchMaterialCost / pPcs).toFixed(2)) : 0;
+        const finalUnitCost = (productionUnitCost !== undefined && parseFloat(productionUnitCost) >= 0) 
+            ? parseFloat(productionUnitCost) 
+            : calculatedUnitCost;
+
+        // Automatically update Product Master Cost Price (₹)
+        const targetProdId = production.finishedGoodProduct?._id || production.finishedGoodProduct || production.mixProduct?._id || production.mixProduct;
+        if (targetProdId && finalUnitCost > 0) {
+            await Product.findByIdAndUpdate(targetProdId, {
+                costPrice: finalUnitCost
+            });
+        }
 
         // 1. Inward Stock based on Actual Produced Quantity!
         if (isMixReq && production.finishedGoodProduct) {
@@ -623,6 +659,7 @@ exports.completeProduction = async (req, res) => {
             piecesPerBox: pPerBox,
             passedPieces: pPcs,
             passedBoxes: passedBoxes,
+            productionUnitCost: finalUnitCost,
             status: 'QC_PASSED',
             qcStatus: 'PASSED',
             completedAt: new Date(),

@@ -724,16 +724,26 @@ const ProductList = () => {
                       <div className="flex items-center justify-between">
                         <label className="text-[11px] font-bold text-gray-700 uppercase tracking-wider block">Cost Price (₹)</label>
                         <span className="text-[9px] font-extrabold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200">
-                          Auto Calculated
+                          Auto Calculated from Materials & Yield
                         </span>
                       </div>
                       <input 
                         type="number" 
                         disabled
-                        value={formData.costPrice || 0} 
-                        className="w-full bg-gray-100 border border-gray-300 rounded-xl px-3.5 py-2.5 text-gray-600 text-sm font-mono font-extrabold cursor-not-allowed" 
+                        value={
+                          formData.costPrice > 0 
+                            ? formData.costPrice 
+                            : (Array.isArray(formData.rawMaterials) 
+                                ? formData.rawMaterials.reduce((sum, rm) => {
+                                    const p = products.find(item => item._id === rm.product || item.id === rm.product);
+                                    return sum + (parseFloat(rm.quantity || 0) * parseFloat(p?.purchasePrice || p?.costPrice || 0));
+                                  }, 0).toFixed(2)
+                                : 0)
+                        } 
+                        className="w-full bg-emerald-50/40 border border-emerald-300 rounded-xl px-3.5 py-2.5 text-emerald-950 text-sm font-mono font-black cursor-not-allowed" 
                         placeholder="0.00" 
                       />
+                      <span className="text-[10px] text-gray-500 font-semibold block">Computed automatically from raw material purchase prices & completed production runs</span>
                     </div>
 
                     {/* MRP */}
