@@ -2,9 +2,10 @@ import React, { useState } from 'react';
 import { Outlet, Navigate, useNavigate, Link, useLocation } from 'react-router-dom';
 import {
   LogOut, LayoutDashboard, Building2, Users, Menu, X, ChevronDown,
-  Package, ShoppingCart, ShieldCheck, GitBranch, ChevronLeft, ChevronRight, PanelLeft, ArrowLeftRight, Factory, ThermometerSnowflake, FileText, Truck, BookOpen
+  Package, ShoppingCart, ShieldCheck, GitBranch, ChevronLeft, ChevronRight, PanelLeft, ArrowLeftRight, Factory, ThermometerSnowflake, FileText, Truck, BookOpen, ShieldAlert
 } from 'lucide-react';
 import api from '../services/api';
+import { hasPageAccess } from '../utils/permissions';
 
 const DashboardLayout = () => {
   const navigate = useNavigate();
@@ -20,6 +21,8 @@ const DashboardLayout = () => {
     return <Navigate to="/login" replace />;
   }
 
+  const isCurrentPageAllowed = hasPageAccess(user, location.pathname);
+
   const handleLogout = async () => {
     try {
       await api.post('/auth/logout');
@@ -33,6 +36,8 @@ const DashboardLayout = () => {
   };
 
   const NavItem = ({ to, icon: Icon, title }) => {
+    if (!hasPageAccess(user, to)) return null;
+
     const isActive = location.pathname.startsWith(to);
     return (
       <Link
@@ -53,10 +58,19 @@ const DashboardLayout = () => {
   const NavGroup = ({ title, children, defaultOpen = true }) => {
     const [isOpen, setIsOpen] = useState(defaultOpen);
 
+    const validChildren = React.Children.toArray(children).filter(child => {
+      if (child && child.props && child.props.to) {
+        return hasPageAccess(user, child.props.to);
+      }
+      return true;
+    });
+
+    if (validChildren.length === 0) return null;
+
     if (isCollapsed) {
       return (
         <div className="py-2 border-b border-pink-400/20 last:border-b-0 space-y-1">
-          {children}
+          {validChildren}
         </div>
       );
     }
@@ -243,7 +257,27 @@ const DashboardLayout = () => {
         {/* Page Content View */}
         <main className="flex-1 overflow-y-auto custom-scrollbar p-4 lg:p-8 relative z-0">
           <div className="fixed top-20 right-20 w-[300px] h-[300px] lg:w-[500px] lg:h-[500px] bg-[var(--color-primary)] rounded-full blur-[100px] lg:blur-[150px] opacity-[0.05] pointer-events-none"></div>
-          <Outlet />
+          {!isCurrentPageAllowed ? (
+            <div className="flex flex-col items-center justify-center min-h-[60vh] text-center p-8 bg-white/60 backdrop-blur-md rounded-3xl border border-rose-200 shadow-xl max-w-lg mx-auto my-12">
+              <div className="p-4 bg-rose-100 text-rose-600 rounded-3xl mb-4 shadow-inner">
+                <ShieldAlert size={56} />
+              </div>
+              <h2 className="text-2xl font-black text-slate-900 font-display mb-2">Access Restricted</h2>
+              <p className="text-xs sm:text-sm text-slate-600 mb-6 leading-relaxed">
+                Your account (<strong className="text-rose-950">{user.name || user.username}</strong> — <span className="font-extrabold text-rose-700">{typeof user.role === 'object' ? user.role?.name : (user.role || 'User')}</span>) does not have permission to access the page:
+                <br />
+                <code className="font-mono bg-rose-50 text-rose-900 px-2 py-1 rounded-md font-bold text-xs inline-block mt-2">{location.pathname}</code>
+              </p>
+              <button
+                onClick={() => navigate('/dashboard')}
+                className="bg-gradient-to-r from-rose-700 to-pink-700 hover:from-rose-800 hover:to-pink-800 text-white px-6 py-3 rounded-2xl font-black text-xs shadow-lg transition-all cursor-pointer"
+              >
+                Return to Authorized Dashboard
+              </button>
+            </div>
+          ) : (
+            <Outlet />
+          )}
         </main>
       </div>
     </div>
