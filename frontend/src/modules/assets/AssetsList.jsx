@@ -80,10 +80,18 @@ const AssetsList = () => {
     }
   };
 
-  const handleOpenAddAssetModal = () => {
+  const handleOpenAddAssetModal = async () => {
     setEditingAssetId(null);
+    let nextCode = 'A001';
+    try {
+      const res = await api.get('/assets/next-code');
+      if (res.data?.nextCode) nextCode = res.data.nextCode;
+    } catch (err) {
+      console.error('Failed to get next asset code:', err);
+    }
+
     setAssetForm({
-      assetCode: '',
+      assetCode: nextCode,
       name: '',
       category: 'Processing Machinery',
       modelNumber: '',

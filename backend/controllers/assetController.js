@@ -15,6 +15,17 @@ const generateAssetCode = async () => {
     return `A${nextNum.toString().padStart(3, '0')}`;
 };
 
+// @desc    Get next sequential asset code (A001, A002...)
+// @route   GET /api/v1/assets/next-code
+exports.getNextAssetCode = async (req, res) => {
+    try {
+        const nextCode = await generateAssetCode();
+        res.json({ success: true, nextCode });
+    } catch (error) {
+        res.status(500).json({ success: false, message: error.message });
+    }
+};
+
 // @desc    Get all assets
 // @route   GET /api/v1/assets
 exports.getAssets = async (req, res) => {

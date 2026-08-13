@@ -5,6 +5,8 @@ const { protect } = require('../middleware/auth');
 
 router.use(protect);
 
+router.get('/next-code', vehicleController.getNextVehicleCode);
+
 router.route('/')
     .get(vehicleController.getVehicles)
     .post(vehicleController.createVehicle);

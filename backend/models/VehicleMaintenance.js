@@ -7,7 +7,7 @@ const vehicleMaintenanceSchema = new mongoose.Schema({
         unique: true
     },
     vehicle: {
-        type: mongoose.Schema.Types.ObjectId,
+        type: mongoose.Schema.Types.Mixed,
         ref: 'Vehicle',
         required: true
     },
@@ -42,7 +42,7 @@ const vehicleMaintenanceSchema = new mongoose.Schema({
     nextServiceDueKm: Number,
     receiptNumber: String,
     performedBy: {
-        type: mongoose.Schema.Types.ObjectId,
+        type: mongoose.Schema.Types.Mixed,
         ref: 'User'
     }
 }, { timestamps: true });

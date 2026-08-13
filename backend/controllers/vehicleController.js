@@ -15,6 +15,17 @@ const generateVehicleCode = async () => {
     return `VECH${nextNum.toString().padStart(3, '0')}`;
 };
 
+// @desc    Get next sequential vehicle code (VECH001, VECH002...)
+// @route   GET /api/v1/vehicles/next-code
+exports.getNextVehicleCode = async (req, res) => {
+    try {
+        const nextCode = await generateVehicleCode();
+        res.json({ success: true, nextCode });
+    } catch (error) {
+        res.status(500).json({ success: false, message: error.message });
+    }
+};
+
 // @desc    Get all vehicles
 // @route   GET /api/v1/vehicles
 exports.getVehicles = async (req, res) => {

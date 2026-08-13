@@ -19,8 +19,7 @@ const assetSchema = new mongoose.Schema({
         default: 'Processing Machinery'
     },
     branch: {
-        type: mongoose.Schema.Types.ObjectId,
-        ref: 'Branch'
+        type: mongoose.Schema.Types.Mixed
     },
     modelNumber: String,
     serialNumber: String,
@@ -41,7 +40,7 @@ const assetSchema = new mongoose.Schema({
         default: 'Operational'
     },
     assignedDealerCustomer: {
-        type: mongoose.Schema.Types.ObjectId,
+        type: mongoose.Schema.Types.Mixed,
         ref: 'Customer'
     },
     dealerAssignedDate: Date,
@@ -53,7 +52,7 @@ const assetSchema = new mongoose.Schema({
     },
     remarks: String,
     createdBy: {
-        type: mongoose.Schema.Types.ObjectId,
+        type: mongoose.Schema.Types.Mixed,
         ref: 'User'
     }
 }, { timestamps: true });

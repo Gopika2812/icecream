@@ -30,7 +30,7 @@ const vehicleSchema = new mongoose.Schema({
         default: 50
     },
     branch: {
-        type: mongoose.Schema.Types.ObjectId,
+        type: mongoose.Schema.Types.Mixed,
         ref: 'Branch'
     },
     assignedDriver: String,
@@ -58,7 +58,7 @@ const vehicleSchema = new mongoose.Schema({
     },
     remarks: String,
     createdBy: {
-        type: mongoose.Schema.Types.ObjectId,
+        type: mongoose.Schema.Types.Mixed,
         ref: 'User'
     }
 }, { timestamps: true });

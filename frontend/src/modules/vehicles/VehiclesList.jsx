@@ -76,10 +76,18 @@ const VehiclesList = () => {
     }
   };
 
-  const handleOpenAddVehicleModal = () => {
+  const handleOpenAddVehicleModal = async () => {
     setEditingVehicleId(null);
+    let nextCode = 'VECH001';
+    try {
+      const res = await api.get('/vehicles/next-code');
+      if (res.data?.nextCode) nextCode = res.data.nextCode;
+    } catch (err) {
+      console.error('Failed to get next vehicle code:', err);
+    }
+
     setVehicleForm({
-      vehicleCode: '',
+      vehicleCode: nextCode,
       registrationNumber: '',
       vehicleType: 'Auto Sales Delivery Van',
       makeModel: '',

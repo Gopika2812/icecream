@@ -7,7 +7,7 @@ const assetMaintenanceSchema = new mongoose.Schema({
         unique: true
     },
     asset: {
-        type: mongoose.Schema.Types.ObjectId,
+        type: mongoose.Schema.Types.Mixed,
         ref: 'Asset',
         required: true
     },
@@ -43,7 +43,7 @@ const assetMaintenanceSchema = new mongoose.Schema({
         default: 'Completed'
     },
     performedBy: {
-        type: mongoose.Schema.Types.ObjectId,
+        type: mongoose.Schema.Types.Mixed,
         ref: 'User'
     }
 }, { timestamps: true });
