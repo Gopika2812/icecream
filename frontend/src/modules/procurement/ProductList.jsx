@@ -147,6 +147,7 @@ const ProductList = () => {
       unitOfMeasure: 'Kg', 
       hsnCode: '',
       gstPercent: 5, // 5% GST Autofill
+      costPrice: 0,
       mrp: 0, 
       wholesalePrice: 0, 
       piecesPerBox: 12, 
@@ -172,6 +173,7 @@ const ProductList = () => {
       unitOfMeasure: product.unitOfMeasure || 'Kg',
       hsnCode: product.hsnCode || '',
       gstPercent: product.gstPercent !== undefined ? product.gstPercent : 5,
+      costPrice: product.costPrice || 0,
       mrp: product.mrp || 0,
       wholesalePrice: product.wholesalePrice || 0,
       piecesPerBox: product.piecesPerBox || 12,
@@ -210,6 +212,7 @@ const ProductList = () => {
         ...formData,
         hsnCode: formData.hsnCode.trim(),
         gstPercent: parseFloat(formData.gstPercent) || 5,
+        costPrice: parseFloat(formData.costPrice) || 0,
         mrp: parseFloat(formData.mrp) || 0,
         wholesalePrice: parseFloat(formData.wholesalePrice) || 0,
         piecesPerBox: parseInt(formData.piecesPerBox) || 12,
@@ -722,9 +725,9 @@ const ProductList = () => {
                     {/* COST PRICE (AUTO SHOWS READ-ONLY) */}
                     <div className="space-y-1.5">
                       <div className="flex items-center justify-between">
-                        <label className="text-[11px] font-bold text-gray-700 uppercase tracking-wider block">Cost Price (₹)</label>
+                        <label className="text-[11px] font-bold text-gray-700 uppercase tracking-wider block">Production Cost Price (₹ / Piece)</label>
                         <span className="text-[9px] font-extrabold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200">
-                          Auto Calculated from Materials & Yield
+                          Auto Calculated
                         </span>
                       </div>
                       <input 
@@ -732,18 +735,27 @@ const ProductList = () => {
                         disabled
                         value={
                           formData.costPrice > 0 
-                            ? formData.costPrice 
-                            : (Array.isArray(formData.rawMaterials) 
+                            ? Number(formData.costPrice).toFixed(2) 
+                            : (Array.isArray(formData.rawMaterials) && formData.rawMaterials.length > 0
                                 ? formData.rawMaterials.reduce((sum, rm) => {
                                     const p = products.find(item => item._id === rm.product || item.id === rm.product);
-                                    return sum + (parseFloat(rm.quantity || 0) * parseFloat(p?.purchasePrice || p?.costPrice || 0));
+                                    return sum + (parseFloat(rm.quantity || 0) * parseFloat(p?.purchasePrice || p?.costPrice || p?.wholesalePrice || 0));
                                   }, 0).toFixed(2)
-                                : 0)
+                                : '0.00')
                         } 
-                        className="w-full bg-emerald-50/40 border border-emerald-300 rounded-xl px-3.5 py-2.5 text-emerald-950 text-sm font-mono font-black cursor-not-allowed" 
+                        className="w-full bg-emerald-50/50 border border-emerald-300 rounded-xl px-3.5 py-2.5 text-emerald-950 text-sm font-mono font-black cursor-not-allowed" 
                         placeholder="0.00" 
                       />
-                      <span className="text-[10px] text-gray-500 font-semibold block">Computed automatically from raw material purchase prices & completed production runs</span>
+                      <div className="flex justify-between items-center text-[10px] text-gray-700 font-bold pt-0.5">
+                        <span className="text-emerald-900 bg-emerald-100/70 px-2 py-0.5 rounded border border-emerald-200">
+                          Per Piece / Tub: <strong>₹{parseFloat(formData.costPrice || 0).toFixed(2)}</strong>
+                        </span>
+                        {formData.piecesPerBox > 1 && (
+                          <span className="text-purple-900 bg-purple-100/70 px-2 py-0.5 rounded border border-purple-200">
+                            Per Master Box ({formData.piecesPerBox} Pcs): <strong>₹{(parseFloat(formData.costPrice || 0) * parseInt(formData.piecesPerBox || 12)).toFixed(2)}</strong>
+                          </span>
+                        )}
+                      </div>
                     </div>
 
                     {/* MRP */}
