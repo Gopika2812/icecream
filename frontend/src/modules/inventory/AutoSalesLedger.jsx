@@ -100,8 +100,27 @@ const AutoSalesLedger = () => {
     if (cust) {
       setVehicleNo(cust.customerCode || cust.name);
       if (cust.salesOwner) {
-        const ownerId = typeof cust.salesOwner === 'object' ? cust.salesOwner._id : cust.salesOwner;
-        setInchargeId(ownerId);
+        const ownerObj = cust.salesOwner;
+        const ownerId = typeof ownerObj === 'object' ? (ownerObj._id || ownerObj.id) : ownerObj;
+        const ownerName = typeof ownerObj === 'object' ? ownerObj.name : (typeof ownerObj === 'string' ? ownerObj : null);
+
+        const targetIdStr = ownerId ? String(ownerId).trim() : '';
+        const targetNameStr = ownerName ? String(ownerName).trim().toLowerCase() : (ownerId ? String(ownerId).trim().toLowerCase() : '');
+
+        const matchedUser = users.find(u => {
+          const uId = String(u._id || u.id || '').trim();
+          const uName = String(u.name || '').trim().toLowerCase();
+          return (
+            (uId && targetIdStr && uId === targetIdStr) ||
+            (uName && targetNameStr && uName === targetNameStr)
+          );
+        });
+
+        if (matchedUser) {
+          setInchargeId(matchedUser._id || matchedUser.id);
+        } else {
+          setInchargeId(ownerId || ownerName || '');
+        }
       }
     }
 
@@ -328,6 +347,11 @@ const AutoSalesLedger = () => {
                       {u.name} ({u.designation || u.username})
                     </option>
                   ))}
+                  {inchargeId && !users.some(u => u._id === inchargeId || u.name === inchargeId) && (
+                    <option value={inchargeId}>
+                      {inchargeId} (Assigned Driver)
+                    </option>
+                  )}
                 </select>
               </div>
             </div>

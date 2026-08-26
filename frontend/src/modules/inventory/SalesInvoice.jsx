@@ -144,17 +144,27 @@ const SalesInvoice = () => {
     if (cust && cust.salesOwner) {
       const ownerObj = cust.salesOwner;
       const ownerId = typeof ownerObj === 'object' ? (ownerObj._id || ownerObj.id) : ownerObj;
-      const ownerName = typeof ownerObj === 'object' ? ownerObj.name : null;
+      const ownerName = typeof ownerObj === 'object' ? ownerObj.name : (typeof ownerObj === 'string' ? ownerObj : null);
 
-      const matchedUser = users.find(u => 
-        (u._id || u.id) === ownerId || 
-        (ownerName && u.name?.toLowerCase() === ownerName.toLowerCase())
-      );
+      const targetIdStr = ownerId ? String(ownerId).trim() : '';
+      const targetNameStr = ownerName ? String(ownerName).trim().toLowerCase() : (ownerId ? String(ownerId).trim().toLowerCase() : '');
+
+      const matchedUser = users.find(u => {
+        const uId = String(u._id || u.id || '').trim();
+        const uName = String(u.name || '').trim().toLowerCase();
+        const uUsername = String(u.username || '').trim().toLowerCase();
+
+        return (
+          (uId && targetIdStr && uId === targetIdStr) ||
+          (uName && targetNameStr && uName === targetNameStr) ||
+          (uUsername && targetNameStr && uUsername === targetNameStr)
+        );
+      });
 
       if (matchedUser) {
         setSelectedSalesOwnerId(matchedUser._id || matchedUser.id);
       } else {
-        setSelectedSalesOwnerId(ownerId || '');
+        setSelectedSalesOwnerId(ownerId || ownerName || '');
       }
     } else {
       setSelectedSalesOwnerId('');
@@ -903,7 +913,13 @@ const SalesInvoice = () => {
                   {selectedSalesOwnerId && <span className="text-[10px] text-emerald-600 font-extrabold">✓ Auto Selected</span>}
                 </label>
                 <SearchableSelect
-                  options={users.map(u => ({ value: u._id, label: u.name, sublabel: u.designation || u.username }))}
+                  options={(() => {
+                    const opts = users.map(u => ({ value: u._id || u.id, label: u.name, sublabel: u.designation || u.username }));
+                    if (selectedSalesOwnerId && !opts.some(o => o.value === selectedSalesOwnerId || o.label?.toLowerCase() === String(selectedSalesOwnerId).toLowerCase())) {
+                      opts.push({ value: selectedSalesOwnerId, label: selectedSalesOwnerId, sublabel: 'Assigned Sales Owner' });
+                    }
+                    return opts;
+                  })()}
                   value={selectedSalesOwnerId}
                   onChange={(val) => setSelectedSalesOwnerId(val)}
                   placeholder="Select Sales Owner..."

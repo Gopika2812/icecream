@@ -176,7 +176,7 @@
           "S3Bucket": {
             "Ref": "ServerlessDeploymentBucket"
           },
-          "S3Key": "serverless/icecream-erp-backend/dev/1787705365104-2026-08-26T00:49:25.104Z/icecream-erp-backend.zip"
+          "S3Key": "serverless/icecream-erp-backend/dev/1787707800445-2026-08-26T01:30:00.445Z/icecream-erp-backend.zip"
         },
         "Handler": "handler.handler",
         "Runtime": "nodejs20.x",

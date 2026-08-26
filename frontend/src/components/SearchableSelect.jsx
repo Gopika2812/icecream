@@ -27,7 +27,8 @@ const SearchableSelect = ({
 
   // Find currently selected option
   const selectedOption = options.find(opt => 
-    opt.value === value || opt._id === value || opt.id === value
+    opt.value === value || opt._id === value || opt.id === value ||
+    (typeof value === 'string' && value.trim() && (opt.label || opt.name || '').toLowerCase() === value.trim().toLowerCase())
   );
 
   // Filter options based on search query
