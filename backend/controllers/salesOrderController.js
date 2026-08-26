@@ -4,17 +4,92 @@ const InventoryTransaction = require('../models/InventoryTransaction');
 const Customer = require('../models/Customer');
 const User = require('../models/User');
 
+// Helper for Indian Fiscal Year suffix (e.g. "26-27")
+const getFiscalYearSuffix = () => {
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = now.getMonth() + 1;
+    let startYear = year;
+    let endYear = year + 1;
+    if (month < 4) {
+        startYear = year - 1;
+        endYear = year;
+    }
+    return `${startYear.toString().slice(-2)}-${endYear.toString().slice(-2)}`;
+};
+
+const getInvoicePrefix = (type) => {
+    switch (type) {
+        case 'Auto Sales':
+            return 'AU';
+        case 'Party Order':
+            return 'PO';
+        case 'Sample Products':
+            return 'SMP';
+        case 'Guest':
+            return 'GST';
+        case 'Dealer':
+            return 'DLR';
+        default:
+            return 'INV';
+    }
+};
+
 // @desc    Get all Sales Orders / Invoices
 // @route   GET /api/v1/sales-orders
 exports.getSalesOrders = async (req, res) => {
     try {
-        const salesOrders = await SalesOrder.find()
-            .populate('customer')
-            .populate('salesOwner', 'name username employeeId designation')
-            .populate('items.product')
-            .sort({ createdAt: -1 });
+        const salesOrders = await SalesOrder.find().sort({ createdAt: -1 });
 
-        res.json({ success: true, count: salesOrders.length, data: salesOrders });
+        const [allCustomers, allUsers, allProducts] = await Promise.all([
+            Customer.find(),
+            User.find(),
+            require('../models/Product').find()
+        ]);
+
+        const customerMap = new Map((allCustomers || []).map(c => [c._id || c.id, c]));
+        const userMap = new Map((allUsers || []).map(u => [u._id || u.id, u]));
+        const userByNameMap = new Map((allUsers || []).map(u => [u.name?.toLowerCase().trim(), u]));
+        const productMap = new Map((allProducts || []).map(p => [p._id || p.id, p]));
+
+        const populatedOrders = (salesOrders || []).map(order => {
+            const copy = { ...order };
+
+            // Populate Customer
+            if (copy.customer) {
+                const custId = typeof copy.customer === 'object' ? (copy.customer._id || copy.customer.id) : copy.customer;
+                if (customerMap.has(custId)) {
+                    copy.customer = customerMap.get(custId);
+                }
+            }
+
+            // Populate Sales Owner
+            if (copy.salesOwner) {
+                const ownerId = typeof copy.salesOwner === 'object' ? (copy.salesOwner._id || copy.salesOwner.id) : copy.salesOwner;
+                if (userMap.has(ownerId)) {
+                    copy.salesOwner = userMap.get(ownerId);
+                } else if (typeof copy.salesOwner === 'string' && userByNameMap.has(copy.salesOwner.toLowerCase().trim())) {
+                    copy.salesOwner = userByNameMap.get(copy.salesOwner.toLowerCase().trim());
+                } else if (typeof copy.salesOwner === 'string') {
+                    copy.salesOwner = { name: copy.salesOwner };
+                }
+            }
+
+            // Populate items.product
+            if (Array.isArray(copy.items)) {
+                copy.items = copy.items.map(item => {
+                    const prodId = typeof item.product === 'object' ? (item.product?._id || item.product?.id) : item.product;
+                    return {
+                        ...item,
+                        product: productMap.get(prodId) || item.product
+                    };
+                });
+            }
+
+            return copy;
+        });
+
+        res.json({ success: true, count: populatedOrders.length, data: populatedOrders });
     } catch (error) {
         res.status(500).json({ success: false, message: error.message });
     }
@@ -38,12 +113,13 @@ exports.createSalesOrder = async (req, res) => {
         const targetCustomerName = invoiceType === 'Guest' ? (guestName || 'Guest Receiver') : (customerObj?.name || 'Customer');
 
         const salesOwnerObj = salesOwnerId ? await User.findById(salesOwnerId) : null;
-        const ownerName = salesOwnerObj ? salesOwnerObj.name : 'Unassigned';
+        const ownerName = salesOwnerObj ? salesOwnerObj.name : (typeof salesOwnerId === 'string' ? salesOwnerId : 'Unassigned');
 
-        // Auto Generate Invoice Number
+        // Auto Generate Short Invoice Number (e.g. AU/001/26-27 or INV/001/26-27)
         const count = await SalesOrder.countDocuments();
-        const dateStr = new Date().toISOString().split('T')[0].replace(/-/g, '');
-        const invoiceNumber = `INV-${dateStr}-${(count + 1).toString().padStart(3, '0')}`;
+        const prefix = getInvoicePrefix(invoiceType);
+        const fySuffix = getFiscalYearSuffix();
+        const invoiceNumber = `${prefix}/${(count + 1).toString().padStart(3, '0')}/${fySuffix}`;
 
         // Calculate Totals
         let subTotal = 0;

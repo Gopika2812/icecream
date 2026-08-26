@@ -721,22 +721,33 @@ const SalesInvoice = () => {
                         </td>
 
                         <td className="px-6 py-4 font-bold text-gray-900">
-                          {order.customer?.name || 'Walk-in Customer'}
-                          <span className="block text-[11px] text-gray-400 font-normal">GSTIN: {order.customer?.gstinNumber || 'N/A'}</span>
+                          {(() => {
+                            const cObj = typeof order.customer === 'object' ? order.customer : customers.find(c => (c._id || c.id) === order.customer);
+                            return order.guestName || cObj?.name || 'Walk-in Customer';
+                          })()}
+                          <span className="block text-[11px] text-gray-400 font-normal">
+                            GSTIN: {((typeof order.customer === 'object' ? order.customer : customers.find(c => (c._id || c.id) === order.customer))?.gstinNumber) || 'N/A'}
+                          </span>
                         </td>
 
                         <td className="px-6 py-4">
-                          {order.salesOwner ? (
-                            <div className="flex items-center gap-1.5 font-bold text-gray-800">
-                              <UserCheck size={14} className="text-[var(--color-primary)] shrink-0" />
-                              <div>
-                                <span>{order.salesOwner.name}</span>
-                                <span className="block text-[10px] text-gray-400 font-normal">{order.salesOwner.designation || 'Sales Owner'}</span>
+                          {(() => {
+                            const uObj = typeof order.salesOwner === 'object' ? order.salesOwner : users.find(u => (u._id || u.id) === order.salesOwner);
+                            const name = uObj?.name || (typeof order.salesOwner === 'string' ? order.salesOwner : null);
+                            const desig = uObj?.designation || uObj?.username || 'Sales Owner';
+
+                            if (!name) return <span className="text-gray-400 italic text-xs">Unassigned</span>;
+
+                            return (
+                              <div className="flex items-center gap-1.5 font-bold text-gray-800">
+                                <UserCheck size={14} className="text-[var(--color-primary)] shrink-0" />
+                                <div>
+                                  <span>{name}</span>
+                                  <span className="block text-[10px] text-gray-400 font-normal">{desig}</span>
+                                </div>
                               </div>
-                            </div>
-                          ) : (
-                            <span className="text-gray-400 italic text-xs">Unassigned</span>
-                          )}
+                            );
+                          })()}
                         </td>
 
                         <td className="px-6 py-4 text-right font-mono font-extrabold text-emerald-700 text-base">
