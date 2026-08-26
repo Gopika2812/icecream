@@ -296,24 +296,32 @@ const SalesInvoice = () => {
 
       if (isAutoSales) {
         itemsPayload = autoSalesStockItems
-          .filter(i => i.takenQty > 0 || i.openingQty > 0)
-          .map(i => ({
-            product: i.productId,
-            batchNumber: 'COLD-ROOM',
-            quantityBoxes: Math.ceil((i.takenQty || 0) / (i.piecesPerBox || 1)),
-            quantityPcs: i.takenQty || 0,
-            openingPcs: i.openingQty || 0,
-            totalPcs: i.totalQty || 0,
-            unitPrice: i.unitPrice || 0
-          }));
+          .filter(i => (i.takenQty > 0 || i.openingQty > 0))
+          .map(i => {
+            const matchedInv = inventory.find(inv => (inv.product?._id || inv.product) === i.productId && inv.batchNumber && inv.batchNumber !== 'COLD-ROOM');
+            const realBatch = matchedInv?.batchNumber || `BATCH-${new Date().toISOString().split('T')[0].replace(/-/g, '')}`;
+            return {
+              product: i.productId,
+              batchNumber: realBatch,
+              quantityBoxes: Math.ceil((i.takenQty || 0) / (i.piecesPerBox || 1)),
+              quantityPcs: i.takenQty || 0,
+              openingPcs: i.openingQty || 0,
+              totalPcs: i.totalQty || 0,
+              unitPrice: i.unitPrice || 0
+            };
+          });
       } else {
-        itemsPayload = lineItems.filter(i => i.productId).map(i => ({
-          product: i.productId,
-          batchNumber: i.batchNumber || 'COLD-ROOM',
-          quantityBoxes: parseInt(i.quantityBoxes) || 0,
-          quantityPcs: parseInt(i.quantityPcs) || 0,
-          unitPrice: parseFloat(i.unitPrice) || 0
-        }));
+        itemsPayload = lineItems.filter(i => i.productId).map(i => {
+          const matchedInv = inventory.find(inv => (inv.product?._id || inv.product) === i.productId && inv.batchNumber && inv.batchNumber !== 'COLD-ROOM');
+          const realBatch = i.batchNumber && i.batchNumber !== 'COLD-ROOM' ? i.batchNumber : (matchedInv?.batchNumber || `BATCH-${new Date().toISOString().split('T')[0].replace(/-/g, '')}`);
+          return {
+            product: i.productId,
+            batchNumber: realBatch,
+            quantityBoxes: parseInt(i.quantityBoxes) || 0,
+            quantityPcs: parseInt(i.quantityPcs) || 0,
+            unitPrice: parseFloat(i.unitPrice) || 0
+          };
+        });
       }
 
       const res = await api.post('/sales-orders', {
@@ -490,7 +498,12 @@ const SalesInvoice = () => {
                     <tr>
                       <td class="text-center font-mono">${idx + 1}</td>
                       <td><strong>${prod.name || 'Ice Cream Finished Good'}</strong></td>
-                      <td class="font-mono">${item.batchNumber || 'COLD-ROOM'}</td>
+                      <td class="font-mono">${(() => {
+                        if (item.batchNumber && item.batchNumber !== 'COLD-ROOM') return item.batchNumber;
+                        const prodId = prod._id || prod.id || item.product;
+                        const matched = inventory.find(inv => (inv.product?._id || inv.product) === prodId && inv.batchNumber && inv.batchNumber !== 'COLD-ROOM');
+                        return matched?.batchNumber || `BATCH-${new Date().toISOString().split('T')[0].replace(/-/g, '')}`;
+                      })()}</td>
                       <td class="text-right font-mono">${item.quantityBoxes || 0}</td>
                       <td class="text-right font-mono" style="font-weight: 700;">${item.quantityPcs}</td>
                       <td class="text-right font-mono">₹${(item.unitPrice || 0).toFixed(2)}</td>
@@ -1339,7 +1352,14 @@ const SalesInvoice = () => {
                   {selectedInvoiceForPrint.items?.map((item, idx) => (
                     <tr key={idx} className="hover:bg-gray-50/50">
                       <td className="p-2.5 font-bold text-gray-900">{item.product?.name || 'Ice Cream Finished Good'}</td>
-                      <td className="p-2.5 text-center font-mono text-[11px] text-gray-600">{item.batchNumber || 'COLD-ROOM'}</td>
+                      <td className="p-2.5 text-center font-mono text-[11px] text-gray-600">
+                        {(() => {
+                          if (item.batchNumber && item.batchNumber !== 'COLD-ROOM') return item.batchNumber;
+                          const prodId = item.product?._id || item.product?.id || item.product;
+                          const matched = inventory.find(inv => (inv.product?._id || inv.product) === prodId && inv.batchNumber && inv.batchNumber !== 'COLD-ROOM');
+                          return matched?.batchNumber || `BATCH-${new Date().toISOString().split('T')[0].replace(/-/g, '')}`;
+                        })()}
+                      </td>
                       <td className="p-2.5 text-right font-mono text-gray-700">{item.quantityBoxes || 0}</td>
                       <td className="p-2.5 text-right font-mono font-bold text-gray-900">{item.quantityPcs}</td>
                       <td className="p-2.5 text-right font-mono text-gray-700">₹{(item.unitPrice || 0).toFixed(2)}</td>
