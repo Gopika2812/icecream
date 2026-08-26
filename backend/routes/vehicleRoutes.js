@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const vehicleController = require('../controllers/vehicleController');
-const { protect } = require('../middleware/auth');
+const { protect } = require('../middleware/authMiddleware');
 
 router.use(protect);
 

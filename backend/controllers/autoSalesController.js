@@ -45,13 +45,16 @@ exports.getPreviousOpeningStock = async (req, res) => {
         if (vehicleNo) query.vehicleNo = vehicleNo;
 
         // 1. Fetch Previous Day Opening Stock (Yesterday's Unsold Returns)
-        const lastEntry = await AutoSalesEntry.findOne(query)
-            .sort({ entryDate: -1, createdAt: -1 });
+        const entries = await AutoSalesEntry.find(query).sort({ entryDate: -1, createdAt: -1 });
+        const lastEntry = entries && entries.length > 0 ? entries[0] : null;
 
         const openingMap = {};
-        if (lastEntry && lastEntry.items) {
+        if (lastEntry && Array.isArray(lastEntry.items)) {
             lastEntry.items.forEach(item => {
-                openingMap[item.product.toString()] = item.returnQty || 0;
+                if (item && item.product) {
+                    const pId = (item.product._id || item.product).toString();
+                    openingMap[pId] = item.returnQty || 0;
+                }
             });
         }
 
@@ -70,18 +73,20 @@ exports.getPreviousOpeningStock = async (req, res) => {
 
         const takenMap = {};
         const returnMap = {};
-        todayInvoices.forEach(inv => {
-            if (inv.items && inv.items.length > 0) {
+        (todayInvoices || []).forEach(inv => {
+            if (inv && Array.isArray(inv.items)) {
                 inv.items.forEach((item, idx) => {
-                    const pId = item.product.toString();
-                    takenMap[pId] = (takenMap[pId] || 0) + (item.quantityPcs || 0);
-                    
-                    // Use item.returnedPcs or fallback to inv.returnedPcs if single item invoice
-                    let ret = item.returnedPcs || 0;
-                    if (!ret && inv.returnedPcs && idx === 0) {
-                        ret = inv.returnedPcs;
+                    if (item && item.product) {
+                        const pId = (item.product._id || item.product).toString();
+                        takenMap[pId] = (takenMap[pId] || 0) + (item.quantityPcs || 0);
+                        
+                        // Use item.returnedPcs or fallback to inv.returnedPcs if single item invoice
+                        let ret = item.returnedPcs || 0;
+                        if (!ret && inv.returnedPcs && idx === 0) {
+                            ret = inv.returnedPcs;
+                        }
+                        returnMap[pId] = (returnMap[pId] || 0) + ret;
                     }
-                    returnMap[pId] = (returnMap[pId] || 0) + ret;
                 });
             }
         });

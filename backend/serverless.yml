@@ -30,6 +30,7 @@ provider:
       allowCredentials: true
   environment:
     NODE_ENV: production
+    MONGODB_URI: ${env:MONGODB_URI, 'mongodb+srv://gopikap2812_db_user:4SyjUP7qMMarkgqu@saravanas.qg7d9tq.mongodb.net/sri_saravanass_erp'}
     JWT_SECRET: ${env:JWT_SECRET, 'super_secret_jwt_key_for_erp_2026'}
     USERS_TABLE: ${self:service}-users-${self:provider.stage}
     ROLES_TABLE: ${self:service}-roles-${self:provider.stage}

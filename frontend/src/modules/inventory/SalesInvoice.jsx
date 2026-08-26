@@ -38,6 +38,12 @@ const SalesInvoice = () => {
   const [returnItemsForm, setReturnItemsForm] = useState([]);
   const [returnRemarks, setReturnRemarks] = useState('');
 
+  // Auto Sales Specific State
+  const [products, setProducts] = useState([]);
+  const [autoSalesStockItems, setAutoSalesStockItems] = useState([]);
+  const [loadingAutoStock, setLoadingAutoStock] = useState(false);
+  const [showAllAutoProducts, setShowAllAutoProducts] = useState(true);
+
   useEffect(() => {
     fetchInitialData();
   }, []);
@@ -45,17 +51,21 @@ const SalesInvoice = () => {
   const fetchInitialData = async () => {
     try {
       setLoading(true);
-      const [soRes, custRes, userRes, invRes] = await Promise.all([
+      const [soRes, custRes, userRes, invRes, prodRes] = await Promise.all([
         api.get('/sales-orders'),
         api.get('/customers'),
         api.get('/users'),
-        api.get('/inventory')
+        api.get('/inventory'),
+        api.get('/products')
       ]);
 
       setSalesOrders(soRes.data.data || []);
       setCustomers(custRes.data.data || []);
       setUsers(userRes.data.data || []);
       
+      const fgProds = (prodRes.data.data || []).filter(p => p.itemType === 'Finished Goods');
+      setProducts(fgProds.length > 0 ? fgProds : prodRes.data.data || []);
+
       // Filter Cold Room inventory
       const coldRoomInv = (invRes.data.data || []).filter(i => i.inventoryType === 'Cold Room' && i.quantity > 0);
       setInventory(coldRoomInv);
@@ -63,6 +73,39 @@ const SalesInvoice = () => {
       console.error('Failed to load sales data', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  // Fetch Opening Stock & Products for Auto Sales Vehicle
+  const loadAutoSalesStock = async (customerId) => {
+    if (!customerId) return;
+    try {
+      setLoadingAutoStock(true);
+      const dateStr = new Date().toISOString().split('T')[0];
+      const res = await api.get(`/auto-sales/previous-opening?customerId=${customerId}&date=${dateStr}`);
+      const { openingMap = {} } = res.data.data || {};
+
+      const prodsToUse = products.length > 0 ? products : (inventory.map(i => i.product).filter(Boolean));
+      const items = prodsToUse.map(p => {
+        const op = openingMap[p._id] || 0;
+        const basePrice = p.wholesalePrice || p.mrp || 20;
+        const price = getCustomerMarginPrice(basePrice, customerId, p._id);
+        return {
+          productId: p._id,
+          productName: p.name,
+          piecesPerBox: p.piecesPerBox || 12,
+          openingQty: op,
+          takenQty: 0,
+          totalQty: op,
+          unitPrice: price,
+          totalPrice: 0
+        };
+      });
+      setAutoSalesStockItems(items);
+    } catch (e) {
+      console.error('Failed to load auto stock data', e);
+    } finally {
+      setLoadingAutoStock(false);
     }
   };
 
@@ -99,10 +142,26 @@ const SalesInvoice = () => {
     setSelectedCustomerId(customerId);
     const cust = customers.find(c => (c._id || c.id) === customerId);
     if (cust && cust.salesOwner) {
-      const ownerId = typeof cust.salesOwner === 'object' ? cust.salesOwner._id : cust.salesOwner;
-      setSelectedSalesOwnerId(ownerId);
+      const ownerObj = cust.salesOwner;
+      const ownerId = typeof ownerObj === 'object' ? (ownerObj._id || ownerObj.id) : ownerObj;
+      const ownerName = typeof ownerObj === 'object' ? ownerObj.name : null;
+
+      const matchedUser = users.find(u => 
+        (u._id || u.id) === ownerId || 
+        (ownerName && u.name?.toLowerCase() === ownerName.toLowerCase())
+      );
+
+      if (matchedUser) {
+        setSelectedSalesOwnerId(matchedUser._id || matchedUser.id);
+      } else {
+        setSelectedSalesOwnerId(ownerId || '');
+      }
     } else {
       setSelectedSalesOwnerId('');
+    }
+
+    if (invoiceType === 'Auto Sales' && customerId) {
+      loadAutoSalesStock(customerId);
     }
 
     // Recalculate existing line item prices with new customer margin
@@ -122,6 +181,21 @@ const SalesInvoice = () => {
       });
       setLineItems(updated);
     }
+  };
+
+  // Handle Auto Sales Stock Table Field Change
+  const handleAutoSalesItemChange = (index, field, value) => {
+    const updated = [...autoSalesStockItems];
+    const val = parseFloat(value) || 0;
+    updated[index][field] = val;
+
+    const op = updated[index].openingQty || 0;
+    const tk = updated[index].takenQty || 0;
+    const tot = op + tk;
+    updated[index].totalQty = tot;
+    updated[index].totalPrice = tk * (updated[index].unitPrice || 0);
+
+    setAutoSalesStockItems(updated);
   };
 
   // Line Item Logic
@@ -176,8 +250,13 @@ const SalesInvoice = () => {
   };
 
   // Compute Invoice Summary Totals
-  const subTotal = lineItems.reduce((sum, item) => sum + (parseFloat(item.totalPrice) || 0), 0);
-  const taxAmount = subTotal * 0.18;
+  const isAutoSales = invoiceType === 'Auto Sales';
+
+  const subTotal = isAutoSales
+    ? autoSalesStockItems.reduce((sum, item) => sum + (parseFloat(item.totalPrice) || 0), 0)
+    : lineItems.reduce((sum, item) => sum + (parseFloat(item.totalPrice) || 0), 0);
+
+  const taxAmount = isAutoSales ? 0 : subTotal * 0.18;
   const grandTotal = subTotal + taxAmount;
 
   // Submit Invoice Creation
@@ -189,19 +268,43 @@ const SalesInvoice = () => {
     if (invoiceType === 'Guest' && !guestName.trim()) {
       return alert('Please enter Guest / Receiver Name.');
     }
-    if (!lineItems.some(i => i.productId && i.quantityPcs > 0)) {
-      return alert('Please select at least 1 finished good item with valid quantity.');
+
+    if (isAutoSales) {
+      const activeItems = autoSalesStockItems.filter(i => (i.takenQty > 0 || i.openingQty > 0));
+      if (activeItems.length === 0) {
+        return alert('Please enter Taken Stock (Pcs) loaded into the van for at least 1 Finished Good.');
+      }
+    } else {
+      if (!lineItems.some(i => i.productId && i.quantityPcs > 0)) {
+        return alert('Please select at least 1 finished good item with valid quantity.');
+      }
     }
 
     try {
       setSubmitting(true);
-      const itemsPayload = lineItems.filter(i => i.productId).map(i => ({
-        product: i.productId,
-        batchNumber: i.batchNumber || 'COLD-ROOM',
-        quantityBoxes: parseInt(i.quantityBoxes) || 0,
-        quantityPcs: parseInt(i.quantityPcs) || 0,
-        unitPrice: parseFloat(i.unitPrice) || 0
-      }));
+      let itemsPayload = [];
+
+      if (isAutoSales) {
+        itemsPayload = autoSalesStockItems
+          .filter(i => i.takenQty > 0 || i.openingQty > 0)
+          .map(i => ({
+            product: i.productId,
+            batchNumber: 'COLD-ROOM',
+            quantityBoxes: Math.ceil((i.takenQty || 0) / (i.piecesPerBox || 1)),
+            quantityPcs: i.takenQty || 0,
+            openingPcs: i.openingQty || 0,
+            totalPcs: i.totalQty || 0,
+            unitPrice: i.unitPrice || 0
+          }));
+      } else {
+        itemsPayload = lineItems.filter(i => i.productId).map(i => ({
+          product: i.productId,
+          batchNumber: i.batchNumber || 'COLD-ROOM',
+          quantityBoxes: parseInt(i.quantityBoxes) || 0,
+          quantityPcs: parseInt(i.quantityPcs) || 0,
+          unitPrice: parseFloat(i.unitPrice) || 0
+        }));
+      }
 
       const res = await api.post('/sales-orders', {
         invoiceType,
@@ -209,8 +312,8 @@ const SalesInvoice = () => {
         guestName: invoiceType === 'Guest' ? guestName : undefined,
         salesOwner: selectedSalesOwnerId,
         items: itemsPayload,
-        taxRate: (invoiceType === 'Sample Products' || invoiceType === 'Guest') ? 0 : 18,
-        paymentStatus,
+        taxRate: (invoiceType === 'Sample Products' || invoiceType === 'Guest' || isAutoSales) ? 0 : 18,
+        paymentStatus: isAutoSales ? 'Pending' : paymentStatus,
         remarks
       });
 
@@ -224,6 +327,7 @@ const SalesInvoice = () => {
       setGuestName('');
       setSelectedSalesOwnerId('');
       setRemarks('');
+      setAutoSalesStockItems([]);
       setLineItems([{ productId: '', batchNumber: '', quantityBoxes: 1, quantityPcs: 12, unitPrice: 0, totalPrice: 0 }]);
     } catch (error) {
       console.error('Failed to create sales invoice', error);
@@ -726,6 +830,7 @@ const SalesInvoice = () => {
                         setSelectedCustomerId('');
                         setGuestName('');
                         setSelectedSalesOwnerId('');
+                        setAutoSalesStockItems([]);
                       }}
                       className={`p-3 rounded-xl border text-left transition-all flex flex-col justify-between ${
                         isSelected
@@ -806,114 +911,220 @@ const SalesInvoice = () => {
               </div>
             </div>
 
-            {/* STEP 4: LINE ITEMS (FINISHED GOODS STOCK SELECTION) */}
-            <div className="relative z-30">
-              <div className="flex justify-between items-center mb-2">
-                <label className="text-xs font-extrabold text-gray-700 uppercase tracking-wider block">
-                  4. Select Finished Goods Stock from Cold Room *
-                </label>
-                <button
-                  type="button"
-                  onClick={addLineItem}
-                  className="text-xs font-bold text-[var(--color-primary)] hover:underline flex items-center gap-1"
-                >
-                  <Plus size={14} /> Add Another Item
-                </button>
-              </div>
+            {/* STEP 4: LINE ITEMS OR AUTO SALES STOCK TABLE */}
+            {isAutoSales ? (
+              <div className="space-y-4 relative z-30">
+                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 bg-pink-50/80 p-3.5 rounded-xl border border-pink-200">
+                  <div>
+                    <h3 className="text-xs font-extrabold text-[var(--color-primary)] uppercase tracking-wider flex items-center gap-1.5">
+                      <Truck size={16} /> 4. Auto Sales Finished Goods Stock Dispatch
+                    </h3>
+                    <p className="text-[11px] text-gray-500 mt-0.5">
+                      Opening stock is auto-loaded from yesterday's evening return. Enter today's Taken Stock from Cold Room.
+                    </p>
+                  </div>
 
-              <div className="space-y-3">
-                {lineItems.map((item, idx) => (
-                  <div key={idx} className="grid grid-cols-12 gap-2 items-center p-3 bg-white border border-pink-200 rounded-xl shadow-sm relative" style={{ zIndex: 40 - idx }}>
-                    {/* Item & Batch Picker */}
-                    <div className="col-span-12 sm:col-span-5 space-y-1">
-                      <label className="text-[10px] text-gray-400 font-bold uppercase">Product & Cold Room Batch</label>
-                      <SearchableSelect
-                        options={inventory.map(inv => ({
-                          value: inv.product?._id,
-                          label: inv.product?.name,
-                          code: `Batch: ${inv.batchNumber}`,
-                          sublabel: `Available: ${inv.quantity} ${inv.product?.unitOfMeasure || 'Pcs'}`
-                        }))}
-                        value={item.productId}
-                        onChange={(val) => handleLineItemChange(idx, 'productId', val)}
-                        placeholder="Select Finished Good..."
-                        required
-                      />
-                    </div>
+                  <button
+                    type="button"
+                    onClick={() => setShowAllAutoProducts(!showAllAutoProducts)}
+                    className="px-3 py-1.5 rounded-lg bg-white border border-pink-300 text-[11px] font-bold text-[var(--color-primary)] hover:bg-pink-100 transition-all shadow-sm shrink-0"
+                  >
+                    {showAllAutoProducts ? 'Showing All Master Products' : '+ Show All Master Products'}
+                  </button>
+                </div>
 
-                    {/* Quantity Boxes */}
-                    <div className="col-span-4 sm:col-span-2 space-y-1">
-                      <label className="text-[10px] text-gray-400 font-bold uppercase">Boxes</label>
-                      <input
-                        type="number"
-                        min="0"
-                        value={item.quantityBoxes}
-                        onChange={(e) => handleLineItemChange(idx, 'quantityBoxes', e.target.value)}
-                        className="w-full bg-gray-50 border border-gray-300 rounded-lg px-2 py-1.5 text-xs font-bold text-right font-mono"
-                      />
-                    </div>
+                {!selectedCustomerId ? (
+                  <div className="p-8 text-center bg-amber-50 border border-amber-200 rounded-2xl text-amber-900 font-bold text-xs">
+                    ⚠️ Please select an Auto Sales Customer / Vehicle above to load yesterday's opening stock and finished goods list.
+                  </div>
+                ) : loadingAutoStock ? (
+                  <div className="p-8 text-center bg-gray-50 rounded-2xl flex justify-center items-center gap-2 text-xs font-bold text-gray-500">
+                    <Loader2 size={18} className="animate-spin text-[var(--color-primary)]" /> Loading Vehicle Opening Stock & Finished Goods...
+                  </div>
+                ) : (
+                  <div className="border border-gray-200 rounded-2xl overflow-hidden bg-white shadow-sm">
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-xs text-left">
+                        <thead className="bg-gray-50 text-gray-700 uppercase font-extrabold text-[10px] tracking-wider border-b border-gray-200">
+                          <tr>
+                            <th className="px-4 py-3 text-center">S.No</th>
+                            <th className="px-4 py-3">Finished Goods Name</th>
+                            <th className="px-4 py-3 text-center bg-amber-50/70 text-amber-900">Opening (Pcs)</th>
+                            <th className="px-4 py-3 text-center bg-sky-50/70 text-sky-900">Taken Today (Pcs)</th>
+                            <th className="px-4 py-3 text-center bg-indigo-50/70 text-indigo-900">Total Stock (Pcs)</th>
+                            <th className="px-4 py-3 text-right">Rate (₹/Pc)</th>
+                            <th className="px-4 py-3 text-right">Dispatch Value (₹)</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-100">
+                          {autoSalesStockItems
+                            .filter(item => showAllAutoProducts || item.openingQty > 0 || item.takenQty > 0)
+                            .map((item, idx) => (
+                              <tr key={item.productId} className="hover:bg-gray-50/80 transition-all">
+                                <td className="px-4 py-2.5 text-center font-bold text-gray-400">{idx + 1}</td>
+                                <td className="px-4 py-2.5 font-bold text-gray-900">
+                                  {item.productName}
+                                  <span className="block text-[10px] text-gray-400 font-normal">Box Packing: {item.piecesPerBox} Pcs/Box</span>
+                                </td>
+                                <td className="px-4 py-2.5 text-center bg-amber-50/30 font-bold font-mono text-amber-800">
+                                  {item.openingQty}
+                                </td>
+                                <td className="px-4 py-2.5 text-center bg-sky-50/30">
+                                  <input
+                                    type="number"
+                                    min="0"
+                                    value={item.takenQty}
+                                    onChange={(e) => handleAutoSalesItemChange(idx, 'takenQty', e.target.value)}
+                                    className="w-24 bg-white border border-sky-300 rounded-lg px-2.5 py-1 text-xs font-bold text-center font-mono focus:ring-2 focus:ring-sky-500/20 shadow-sm"
+                                    placeholder="0"
+                                  />
+                                </td>
+                                <td className="px-4 py-2.5 text-center bg-indigo-50/30 font-black font-mono text-indigo-900 text-sm">
+                                  {item.totalQty}
+                                </td>
+                                <td className="px-4 py-2.5 text-right font-mono">
+                                  <input
+                                    type="number"
+                                    step="0.5"
+                                    value={item.unitPrice}
+                                    onChange={(e) => handleAutoSalesItemChange(idx, 'unitPrice', e.target.value)}
+                                    className="w-20 bg-white border border-gray-300 rounded-lg px-2 py-1 text-xs font-bold text-right font-mono"
+                                  />
+                                </td>
+                                <td className="px-4 py-2.5 text-right font-mono font-extrabold text-emerald-700">
+                                  ₹{item.totalPrice.toFixed(2)}
+                                </td>
+                              </tr>
+                            ))}
 
-                    {/* Total Pieces */}
-                    <div className="col-span-4 sm:col-span-2 space-y-1">
-                      <label className="text-[10px] text-gray-400 font-bold uppercase">Total Pcs</label>
-                      <input
-                        type="number"
-                        min="1"
-                        value={item.quantityPcs}
-                        onChange={(e) => handleLineItemChange(idx, 'quantityPcs', e.target.value)}
-                        className="w-full bg-gray-50 border border-gray-300 rounded-lg px-2 py-1.5 text-xs font-bold text-right font-mono text-emerald-700"
-                      />
-                    </div>
-
-                    {/* Price per Piece */}
-                    <div className="col-span-3 sm:col-span-2 space-y-1">
-                      <label className="text-[10px] text-gray-400 font-bold uppercase">Rate (₹/Pc)</label>
-                      <input
-                        type="number"
-                        step="0.5"
-                        value={item.unitPrice}
-                        onChange={(e) => handleLineItemChange(idx, 'unitPrice', e.target.value)}
-                        className="w-full bg-gray-50 border border-gray-300 rounded-lg px-2 py-1.5 text-xs font-bold text-right font-mono"
-                      />
-                    </div>
-
-                    {/* Delete Item */}
-                    <div className="col-span-1 text-center pt-3">
-                      {lineItems.length > 1 && (
-                        <button
-                          type="button"
-                          onClick={() => removeLineItem(idx)}
-                          className="p-1 text-rose-500 hover:bg-rose-50 rounded"
-                        >
-                          <X size={16} />
-                        </button>
-                      )}
+                          {autoSalesStockItems.filter(item => showAllAutoProducts || item.openingQty > 0 || item.takenQty > 0).length === 0 && (
+                            <tr>
+                              <td colSpan="7" className="px-6 py-8 text-center text-gray-500">
+                                No active stock found for this vehicle. Click <span className="font-bold text-[var(--color-primary)]">+ Show All Master Products</span> to view all products and enter stock.
+                              </td>
+                            </tr>
+                          )}
+                        </tbody>
+                      </table>
                     </div>
                   </div>
-                ))}
+                )}
               </div>
-            </div>
+            ) : (
+              <div className="relative z-30">
+                <div className="flex justify-between items-center mb-2">
+                  <label className="text-xs font-extrabold text-gray-700 uppercase tracking-wider block">
+                    4. Select Finished Goods Stock from Cold Room *
+                  </label>
+                  <button
+                    type="button"
+                    onClick={addLineItem}
+                    className="text-xs font-bold text-[var(--color-primary)] hover:underline flex items-center gap-1"
+                  >
+                    <Plus size={14} /> Add Another Item
+                  </button>
+                </div>
+
+                <div className="space-y-3">
+                  {lineItems.map((item, idx) => (
+                    <div key={idx} className="grid grid-cols-12 gap-2 items-center p-3 bg-white border border-pink-200 rounded-xl shadow-sm relative" style={{ zIndex: 40 - idx }}>
+                      {/* Item & Batch Picker */}
+                      <div className="col-span-12 sm:col-span-5 space-y-1">
+                        <label className="text-[10px] text-gray-400 font-bold uppercase">Product & Cold Room Batch</label>
+                        <SearchableSelect
+                          options={inventory.map(inv => ({
+                            value: inv.product?._id,
+                            label: inv.product?.name,
+                            code: `Batch: ${inv.batchNumber}`,
+                            sublabel: `Available: ${inv.quantity} ${inv.product?.unitOfMeasure || 'Pcs'}`
+                          }))}
+                          value={item.productId}
+                          onChange={(val) => handleLineItemChange(idx, 'productId', val)}
+                          placeholder="Select Finished Good..."
+                          required
+                        />
+                      </div>
+
+                      {/* Quantity Boxes */}
+                      <div className="col-span-4 sm:col-span-2 space-y-1">
+                        <label className="text-[10px] text-gray-400 font-bold uppercase">Boxes</label>
+                        <input
+                          type="number"
+                          min="0"
+                          value={item.quantityBoxes}
+                          onChange={(e) => handleLineItemChange(idx, 'quantityBoxes', e.target.value)}
+                          className="w-full bg-gray-50 border border-gray-300 rounded-lg px-2 py-1.5 text-xs font-bold text-right font-mono"
+                        />
+                      </div>
+
+                      {/* Total Pieces */}
+                      <div className="col-span-4 sm:col-span-2 space-y-1">
+                        <label className="text-[10px] text-gray-400 font-bold uppercase">Total Pcs</label>
+                        <input
+                          type="number"
+                          min="1"
+                          value={item.quantityPcs}
+                          onChange={(e) => handleLineItemChange(idx, 'quantityPcs', e.target.value)}
+                          className="w-full bg-gray-50 border border-gray-300 rounded-lg px-2 py-1.5 text-xs font-bold text-right font-mono text-emerald-700"
+                        />
+                      </div>
+
+                      {/* Price per Piece */}
+                      <div className="col-span-3 sm:col-span-2 space-y-1">
+                        <label className="text-[10px] text-gray-400 font-bold uppercase">Rate (₹/Pc)</label>
+                        <input
+                          type="number"
+                          step="0.5"
+                          value={item.unitPrice}
+                          onChange={(e) => handleLineItemChange(idx, 'unitPrice', e.target.value)}
+                          className="w-full bg-gray-50 border border-gray-300 rounded-lg px-2 py-1.5 text-xs font-bold text-right font-mono"
+                        />
+                      </div>
+
+                      {/* Delete Item */}
+                      <div className="col-span-1 text-center pt-3">
+                        {lineItems.length > 1 && (
+                          <button
+                            type="button"
+                            onClick={() => removeLineItem(idx)}
+                            className="p-1 text-rose-500 hover:bg-rose-50 rounded"
+                          >
+                            <X size={16} />
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
 
             {/* STEP 5: TOTAL SUMMARY & PAYMENT STATUS */}
             <div className="flex flex-col sm:flex-row justify-between items-center p-4 bg-gray-50 rounded-2xl border border-gray-200 gap-4">
-              <div className="space-y-1 w-full sm:w-auto">
-                <label className="text-xs font-bold text-gray-700 uppercase tracking-wider block">Payment Status</label>
-                <select
-                  value={paymentStatus}
-                  onChange={(e) => setPaymentStatus(e.target.value)}
-                  className="bg-white border border-gray-300 rounded-xl px-3 py-1.5 text-xs font-bold text-gray-900"
-                >
-                  <option value="Paid">🟢 Paid (Cash / UPI)</option>
-                  <option value="Pending">🟡 Pending Payment</option>
-                  <option value="Credit">🔵 Customer Credit Account</option>
-                </select>
-              </div>
+              {!isAutoSales ? (
+                <div className="space-y-1 w-full sm:w-auto">
+                  <label className="text-xs font-bold text-gray-700 uppercase tracking-wider block">Payment Status</label>
+                  <select
+                    value={paymentStatus}
+                    onChange={(e) => setPaymentStatus(e.target.value)}
+                    className="bg-white border border-gray-300 rounded-xl px-3 py-1.5 text-xs font-bold text-gray-900"
+                  >
+                    <option value="Paid">🟢 Paid (Cash / UPI)</option>
+                    <option value="Pending">🟡 Pending Payment</option>
+                    <option value="Credit">🔵 Customer Credit Account</option>
+                  </select>
+                </div>
+              ) : (
+                <div className="text-xs text-gray-500 font-medium italic">
+                  ℹ️ Payment collection for Auto Sales is settled during evening trip return.
+                </div>
+              )}
 
               <div className="text-right w-full sm:w-auto space-y-0.5">
                 <div className="text-xs text-gray-500 font-semibold">Subtotal: ₹{subTotal.toFixed(2)}</div>
-                <div className="text-xs text-gray-500 font-semibold">GST Tax (18%): ₹{taxAmount.toFixed(2)}</div>
+                {!isAutoSales && <div className="text-xs text-gray-500 font-semibold">GST Tax (18%): ₹{taxAmount.toFixed(2)}</div>}
                 <div className="text-lg font-black text-emerald-700 font-mono">
-                  Grand Total: ₹{grandTotal.toFixed(2)}
+                  Dispatch Value: ₹{grandTotal.toFixed(2)}
                 </div>
               </div>
             </div>
