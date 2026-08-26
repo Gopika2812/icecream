@@ -122,12 +122,28 @@ exports.createSalesOrder = async (req, res) => {
             createdBy: req.user?._id || '6a5ec376b44299bf18d9e800'
         });
 
-        const populatedOrder = await SalesOrder.findById(salesOrder._id)
-            .populate('customer')
-            .populate('salesOwner', 'name username employeeId designation')
-            .populate('items.product');
+        let populatedOrder = await SalesOrder.findById(salesOrder._id);
+        if (populatedOrder) {
+            if (populatedOrder.customer && typeof populatedOrder.customer === 'string') {
+                const cObj = await Customer.findById(populatedOrder.customer);
+                if (cObj) populatedOrder.customer = cObj;
+            }
+            if (populatedOrder.salesOwner && typeof populatedOrder.salesOwner === 'string') {
+                const uObj = await User.findById(populatedOrder.salesOwner);
+                if (uObj) populatedOrder.salesOwner = uObj;
+            }
+            if (Array.isArray(populatedOrder.items)) {
+                const Product = require('../models/Product');
+                for (let item of populatedOrder.items) {
+                    if (item.product && typeof item.product === 'string') {
+                        const pObj = await Product.findById(item.product);
+                        if (pObj) item.product = pObj;
+                    }
+                }
+            }
+        }
 
-        res.status(201).json({ success: true, data: populatedOrder });
+        res.status(201).json({ success: true, data: populatedOrder || salesOrder });
     } catch (error) {
         console.error('Error generating sales invoice:', error);
         res.status(400).json({ success: false, message: error.message });

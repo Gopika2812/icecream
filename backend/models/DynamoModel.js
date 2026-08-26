@@ -35,7 +35,11 @@ class DynamoModel {
         return formatted;
     }
 
-    async findById(id) {
+    findById(id) {
+        return new QuerySingleResultQuery(this, id);
+    }
+
+    async _executeFindById(id) {
         if (!id) return null;
         const targetId = typeof id === 'object' && (id._id || id.id) ? (id._id || id.id).toString() : id.toString();
         try {
@@ -143,9 +147,14 @@ class DynamoModel {
         return this._formatDoc(item);
     }
 
-    async findByIdAndUpdate(id, updates = {}, options = { new: true }) {
-        const targetId = typeof id === 'object' && id._id ? id._id.toString() : id.toString();
-        const existing = await this.findById(targetId);
+    findByIdAndUpdate(id, updates = {}, options = { new: true }) {
+        return new QuerySingleUpdateQuery(this, id, updates, options);
+    }
+
+    async _executeFindByIdAndUpdate(id, updates = {}, options = { new: true }) {
+        if (!id) return null;
+        const targetId = typeof id === 'object' && (id._id || id.id) ? (id._id || id.id).toString() : id.toString();
+        const existing = await this._executeFindById(targetId);
         if (!existing) return null;
 
         const updatedDoc = this._cleanUndefined({
@@ -291,6 +300,66 @@ class QueryResultQuery {
             }
 
             return onFulfilled ? onFulfilled(items) : items;
+        } catch (err) {
+            if (onRejected) return onRejected(err);
+            throw err;
+        }
+    }
+}
+
+class QuerySingleResultQuery {
+    constructor(model, id) {
+        this.model = model;
+        this.id = id;
+    }
+
+    populate(pathSpec, fields) {
+        return this;
+    }
+
+    lean() {
+        return this;
+    }
+
+    sort() {
+        return this;
+    }
+
+    async then(onFulfilled, onRejected) {
+        try {
+            const item = await this.model._executeFindById(this.id);
+            return onFulfilled ? onFulfilled(item) : item;
+        } catch (err) {
+            if (onRejected) return onRejected(err);
+            throw err;
+        }
+    }
+}
+
+class QuerySingleUpdateQuery {
+    constructor(model, id, updates, options) {
+        this.model = model;
+        this.id = id;
+        this.updates = updates;
+        this.options = options;
+    }
+
+    populate(pathSpec, fields) {
+        return this;
+    }
+
+    lean() {
+        return this;
+    }
+
+    sort() {
+        return this;
+    }
+
+    async then(onFulfilled, onRejected) {
+        try {
+            const item = await this.model._executeFindByIdAndUpdate(this.id, this.updates, this.options);
+            return onFulfilled ? onFulfilled(item) : item;
         } catch (err) {
             if (onRejected) return onRejected(err);
             throw err;
