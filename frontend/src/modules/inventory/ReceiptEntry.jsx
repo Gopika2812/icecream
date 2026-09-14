@@ -879,13 +879,14 @@ const ReceiptEntry = () => {
         <Modal
           isOpen={autoSettlementModalOpen}
           onClose={() => setAutoSettlementModalOpen(false)}
+          size="full"
           title={activeAutoSO ? `Auto Sales Settlement — ${activeAutoSO.invoiceNumber || activeAutoSO.id}` : 'Auto Van Daily Stock & Expense Settlement'}
         >
-          <form onSubmit={handleSubmitAutoSettlement} className="space-y-5 max-h-[80vh] overflow-y-auto pr-1">
-            {/* Header info */}
-            <div className="bg-pink-50/70 p-4 rounded-xl border border-pink-200 grid grid-cols-1 md:grid-cols-4 gap-3">
+          <form onSubmit={handleSubmitAutoSettlement} className="space-y-6">
+            {/* Header info banner */}
+            <div className="bg-gradient-to-r from-pink-50 via-white to-pink-50/50 p-5 rounded-2xl border-2 border-pink-200 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 shadow-sm">
               <div>
-                <label className="block text-[11px] font-bold text-gray-700 mb-1">Settlement Date *</label>
+                <label className="block text-xs font-black text-gray-700 mb-1 tracking-wide">SETTLEMENT DATE *</label>
                 <input
                   type="date"
                   value={autoDate}
@@ -893,17 +894,17 @@ const ReceiptEntry = () => {
                     setAutoDate(e.target.value);
                     if (selectedAutoCustomerId) handleAutoVehicleChangeInModal(selectedAutoCustomerId, e.target.value);
                   }}
-                  className="w-full px-2.5 py-1.5 bg-white border border-pink-200 rounded-lg text-xs font-bold"
+                  className="w-full px-3 py-2 bg-white border-2 border-pink-200 rounded-xl text-xs font-bold text-gray-800 outline-none focus:ring-2 focus:ring-pink-400"
                   required
                 />
               </div>
 
               <div>
-                <label className="block text-[11px] font-bold text-gray-700 mb-1">Auto Sales Van *</label>
+                <label className="block text-xs font-black text-gray-700 mb-1 tracking-wide">SELECT AUTO SALES VAN *</label>
                 <select
                   value={selectedAutoCustomerId}
                   onChange={(e) => handleAutoVehicleChangeInModal(e.target.value, autoDate)}
-                  className="w-full px-2.5 py-1.5 bg-white border border-pink-200 rounded-lg text-xs font-bold"
+                  className="w-full px-3 py-2 bg-white border-2 border-pink-300 rounded-xl text-xs font-bold text-gray-900 outline-none focus:ring-2 focus:ring-pink-400 shadow-xs"
                   required
                 >
                   <option value="">-- Choose Auto Van --</option>
@@ -914,22 +915,22 @@ const ReceiptEntry = () => {
               </div>
 
               <div>
-                <label className="block text-[11px] font-bold text-gray-700 mb-1">Vehicle Reg No</label>
+                <label className="block text-xs font-black text-gray-700 mb-1 tracking-wide">VEHICLE REG / CODE</label>
                 <input
                   type="text"
                   value={vehicleNo}
                   readOnly
                   placeholder="Auto Reg No"
-                  className="w-full px-2.5 py-1.5 bg-gray-100 border border-gray-200 rounded-lg text-xs font-bold text-gray-600"
+                  className="w-full px-3 py-2 bg-gray-100 border border-gray-300 rounded-xl text-xs font-black text-gray-700 outline-none"
                 />
               </div>
 
               <div>
-                <label className="block text-[11px] font-bold text-gray-700 mb-1">Driver / Incharge</label>
+                <label className="block text-xs font-black text-gray-700 mb-1 tracking-wide">INCHARGE / DRIVER</label>
                 <select
                   value={inchargeId}
                   onChange={(e) => setInchargeId(e.target.value)}
-                  className="w-full px-2.5 py-1.5 bg-white border border-pink-200 rounded-lg text-xs font-semibold"
+                  className="w-full px-3 py-2 bg-white border-2 border-pink-200 rounded-xl text-xs font-bold text-gray-800 outline-none focus:ring-2 focus:ring-pink-400"
                 >
                   <option value="">-- Select Driver --</option>
                   {users.map(u => (
@@ -940,46 +941,59 @@ const ReceiptEntry = () => {
             </div>
 
             {/* Stock Reconciliation Grid */}
-            <div className="bg-white rounded-xl border border-pink-200 overflow-hidden shadow-xs">
-              <div className="p-3 bg-gradient-to-r from-pink-50 to-white border-b border-pink-200 flex items-center justify-between">
-                <span className="text-xs font-bold text-gray-800 uppercase tracking-wider">
-                  Fill Unsold Returns to Calculate Sales Value ({displayedAutoItems.length} Products)
-                </span>
+            <div className="bg-white rounded-2xl border-2 border-gray-200 overflow-hidden shadow-sm">
+              <div className="p-4 bg-gradient-to-r from-gray-900 to-gray-800 text-white flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Truck size={18} className="text-pink-400" />
+                  <span className="text-xs font-black uppercase tracking-wider">
+                    Fill Evening Unsold Returns (Pcs) to Calculate Net Sales & Collection ({displayedAutoItems.length} Products)
+                  </span>
+                </div>
                 <button
                   type="button"
                   onClick={() => setShowAllProducts(!showAllProducts)}
-                  className="px-2.5 py-0.5 rounded bg-pink-100 hover:bg-pink-200 text-pink-800 text-[10px] font-bold transition-all"
+                  className="px-3 py-1 rounded-lg bg-white/10 hover:bg-white/20 text-white text-xs font-bold transition-all border border-white/20"
                 >
-                  {showAllProducts ? 'Show Only Active Products' : '+ Show All Products'}
+                  {showAllProducts ? 'Show Active Van Products Only' : '+ Show All Master Products'}
                 </button>
               </div>
 
-              <div className="overflow-x-auto max-h-60 overflow-y-auto">
+              <div className="overflow-x-auto">
                 <table className="w-full text-left text-xs text-gray-800">
-                  <thead className="bg-gray-100 text-gray-700 uppercase text-[10px] font-extrabold sticky top-0">
+                  <thead className="text-white uppercase text-[11px] font-black tracking-wider">
                     <tr>
-                      <th className="px-3 py-2 text-center w-10">#</th>
-                      <th className="px-3 py-2">Product</th>
-                      <th className="px-2 py-2 text-center bg-amber-100 text-amber-900">Opening</th>
-                      <th className="px-2 py-2 text-center bg-blue-100 text-blue-900">Taken (SO)</th>
-                      <th className="px-2 py-2 text-center bg-indigo-100 text-indigo-900">Total</th>
-                      <th className="px-2 py-2 text-center bg-rose-100 text-rose-900">Return Unsold</th>
-                      <th className="px-2 py-2 text-center bg-emerald-100 text-emerald-900">Sold</th>
-                      <th className="px-2 py-2 text-right">Rate</th>
-                      <th className="px-3 py-2 text-right">Value (₹)</th>
+                      <th className="px-3 py-3 text-center w-12 bg-slate-900 border-r border-slate-700">#</th>
+                      <th className="px-4 py-3 bg-slate-900 border-r border-slate-700 min-w-[200px]">PRODUCT NAME</th>
+                      <th className="px-3 py-3 text-center bg-amber-600 border-r border-amber-500 w-28">OPENING (PCS)</th>
+                      <th className="px-3 py-3 text-center bg-blue-600 border-r border-blue-500 w-28">TAKEN (SO)</th>
+                      <th className="px-3 py-3 text-center bg-indigo-700 border-r border-indigo-600 w-28">TOTAL (PCS)</th>
+                      <th className="px-3 py-3 text-center bg-rose-600 border-r border-rose-500 w-36">RETURN UNSOLD</th>
+                      <th className="px-3 py-3 text-center bg-emerald-700 border-r border-emerald-600 w-28">NET SOLD</th>
+                      <th className="px-3 py-3 text-right bg-slate-900 border-r border-slate-700 w-24">RATE (₹)</th>
+                      <th className="px-4 py-3 text-right bg-slate-900 w-32">SALES VALUE (₹)</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-gray-100">
+                  <tbody className="divide-y divide-gray-200">
                     {displayedAutoItems.map((item, idx) => {
                       const originalIdx = autoItems.findIndex(i => i.product === item.product);
                       return (
-                        <tr key={item.product || idx} className="hover:bg-pink-50/20">
-                          <td className="px-3 py-2 text-center text-gray-400 font-bold">{idx + 1}</td>
-                          <td className="px-3 py-2 font-bold text-gray-900">{item.productName}</td>
-                          <td className="px-2 py-2 text-center font-black text-amber-700 bg-amber-50/40">{item.openingQty || 0}</td>
-                          <td className="px-2 py-2 text-center font-black text-blue-700 bg-blue-50/40">{item.takenQty || 0}</td>
-                          <td className="px-2 py-2 text-center font-black text-indigo-900 bg-indigo-50/40">{item.totalQty || 0}</td>
-                          <td className="px-2 py-2 text-center bg-rose-50/40">
+                        <tr key={item.product || idx} className="hover:bg-pink-50/30 transition-colors">
+                          <td className="px-3 py-2.5 text-center text-gray-500 font-bold border-r border-gray-100">{idx + 1}</td>
+                          <td className="px-4 py-2.5 font-bold text-gray-900 border-r border-gray-100">{item.productName}</td>
+                          
+                          <td className="px-3 py-2.5 text-center font-black text-amber-800 bg-amber-50/50 border-r border-gray-100 text-sm">
+                            {item.openingQty || 0}
+                          </td>
+
+                          <td className="px-3 py-2.5 text-center font-black text-blue-800 bg-blue-50/50 border-r border-gray-100 text-sm">
+                            {item.takenQty || 0}
+                          </td>
+
+                          <td className="px-3 py-2.5 text-center font-black text-indigo-950 bg-indigo-50/50 border-r border-gray-100 text-sm">
+                            {item.totalQty || 0}
+                          </td>
+
+                          <td className="px-3 py-2 text-center bg-rose-50/60 border-r border-gray-100">
                             <input
                               type="number"
                               min="0"
@@ -987,142 +1001,194 @@ const ReceiptEntry = () => {
                               value={item.returnQty === 0 ? '' : item.returnQty}
                               placeholder="0"
                               onChange={(e) => handleAutoItemReturnChange(originalIdx, e.target.value)}
-                              className="w-16 px-1.5 py-0.5 bg-white border border-rose-300 rounded text-center font-black text-rose-700 outline-none focus:ring-1 focus:ring-rose-400"
+                              className="w-20 px-2 py-1 bg-white border-2 border-rose-400 rounded-lg text-center font-black text-rose-700 text-sm outline-none focus:ring-2 focus:ring-rose-400 shadow-xs"
                             />
                           </td>
-                          <td className="px-2 py-2 text-center font-black text-emerald-800 bg-emerald-50/40">{item.salesQty || 0}</td>
-                          <td className="px-2 py-2 text-right font-semibold text-gray-700">₹{item.unitPrice}</td>
-                          <td className="px-3 py-2 text-right font-black text-gray-900">
-                            ₹{(item.totalSalesValue || 0).toFixed(2)}
+
+                          <td className="px-3 py-2.5 text-center font-black text-emerald-800 bg-emerald-50/60 border-r border-gray-100 text-base">
+                            {item.salesQty || 0}
+                          </td>
+
+                          <td className="px-3 py-2.5 text-right font-bold text-gray-700 border-r border-gray-100">
+                            ₹{item.unitPrice}
+                          </td>
+
+                          <td className="px-4 py-2.5 text-right font-black text-gray-900 text-sm">
+                            ₹{(item.totalSalesValue || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                           </td>
                         </tr>
                       );
                     })}
+
+                    {displayedAutoItems.length === 0 && (
+                      <tr>
+                        <td colSpan="9" className="px-6 py-12 text-center text-gray-400 font-medium">
+                          No active stock items for this Auto Van today. Click "+ Show All Master Products" to add products.
+                        </td>
+                      </tr>
+                    )}
                   </tbody>
                 </table>
               </div>
             </div>
 
-            {/* Expenses & Collection Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {/* Daily Expenses */}
-              <div className="bg-gray-50 p-3.5 rounded-xl border border-gray-200 space-y-2 text-xs">
-                <div className="font-bold text-gray-800 flex items-center gap-1">
-                  <Fuel size={14} className="text-amber-600" /> Daily Expenses (Deducted from Collection)
+            {/* Expenses & Financial Summary Section */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {/* Daily Expenses Box */}
+              <div className="bg-white p-5 rounded-2xl border-2 border-gray-200 shadow-sm space-y-4">
+                <div className="flex items-center gap-2 text-xs font-black text-gray-800 uppercase tracking-wider border-b border-gray-100 pb-2">
+                  <Fuel size={16} className="text-amber-600" />
+                  Daily Auto Expenses (Deducted from Collection)
                 </div>
-                <div className="grid grid-cols-3 gap-2">
+
+                <div className="grid grid-cols-3 gap-3">
                   <div>
-                    <label className="block text-[10px] font-bold text-gray-600 mb-0.5">Diesel (₹)</label>
+                    <label className="block text-xs font-bold text-gray-700 mb-1">Diesel / Fuel (₹)</label>
                     <input
                       type="number"
                       min="0"
                       value={autoExpenses.dieselCost || ''}
                       placeholder="0.00"
                       onChange={(e) => setAutoExpenses({ ...autoExpenses, dieselCost: e.target.value })}
-                      className="w-full px-2 py-1 bg-white border border-gray-300 rounded text-xs font-bold"
+                      className="w-full px-3 py-2 bg-gray-50 border border-gray-300 rounded-xl text-xs font-bold text-gray-900 outline-none focus:ring-2 focus:ring-pink-400"
                     />
                   </div>
+
                   <div>
-                    <label className="block text-[10px] font-bold text-gray-600 mb-0.5">Repairs (₹)</label>
+                    <label className="block text-xs font-bold text-gray-700 mb-1">Repairs / Maintenance (₹)</label>
                     <input
                       type="number"
                       min="0"
                       value={autoExpenses.maintenanceCost || ''}
                       placeholder="0.00"
                       onChange={(e) => setAutoExpenses({ ...autoExpenses, maintenanceCost: e.target.value })}
-                      className="w-full px-2 py-1 bg-white border border-gray-300 rounded text-xs font-bold"
+                      className="w-full px-3 py-2 bg-gray-50 border border-gray-300 rounded-xl text-xs font-bold text-gray-900 outline-none focus:ring-2 focus:ring-pink-400"
                     />
                   </div>
+
                   <div>
-                    <label className="block text-[10px] font-bold text-gray-600 mb-0.5">Other (₹)</label>
+                    <label className="block text-xs font-bold text-gray-700 mb-1">Toll / Other (₹)</label>
                     <input
                       type="number"
                       min="0"
                       value={autoExpenses.otherCost || ''}
                       placeholder="0.00"
                       onChange={(e) => setAutoExpenses({ ...autoExpenses, otherCost: e.target.value })}
-                      className="w-full px-2 py-1 bg-white border border-gray-300 rounded text-xs font-bold"
+                      className="w-full px-3 py-2 bg-gray-50 border border-gray-300 rounded-xl text-xs font-bold text-gray-900 outline-none focus:ring-2 focus:ring-pink-400"
                     />
                   </div>
                 </div>
-                <div className="text-right font-black text-rose-600 text-[11px] pt-1">
-                  Total Deductions: - ₹{autoTotalExpenses.toFixed(2)}
+
+                <div className="pt-2 border-t border-gray-100 flex justify-between items-center text-xs font-bold">
+                  <span className="text-gray-500">Total Deductible Expenses:</span>
+                  <span className="text-rose-600 font-black text-sm">
+                    - ₹{autoTotalExpenses.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                  </span>
                 </div>
               </div>
 
-              {/* Settlement Summary */}
-              <div className="bg-pink-50/70 p-3.5 rounded-xl border border-pink-200 space-y-2 text-xs">
-                <div className="flex justify-between font-semibold text-gray-700">
-                  <span>Gross Sold Value:</span>
-                  <span className="font-bold text-gray-900">₹{autoGrossSalesTotal.toFixed(2)}</span>
+              {/* Financial Settlement & Net Collection Box */}
+              <div className="bg-gradient-to-br from-pink-50/90 to-white p-5 rounded-2xl border-2 border-pink-300 shadow-sm space-y-4">
+                <div className="flex items-center justify-between border-b border-pink-200 pb-2">
+                  <div className="text-xs font-black text-gray-900 uppercase tracking-wider">
+                    Settlement Summary & Collection
+                  </div>
+                  <span className="text-[10px] font-black px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-300">
+                    Net Cash/UPI Handover
+                  </span>
                 </div>
-                <div className="flex justify-between font-semibold text-rose-600">
-                  <span>Less Expenses:</span>
-                  <span>- ₹{autoTotalExpenses.toFixed(2)}</span>
+
+                <div className="space-y-2 text-xs">
+                  <div className="flex justify-between text-gray-700">
+                    <span className="font-semibold">Gross Sold Value:</span>
+                    <span className="font-black text-gray-900 text-sm">
+                      ₹{autoGrossSalesTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                    </span>
+                  </div>
+
+                  <div className="flex justify-between text-rose-600 font-semibold">
+                    <span>Less: Extra Expenses (Diesel + Repairs):</span>
+                    <span className="font-bold">
+                      - ₹{autoTotalExpenses.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                    </span>
+                  </div>
+
+                  <div className="pt-2 border-t-2 border-pink-200 flex justify-between items-center">
+                    <span className="font-black text-gray-900 text-sm">Net Final Payment to Collect:</span>
+                    <span className="text-2xl font-black text-emerald-600">
+                      ₹{autoNetCollectionTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                    </span>
+                  </div>
                 </div>
-                <div className="flex justify-between items-center pt-1 border-t border-pink-200">
-                  <span className="font-black text-gray-900 text-sm">Net Handover Amount:</span>
-                  <span className="text-base font-black text-emerald-600">₹{autoNetCollectionTotal.toFixed(2)}</span>
+
+                {/* Payment Breakdown Inputs */}
+                <div className="pt-3 border-t border-pink-200 space-y-2">
+                  <div className="text-[11px] font-bold text-gray-700">Collection Breakdown Received:</div>
+                  <div className="grid grid-cols-3 gap-2">
+                    <div>
+                      <label className="block text-[10px] font-bold text-gray-500 mb-0.5">Cash (₹)</label>
+                      <input
+                        type="number"
+                        min="0"
+                        value={autoCollection.cashAmount || ''}
+                        placeholder="0.00"
+                        onChange={(e) => setAutoCollection({ ...autoCollection, cashAmount: e.target.value })}
+                        className="w-full px-2.5 py-1.5 bg-white border border-pink-200 rounded-lg text-xs font-black text-gray-900"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-[10px] font-bold text-gray-500 mb-0.5">Paytm (₹)</label>
+                      <input
+                        type="number"
+                        min="0"
+                        value={autoCollection.paytmAmount || ''}
+                        placeholder="0.00"
+                        onChange={(e) => setAutoCollection({ ...autoCollection, paytmAmount: e.target.value })}
+                        className="w-full px-2.5 py-1.5 bg-white border border-pink-200 rounded-lg text-xs font-black text-gray-900"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-[10px] font-bold text-gray-500 mb-0.5">GPay / UPI (₹)</label>
+                      <input
+                        type="number"
+                        min="0"
+                        value={autoCollection.gpayAmount || ''}
+                        placeholder="0.00"
+                        onChange={(e) => setAutoCollection({ ...autoCollection, gpayAmount: e.target.value })}
+                        className="w-full px-2.5 py-1.5 bg-white border border-pink-200 rounded-lg text-xs font-black text-gray-900"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Actions */}
+                <div className="flex gap-2 pt-2">
+                  <button
+                    type="button"
+                    onClick={() => setAutoSettlementModalOpen(false)}
+                    className="flex-1 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl text-xs font-bold"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={submitting}
+                    className="flex-2 py-2.5 bg-gradient-to-r from-[var(--color-primary)] to-pink-600 hover:opacity-95 text-white rounded-xl text-xs font-black uppercase tracking-wider shadow-lg shadow-pink-500/25 flex items-center justify-center gap-2 transition-all disabled:opacity-50"
+                  >
+                    {submitting ? (
+                      <>
+                        <Loader2 size={16} className="animate-spin" /> Finalizing Settlement...
+                      </>
+                    ) : (
+                      <>
+                        <CheckCircle2 size={16} /> Finalize Settlement & Generate Receipt
+                      </>
+                    )}
+                  </button>
                 </div>
               </div>
-            </div>
-
-            {/* Collection Breakdown */}
-            <div className="space-y-1.5 pt-1">
-              <div className="text-[11px] font-bold text-gray-700">Received Collection Breakdown:</div>
-              <div className="grid grid-cols-3 gap-2">
-                <div>
-                  <label className="block text-[10px] font-bold text-gray-500 mb-0.5">Cash (₹)</label>
-                  <input
-                    type="number"
-                    min="0"
-                    value={autoCollection.cashAmount || ''}
-                    placeholder="0.00"
-                    onChange={(e) => setAutoCollection({ ...autoCollection, cashAmount: e.target.value })}
-                    className="w-full px-2 py-1.5 bg-white border border-pink-200 rounded-lg text-xs font-bold text-gray-800"
-                  />
-                </div>
-                <div>
-                  <label className="block text-[10px] font-bold text-gray-500 mb-0.5">Paytm (₹)</label>
-                  <input
-                    type="number"
-                    min="0"
-                    value={autoCollection.paytmAmount || ''}
-                    placeholder="0.00"
-                    onChange={(e) => setAutoCollection({ ...autoCollection, paytmAmount: e.target.value })}
-                    className="w-full px-2 py-1.5 bg-white border border-pink-200 rounded-lg text-xs font-bold text-gray-800"
-                  />
-                </div>
-                <div>
-                  <label className="block text-[10px] font-bold text-gray-500 mb-0.5">GPay / UPI (₹)</label>
-                  <input
-                    type="number"
-                    min="0"
-                    value={autoCollection.gpayAmount || ''}
-                    placeholder="0.00"
-                    onChange={(e) => setAutoCollection({ ...autoCollection, gpayAmount: e.target.value })}
-                    className="w-full px-2 py-1.5 bg-white border border-pink-200 rounded-lg text-xs font-bold text-gray-800"
-                  />
-                </div>
-              </div>
-            </div>
-
-            {/* Actions */}
-            <div className="flex gap-2 pt-2">
-              <button
-                type="button"
-                onClick={() => setAutoSettlementModalOpen(false)}
-                className="flex-1 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl text-xs font-bold"
-              >
-                Cancel
-              </button>
-              <button
-                type="submit"
-                disabled={submitting}
-                className="flex-1 py-2.5 bg-gradient-to-r from-[var(--color-primary)] to-pink-600 hover:opacity-95 text-white rounded-xl text-xs font-black uppercase tracking-wider shadow-md shadow-pink-500/20 disabled:opacity-50"
-              >
-                {submitting ? 'Finalizing...' : 'Finalize Settlement & Generate Receipt'}
-              </button>
             </div>
           </form>
         </Modal>
