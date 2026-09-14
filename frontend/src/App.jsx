@@ -17,7 +17,7 @@ import StoreRoomRequisitions from './modules/production/StoreRoomRequisitions';
 import ProductRequisitionList from './modules/procurement/ProductRequisitionList';
 import FinishedGoodsStock from './modules/inventory/FinishedGoodsStock';
 import SalesInvoice from './modules/inventory/SalesInvoice';
-import AutoSalesLedger from './modules/inventory/AutoSalesLedger';
+import ReceiptEntry from './modules/inventory/ReceiptEntry';
 import CustomerLedgers from './modules/inventory/CustomerLedgers';
 import AssetsList from './modules/assets/AssetsList';
 import VehiclesList from './modules/vehicles/VehiclesList';
@@ -55,7 +55,8 @@ function App() {
             {/* Inventory & Sales */}
             <Route path="finished-goods-stock" element={<FinishedGoodsStock />} />
             <Route path="sales-invoices" element={<SalesInvoice />} />
-            <Route path="auto-sales-ledger" element={<AutoSalesLedger />} />
+            <Route path="receipt-entry" element={<ReceiptEntry />} />
+            <Route path="auto-sales-ledger" element={<Navigate to="/receipt-entry" replace />} />
             <Route path="customer-ledgers" element={<CustomerLedgers />} />
             <Route path="inventory" element={<Navigate to="/finished-goods-stock" replace />} />
 

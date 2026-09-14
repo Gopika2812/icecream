@@ -1,5 +1,6 @@
 {
   "hosting": {
+    "site": "saravanas-5c3bc",
     "public": "dist",
     "ignore": [
       "firebase.json",

@@ -787,26 +787,6 @@ const SalesInvoice = () => {
                             >
                               <Printer size={12} /> Print Invoice
                             </button>
-
-                            {isAutoSales && !order.autoSalesReturnLogged && (
-                              <div className="flex gap-1.5">
-                                <button
-                                  onClick={() => handleOpenAutoReturn(order, 'daily_auto')}
-                                  className="px-2.5 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold transition-all flex items-center gap-1 shadow-sm"
-                                  title="Daily Evening Return — Keep unsold stock in Auto Van for tomorrow"
-                                >
-                                  <Truck size={12} /> Daily Van Return
-                                </button>
-
-                                <button
-                                  onClick={() => handleOpenAutoReturn(order, 'cold_room')}
-                                  className="px-2.5 py-1.5 rounded-lg bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold transition-all flex items-center gap-1 shadow-sm"
-                                  title="Unload Auto Van stock back to Cold Storage Room for Vehicle Maintenance / Service"
-                                >
-                                  <Wrench size={12} /> Cold Room Return
-                                </button>
-                              </div>
-                            )}
                           </div>
                         </td>
                       </tr>

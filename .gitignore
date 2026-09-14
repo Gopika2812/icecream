@@ -1,2 +1,25 @@
+# Dependencies
+node_modules/
+*/node_modules/
 
+# Serverless & Cloud temporary build files
+.serverless/
+*/.serverless/
+
+# Firebase build cache
+.firebase/
+*/.firebase/
+
+# Build outputs
+dist/
+*/dist/
+
+# Environment files
+.env
+*.env
+!.env.example
+
+# OS / Editor files
+.DS_Store
+Thumbs.db
 saravanas_data/

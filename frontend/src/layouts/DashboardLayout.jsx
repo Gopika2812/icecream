@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Outlet, Navigate, useNavigate, Link, useLocation } from 'react-router-dom';
 import {
   LogOut, LayoutDashboard, Building2, Users, Menu, X, ChevronDown,
-  Package, ShoppingCart, ShieldCheck, GitBranch, ChevronLeft, ChevronRight, PanelLeft, ArrowLeftRight, Factory, ThermometerSnowflake, FileText, Truck, BookOpen, ShieldAlert, PackageCheck, Wrench
+  Package, ShoppingCart, ShieldCheck, GitBranch, ChevronLeft, ChevronRight, PanelLeft, ArrowLeftRight, Factory, ThermometerSnowflake, FileText, Truck, BookOpen, ShieldAlert, PackageCheck, Wrench, Receipt
 } from 'lucide-react';
 import api from '../services/api';
 import { hasPageAccess } from '../utils/permissions';
@@ -167,7 +167,7 @@ const DashboardLayout = () => {
 
           <NavGroup title="Sales & Finance Phase">
             <NavItem to="/sales-invoices" icon={FileText} title="Sales Orders & Invoicing" />
-            <NavItem to="/auto-sales-ledger" icon={Truck} title="Auto Sales Stock & Expenses" />
+            <NavItem to="/receipt-entry" icon={Receipt} title="Receipt Entry & Settlement" />
             <NavItem to="/customer-ledgers" icon={BookOpen} title="Customer Ledgers" />
           </NavGroup>
 
