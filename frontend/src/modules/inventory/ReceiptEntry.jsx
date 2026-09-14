@@ -3,10 +3,10 @@ import api from '../../services/api';
 import { 
   Receipt, Plus, FileText, CheckCircle2, Loader2, DollarSign, 
   Truck, Calendar, User, Search, Printer, X, Wrench, Fuel, 
-  ArrowRight, Filter, AlertCircle, History, Sparkles, Building2
+  ArrowRight, Filter, AlertCircle, History, Sparkles, Building2,
+  ChevronRight
 } from 'lucide-react';
 import Modal from '../../components/Modal';
-import SearchableSelect from '../../components/SearchableSelect';
 
 const ReceiptEntry = () => {
   // Navigation Tabs: 'standard' | 'auto_settlement' | 'history'
@@ -25,10 +25,15 @@ const ReceiptEntry = () => {
   const [statusFilter, setStatusFilter] = useState('All'); // 'All' | 'Unpaid' | 'Partially Paid' | 'Paid'
   const [customerFilter, setCustomerFilter] = useState('');
 
+  // Filters for Auto Sales Invoices
+  const [autoSearch, setAutoSearch] = useState('');
+  const [autoStatusFilter, setAutoStatusFilter] = useState('All');
+
   // Modals
   const [paymentModalOpen, setPaymentModalOpen] = useState(false);
   const [selectedInvoiceForPayment, setSelectedInvoiceForPayment] = useState(null);
   const [generalReceiptModalOpen, setGeneralReceiptModalOpen] = useState(false);
+  const [autoSettlementModalOpen, setAutoSettlementModalOpen] = useState(false);
   const [selectedReceiptForPrint, setSelectedReceiptForPrint] = useState(null);
 
   // Standard Receipt Form State
@@ -43,7 +48,8 @@ const ReceiptEntry = () => {
     remarks: ''
   });
 
-  // Auto Sales Settlement State
+  // Auto Sales Settlement Modal Form State
+  const [activeAutoSO, setActiveAutoSO] = useState(null);
   const [autoDate, setAutoDate] = useState(new Date().toISOString().split('T')[0]);
   const [selectedAutoCustomerId, setSelectedAutoCustomerId] = useState('');
   const [vehicleNo, setVehicleNo] = useState('');
@@ -125,8 +131,84 @@ const ReceiptEntry = () => {
     setAutoItems(list);
   };
 
-  // Handle Auto Van / Vehicle Selection
-  const handleAutoVehicleChange = async (customerId, dateStr = autoDate) => {
+  // Open Auto Settlement Modal for a specific Auto Sales Order
+  const handleOpenAutoSettlementForSO = async (so) => {
+    setActiveAutoSO(so);
+    const soDate = so.createdAt ? new Date(so.createdAt).toISOString().split('T')[0] : new Date().toISOString().split('T')[0];
+    setAutoDate(soDate);
+
+    const custId = so.customer?._id || so.customer?.id || so.customer;
+    setSelectedAutoCustomerId(custId);
+
+    const cust = customers.find(c => c._id === custId || c.id === custId);
+    setVehicleNo(so.vehicleNo || cust?.customerCode || cust?.name || 'Auto Van');
+
+    if (cust && cust.salesOwner) {
+      const ownerId = typeof cust.salesOwner === 'object' ? (cust.salesOwner._id || cust.salesOwner.id) : cust.salesOwner;
+      const matched = users.find(u => (u._id || u.id) === ownerId || u.name === cust.salesOwner?.name);
+      setInchargeId(matched?._id || matched?.id || ownerId || '');
+    } else if (so.salesOwner) {
+      const soOwnerId = typeof so.salesOwner === 'object' ? (so.salesOwner._id || so.salesOwner.id) : so.salesOwner;
+      setInchargeId(soOwnerId || '');
+    }
+
+    // Map Taken stock directly from this Sales Order's items
+    const soTakenMap = {};
+    if (Array.isArray(so.items)) {
+      so.items.forEach(it => {
+        if (it && it.product) {
+          const pId = (it.product._id || it.product.id || it.product).toString();
+          soTakenMap[pId] = (soTakenMap[pId] || 0) + (it.quantityPcs || 0);
+        }
+      });
+    }
+
+    // Fetch previous day opening stock
+    try {
+      const res = await api.get(`/auto-sales/previous-opening?customerId=${custId}&date=${soDate}`);
+      const { openingMap = {} } = res.data.data || {};
+
+      setAutoItems(prev => prev.map(item => {
+        const prevOp = openingMap[item.product] || 0;
+        const soTaken = soTakenMap[item.product] || 0;
+        const tot = prevOp + soTaken;
+        const ret = 0;
+        const sQty = tot;
+        const rate = item.unitPrice || 20;
+        return {
+          ...item,
+          openingQty: prevOp,
+          takenQty: soTaken,
+          totalQty: tot,
+          returnQty: ret,
+          salesQty: sQty,
+          totalSalesValue: sQty * rate
+        };
+      }));
+    } catch (e) {
+      console.error('Failed to load previous opening stock', e);
+    }
+
+    // Reset expenses and collection form
+    setAutoExpenses({ dieselCost: 0, maintenanceCost: 0, otherCost: 0 });
+    setAutoCollection({ cashAmount: 0, paytmAmount: 0, gpayAmount: 0 });
+    setAutoSettlementModalOpen(true);
+  };
+
+  // Open Direct / Manual Auto Settlement Modal
+  const handleOpenDirectAutoSettlement = () => {
+    setActiveAutoSO(null);
+    setSelectedAutoCustomerId('');
+    setVehicleNo('');
+    setInchargeId('');
+    initAutoItemsForm(products);
+    setAutoExpenses({ dieselCost: 0, maintenanceCost: 0, otherCost: 0 });
+    setAutoCollection({ cashAmount: 0, paytmAmount: 0, gpayAmount: 0 });
+    setAutoSettlementModalOpen(true);
+  };
+
+  // Handle Auto Van Selection inside modal
+  const handleAutoVehicleChangeInModal = async (customerId, dateStr = autoDate) => {
     setSelectedAutoCustomerId(customerId);
     const cust = customers.find(c => c._id === customerId);
 
@@ -143,27 +225,26 @@ const ReceiptEntry = () => {
 
     try {
       const res = await api.get(`/auto-sales/previous-opening?customerId=${customerId}&date=${dateStr}`);
-      const { openingMap = {}, takenMap = {}, returnMap = {} } = res.data.data || {};
+      const { openingMap = {}, takenMap = {} } = res.data.data || {};
 
       setAutoItems(prev => prev.map(item => {
         const prevOp = openingMap[item.product] || 0;
         const todayTaken = takenMap[item.product] || 0;
-        const todayReturn = returnMap[item.product] || item.returnQty || 0;
         const tot = prevOp + todayTaken;
-        const sQty = Math.max(0, tot - todayReturn);
+        const sQty = tot;
         const rate = item.unitPrice || 20;
         return {
           ...item,
           openingQty: prevOp,
           takenQty: todayTaken,
           totalQty: tot,
-          returnQty: todayReturn,
+          returnQty: 0,
           salesQty: sQty,
           totalSalesValue: sQty * rate
         };
       }));
     } catch (e) {
-      console.error('Failed to load auto stock opening/taken data', e);
+      console.error('Failed to load auto stock data', e);
     }
   };
 
@@ -211,7 +292,8 @@ const ReceiptEntry = () => {
         incharge: inchargeId,
         items: autoItems.filter(i => i.totalQty > 0 || i.takenQty > 0 || i.openingQty > 0),
         expenses: autoExpenses,
-        collectionBreakdown: autoCollection
+        collectionBreakdown: autoCollection,
+        salesOrderId: activeAutoSO?._id || activeAutoSO?.id || null
       });
 
       alert(res.data.message || 'Auto Sales Daily Settlement Completed!');
@@ -219,9 +301,8 @@ const ReceiptEntry = () => {
         setSelectedReceiptForPrint(res.data.data.receipts[0]);
       }
 
+      setAutoSettlementModalOpen(false);
       await refreshInvoicesAndReceipts();
-      handleAutoVehicleChange(selectedAutoCustomerId, autoDate);
-      setAutoCollection({ cashAmount: 0, paytmAmount: 0, gpayAmount: 0 });
     } catch (error) {
       console.error('Failed to submit auto settlement', error);
       alert(error.response?.data?.message || 'Error processing Auto Sales settlement');
@@ -230,7 +311,7 @@ const ReceiptEntry = () => {
     }
   };
 
-  // Open Payment Modal for a Specific Invoice
+  // Open Payment Modal for a Standard Invoice
   const handleOpenPaymentModal = (invoice) => {
     setSelectedInvoiceForPayment(invoice);
     setReceiptForm({
@@ -261,7 +342,7 @@ const ReceiptEntry = () => {
     setGeneralReceiptModalOpen(true);
   };
 
-  // Submit Standard Receipt (Against Invoice OR General)
+  // Submit Standard Receipt
   const handleSubmitReceipt = async (e) => {
     e.preventDefault();
     if (!receiptForm.customerId) return alert('Please select a Customer.');
@@ -289,8 +370,9 @@ const ReceiptEntry = () => {
     }
   };
 
-  // Filtered Pending Invoices
-  const filteredInvoices = pendingInvoices.filter(inv => {
+  // FILTER 1: STANDARD INVOICES ONLY (Exclude Auto Sales)
+  const standardInvoices = pendingInvoices.filter(inv => (inv.invoiceType || '').toLowerCase() !== 'auto sales');
+  const filteredStandardInvoices = standardInvoices.filter(inv => {
     if (statusFilter !== 'All') {
       const pStatus = inv.paymentStatus?.toLowerCase() || '';
       if (statusFilter === 'Unpaid' && pStatus !== 'unpaid') return false;
@@ -309,6 +391,23 @@ const ReceiptEntry = () => {
     return true;
   });
 
+  // FILTER 2: AUTO SALES ORDERS ONLY
+  const autoSalesInvoices = pendingInvoices.filter(inv => (inv.invoiceType || '').toLowerCase() === 'auto sales');
+  const filteredAutoSalesInvoices = autoSalesInvoices.filter(inv => {
+    if (autoStatusFilter !== 'All') {
+      const pStatus = inv.paymentStatus?.toLowerCase() || '';
+      if (autoStatusFilter === 'Unpaid' && pStatus !== 'unpaid') return false;
+      if (autoStatusFilter === 'Paid' && pStatus !== 'paid') return false;
+    }
+    if (autoSearch) {
+      const term = autoSearch.toLowerCase();
+      const invNo = (inv.invoiceNumber || inv.id || '').toLowerCase();
+      const cName = (inv.customer?.name || '').toLowerCase();
+      if (!invNo.includes(term) && !cName.includes(term)) return false;
+    }
+    return true;
+  });
+
   const autoCustomers = customers.filter(c => 
     (c.customerType || '').toLowerCase().includes('auto') || 
     (c.customerType || '').toLowerCase().includes('vechicle') ||
@@ -319,6 +418,9 @@ const ReceiptEntry = () => {
     if (showAllProducts || !selectedAutoCustomerId) return true;
     return (item.openingQty > 0 || item.takenQty > 0 || item.returnQty > 0);
   });
+
+  const standardPendingCount = standardInvoices.filter(i => i.paymentStatus !== 'Paid').length;
+  const autoPendingCount = autoSalesInvoices.filter(i => i.paymentStatus !== 'Paid').length;
 
   return (
     <div className="space-y-6 max-w-7xl mx-auto pb-16">
@@ -345,7 +447,7 @@ const ReceiptEntry = () => {
                 : 'bg-white text-gray-600 hover:bg-pink-50 border border-pink-200'
             }`}
           >
-            <FileText size={15} /> Standard Receipts ({pendingInvoices.filter(i => i.paymentStatus !== 'Paid').length} Pending)
+            <FileText size={15} /> Standard Receipts ({standardPendingCount} Pending)
           </button>
 
           <button
@@ -356,7 +458,7 @@ const ReceiptEntry = () => {
                 : 'bg-white text-gray-600 hover:bg-pink-50 border border-pink-200'
             }`}
           >
-            <Truck size={15} /> Auto Sales Daily Settlement
+            <Truck size={15} /> Auto Sales Daily Settlement ({autoPendingCount} Pending)
           </button>
 
           <button
@@ -379,7 +481,7 @@ const ReceiptEntry = () => {
       ) : (
         <>
           {/* ========================================================================= */}
-          {/* TAB 1: STANDARD RECEIPTS (AGAINST SALES ORDERS & GENERAL RECEIPTS)         */}
+          {/* TAB 1: STANDARD RECEIPTS (EXCLUDES AUTO SALES INVOICES)                   */}
           {/* ========================================================================= */}
           {activeTab === 'standard' && (
             <div className="space-y-6">
@@ -414,7 +516,7 @@ const ReceiptEntry = () => {
                     className="px-3 py-2 bg-gray-50 border border-pink-200 rounded-xl text-xs font-semibold text-gray-700 outline-none max-w-[200px]"
                   >
                     <option value="">All Customers</option>
-                    {customers.map(c => (
+                    {customers.filter(c => !(c.customerType || '').toLowerCase().includes('auto')).map(c => (
                       <option key={c._id} value={c._id}>{c.name}</option>
                     ))}
                   </select>
@@ -428,15 +530,15 @@ const ReceiptEntry = () => {
                 </button>
               </div>
 
-              {/* Invoices List Table */}
+              {/* Standard Invoices List Table */}
               <div className="bg-white rounded-2xl border border-pink-200 shadow-sm overflow-hidden">
                 <div className="p-4 bg-gradient-to-r from-pink-50 to-white border-b border-pink-200 flex items-center justify-between">
                   <div className="flex items-center gap-2 text-xs font-bold text-gray-700 uppercase tracking-wider">
                     <FileText size={16} className="text-[var(--color-primary)]" />
-                    Sales Invoices with Outstanding Balance ({filteredInvoices.length})
+                    Standard Sales Invoices with Outstanding Balance ({filteredStandardInvoices.length})
                   </div>
                   <span className="text-xs text-gray-500 font-medium">
-                    Click "Receive Payment" to log full or partial payments
+                    Party Orders, Dealers & Regular Sales Invoices
                   </span>
                 </div>
 
@@ -455,7 +557,7 @@ const ReceiptEntry = () => {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-100">
-                      {filteredInvoices.map((inv) => {
+                      {filteredStandardInvoices.map((inv) => {
                         const grandTotal = inv.grandTotal || 0;
                         const paid = inv.paidAmount || 0;
                         const pending = inv.pendingAmount !== undefined ? inv.pendingAmount : Math.max(0, grandTotal - paid);
@@ -528,10 +630,10 @@ const ReceiptEntry = () => {
                         );
                       })}
 
-                      {filteredInvoices.length === 0 && (
+                      {filteredStandardInvoices.length === 0 && (
                         <tr>
                           <td colSpan="8" className="px-6 py-12 text-center text-gray-400 font-medium">
-                            No matching sales invoices found.
+                            No matching standard sales invoices found.
                           </td>
                         </tr>
                       )}
@@ -543,322 +645,141 @@ const ReceiptEntry = () => {
           )}
 
           {/* ========================================================================= */}
-          {/* TAB 2: AUTO SALES DAILY STOCK SETTLEMENT & EXPENSE VOUCHER                */}
+          {/* TAB 2: AUTO SALES DAILY SETTLEMENT (LISTS AUTO SOs -> OPENS MODAL)        */}
           {/* ========================================================================= */}
           {activeTab === 'auto_settlement' && (
             <div className="space-y-6">
-              <form onSubmit={handleSubmitAutoSettlement} className="space-y-6">
-                {/* Header Selector Card */}
-                <div className="bg-white p-6 rounded-2xl border border-pink-200 shadow-sm space-y-4">
-                  <div className="text-center border-b border-pink-100 pb-3">
-                    <h2 className="text-base font-black text-gray-900 tracking-wider">SRI SARAVANASS ICE CREAMS</h2>
-                    <p className="text-xs text-[var(--color-primary)] font-bold uppercase tracking-widest mt-0.5">
-                      AUTO SALES — DAILY STOCK SETTLEMENT & RECEIPT VOUCHER
-                    </p>
+              {/* Top Controls & Action Bar */}
+              <div className="bg-white/90 backdrop-blur-md p-5 rounded-2xl border border-pink-200/80 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4">
+                <div className="flex items-center gap-3 flex-wrap flex-1">
+                  <div className="relative min-w-[240px] flex-1">
+                    <Search className="absolute left-3 top-2.5 text-gray-400" size={16} />
+                    <input
+                      type="text"
+                      placeholder="Search Auto Invoice # or Van Driver Name..."
+                      value={autoSearch}
+                      onChange={(e) => setAutoSearch(e.target.value)}
+                      className="w-full pl-9 pr-4 py-2 bg-gray-50 border border-pink-200 rounded-xl text-xs focus:ring-2 focus:ring-pink-400 outline-none"
+                    />
                   </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                    <div>
-                      <label className="block text-xs font-bold text-gray-700 mb-1">SETTLEMENT DATE *</label>
-                      <input
-                        type="date"
-                        value={autoDate}
-                        onChange={(e) => {
-                          setAutoDate(e.target.value);
-                          if (selectedAutoCustomerId) handleAutoVehicleChange(selectedAutoCustomerId, e.target.value);
-                        }}
-                        className="w-full px-3 py-2 bg-gray-50 border border-pink-200 rounded-xl text-xs font-bold text-gray-800 outline-none"
-                        required
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-xs font-bold text-gray-700 mb-1">SELECT AUTO SALES VAN *</label>
-                      <select
-                        value={selectedAutoCustomerId}
-                        onChange={(e) => handleAutoVehicleChange(e.target.value, autoDate)}
-                        className="w-full px-3 py-2 bg-pink-50/60 border-2 border-pink-300 rounded-xl text-xs font-bold text-gray-800 outline-none focus:ring-2 focus:ring-pink-400"
-                        required
-                      >
-                        <option value="">-- Choose Auto Van --</option>
-                        {autoCustomers.map(c => (
-                          <option key={c._id} value={c._id}>{c.name} ({c.customerCode || 'Van'})</option>
-                        ))}
-                      </select>
-                    </div>
-
-                    <div>
-                      <label className="block text-xs font-bold text-gray-700 mb-1">VEHICLE NO / REG CODE</label>
-                      <input
-                        type="text"
-                        value={vehicleNo}
-                        readOnly
-                        placeholder="Auto Reg No"
-                        className="w-full px-3 py-2 bg-gray-100 border border-gray-200 rounded-xl text-xs font-bold text-gray-600 outline-none"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-xs font-bold text-gray-700 mb-1">INCHARGE / SALES DRIVER</label>
-                      <select
-                        value={inchargeId}
-                        onChange={(e) => setInchargeId(e.target.value)}
-                        className="w-full px-3 py-2 bg-gray-50 border border-pink-200 rounded-xl text-xs font-semibold text-gray-800 outline-none"
-                      >
-                        <option value="">-- Select Driver / Staff --</option>
-                        {users.map(u => (
-                          <option key={u._id || u.id} value={u._id || u.id}>{u.name} ({u.employeeId || 'Staff'})</option>
-                        ))}
-                      </select>
-                    </div>
-                  </div>
+                  <select
+                    value={autoStatusFilter}
+                    onChange={(e) => setAutoStatusFilter(e.target.value)}
+                    className="px-3 py-2 bg-gray-50 border border-pink-200 rounded-xl text-xs font-semibold text-gray-700 outline-none"
+                  >
+                    <option value="All">All Settlement Status</option>
+                    <option value="Unpaid">Pending Settlement</option>
+                    <option value="Paid">Settled</option>
+                  </select>
                 </div>
 
-                {/* Stock Table Grid */}
-                <div className="bg-white rounded-2xl border border-pink-200 shadow-sm overflow-hidden">
-                  <div className="p-4 bg-gradient-to-r from-pink-50 to-white border-b border-pink-200 flex items-center justify-between">
-                    <div className="text-xs font-bold text-gray-800 uppercase tracking-wider flex items-center gap-2">
-                      <Truck size={16} className="text-[var(--color-primary)]" />
-                      Daily Stock Reconciliation & Sales Calculation ({displayedAutoItems.length} Products)
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => setShowAllProducts(!showAllProducts)}
-                      className="px-3 py-1 rounded-lg bg-pink-100 hover:bg-pink-200 text-pink-800 text-[11px] font-bold transition-all"
-                    >
-                      {showAllProducts ? 'Show Only Active Van Products' : '+ Show All Master Products'}
-                    </button>
+                <button
+                  onClick={handleOpenDirectAutoSettlement}
+                  className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold shadow-md shadow-indigo-600/20 flex items-center gap-2 transition-all shrink-0"
+                >
+                  <Plus size={16} /> + Direct Van Stock Settlement
+                </button>
+              </div>
+
+              {/* Auto Sales Orders List Table */}
+              <div className="bg-white rounded-2xl border border-pink-200 shadow-sm overflow-hidden">
+                <div className="p-4 bg-gradient-to-r from-pink-50 to-white border-b border-pink-200 flex items-center justify-between">
+                  <div className="flex items-center gap-2 text-xs font-bold text-gray-700 uppercase tracking-wider">
+                    <Truck size={16} className="text-[var(--color-primary)]" />
+                    Auto Sales Daily Dispatches & Invoices ({filteredAutoSalesInvoices.length})
                   </div>
+                  <span className="text-xs text-gray-500 font-medium">
+                    Click "Settle Van & Stock Return" to calculate sold qty, deduct diesel expenses & finalize receipt
+                  </span>
+                </div>
 
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-left text-xs text-gray-800">
-                      <thead className="bg-gradient-to-r from-[var(--color-primary)] to-pink-600 text-white uppercase text-[10px] tracking-wider font-extrabold">
-                        <tr>
-                          <th className="px-3 py-3 text-center w-12">S.NO</th>
-                          <th className="px-4 py-3">PRODUCT NAME</th>
-                          <th className="px-3 py-3 text-center bg-amber-600/90">OPENING (PCS)</th>
-                          <th className="px-3 py-3 text-center bg-blue-600/90">TAKEN (PCS)</th>
-                          <th className="px-3 py-3 text-center bg-indigo-700/90">TOTAL (PCS)</th>
-                          <th className="px-3 py-3 text-center bg-rose-600/90">RETURN UNSOLD (PCS)</th>
-                          <th className="px-3 py-3 text-center bg-emerald-700/90">NET SALES QTY</th>
-                          <th className="px-3 py-3 text-right">RATE (₹)</th>
-                          <th className="px-4 py-3 text-right">SALES VALUE (₹)</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-gray-100">
-                        {displayedAutoItems.map((item, idx) => {
-                          const originalIdx = autoItems.findIndex(i => i.product === item.product);
-                          return (
-                            <tr key={item.product || idx} className="hover:bg-pink-50/30 transition-colors">
-                              <td className="px-3 py-2.5 text-center font-bold text-gray-400">{idx + 1}</td>
-                              <td className="px-4 py-2.5 font-bold text-gray-900">{item.productName}</td>
-                              
-                              <td className="px-3 py-2.5 text-center font-black text-amber-700 bg-amber-50/50">
-                                {item.openingQty || 0}
-                              </td>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-xs text-gray-700">
+                    <thead className="bg-gradient-to-r from-[var(--color-primary)] to-pink-600 text-white uppercase text-[10px] tracking-wider font-extrabold">
+                      <tr>
+                        <th className="px-5 py-3.5">Invoice # & Date</th>
+                        <th className="px-5 py-3.5">Auto Van / Driver</th>
+                        <th className="px-4 py-3.5">Sales Owner</th>
+                        <th className="px-4 py-3.5 text-right">Dispatched Value (₹)</th>
+                        <th className="px-4 py-3.5 text-right">Settled Amount (₹)</th>
+                        <th className="px-4 py-3.5 text-center">Status</th>
+                        <th className="px-5 py-3.5 text-center">Action</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-100">
+                      {filteredAutoSalesInvoices.map((so) => {
+                        const grandTotal = so.grandTotal || 0;
+                        const paid = so.paidAmount || 0;
+                        const isSettled = so.paymentStatus === 'Paid' || so.status === 'Paid';
 
-                              <td className="px-3 py-2.5 text-center font-black text-blue-700 bg-blue-50/50">
-                                {item.takenQty || 0}
-                              </td>
+                        return (
+                          <tr key={so._id || so.id} className="hover:bg-pink-50/40 transition-colors">
+                            <td className="px-5 py-3.5 font-bold text-gray-900">
+                              <div>{so.invoiceNumber || so.id}</div>
+                              <div className="text-[10px] text-gray-400 font-normal">
+                                {new Date(so.createdAt).toLocaleDateString('en-GB')}
+                              </div>
+                            </td>
 
-                              <td className="px-3 py-2.5 text-center font-black text-indigo-900 bg-indigo-50/50">
-                                {item.totalQty || 0}
-                              </td>
+                            <td className="px-5 py-3.5">
+                              <div className="font-semibold text-gray-900">{so.customer?.name || 'Auto Van Driver'}</div>
+                              <span className="inline-block px-2 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-200 mt-0.5">
+                                {so.customer?.customerCode || 'Auto Van'}
+                              </span>
+                            </td>
 
-                              <td className="px-3 py-2.5 text-center bg-rose-50/50">
-                                <input
-                                  type="number"
-                                  min="0"
-                                  max={item.totalQty || 9999}
-                                  value={item.returnQty === 0 ? '' : item.returnQty}
-                                  placeholder="0"
-                                  onChange={(e) => handleAutoItemReturnChange(originalIdx, e.target.value)}
-                                  className="w-20 px-2 py-1 bg-white border-2 border-rose-300 rounded-lg text-center font-black text-rose-700 outline-none focus:ring-2 focus:ring-rose-400"
-                                />
-                              </td>
+                            <td className="px-4 py-3.5 text-gray-600">
+                              {so.salesOwner?.name || 'Staff'}
+                            </td>
 
-                              <td className="px-3 py-2.5 text-center font-black text-emerald-800 bg-emerald-50/50 text-sm">
-                                {item.salesQty || 0}
-                              </td>
+                            <td className="px-4 py-3.5 text-right font-bold text-gray-900">
+                              ₹{grandTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                            </td>
 
-                              <td className="px-3 py-2.5 text-right font-bold text-gray-700">
-                                ₹{item.unitPrice}
-                              </td>
+                            <td className="px-4 py-3.5 text-right font-semibold text-emerald-600">
+                              ₹{paid.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                            </td>
 
-                              <td className="px-4 py-2.5 text-right font-black text-gray-900">
-                                ₹{(item.totalSalesValue || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
-                              </td>
-                            </tr>
-                          );
-                        })}
+                            <td className="px-4 py-3.5 text-center">
+                              {isSettled ? (
+                                <span className="px-2.5 py-1 rounded-full text-[10px] font-black bg-emerald-100 text-emerald-700 border border-emerald-300">
+                                  SETTLED
+                                </span>
+                              ) : (
+                                <span className="px-2.5 py-1 rounded-full text-[10px] font-black bg-rose-100 text-rose-700 border border-rose-300">
+                                  PENDING SETTLEMENT
+                                </span>
+                              )}
+                            </td>
 
-                        {displayedAutoItems.length === 0 && (
-                          <tr>
-                            <td colSpan="9" className="px-6 py-10 text-center text-gray-400">
-                              Please select an Auto Van above to load product stock.
+                            <td className="px-5 py-3.5 text-center">
+                              <button
+                                onClick={() => handleOpenAutoSettlementForSO(so)}
+                                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all shadow-sm flex items-center gap-1.5 mx-auto ${
+                                  isSettled
+                                    ? 'bg-gray-100 hover:bg-gray-200 text-gray-700'
+                                    : 'bg-gradient-to-r from-indigo-600 to-[var(--color-primary)] text-white hover:opacity-95'
+                                }`}
+                              >
+                                <Truck size={13} /> {isSettled ? 'Re-settle Van' : 'Settle Van & Stock Return'}
+                              </button>
                             </td>
                           </tr>
-                        )}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
+                        );
+                      })}
 
-                {/* Expenses & Financial Summary Section */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  {/* Daily Expenses Box */}
-                  <div className="bg-white p-5 rounded-2xl border border-pink-200 shadow-sm space-y-4">
-                    <div className="flex items-center gap-2 text-xs font-black text-gray-800 uppercase tracking-wider border-b border-pink-100 pb-2">
-                      <Fuel size={16} className="text-amber-600" />
-                      Daily Auto Expenses (Deducted from Collection)
-                    </div>
-
-                    <div className="space-y-3">
-                      <div>
-                        <label className="block text-xs font-bold text-gray-700 mb-1">Diesel / Fuel Cost (₹)</label>
-                        <input
-                          type="number"
-                          min="0"
-                          value={autoExpenses.dieselCost || ''}
-                          placeholder="0.00"
-                          onChange={(e) => setAutoExpenses({ ...autoExpenses, dieselCost: e.target.value })}
-                          className="w-full px-3 py-2 bg-gray-50 border border-pink-200 rounded-xl text-xs font-bold text-gray-800 outline-none focus:ring-2 focus:ring-pink-400"
-                        />
-                      </div>
-
-                      <div>
-                        <label className="block text-xs font-bold text-gray-700 mb-1">Vehicle Maintenance / Repairs (₹)</label>
-                        <input
-                          type="number"
-                          min="0"
-                          value={autoExpenses.maintenanceCost || ''}
-                          placeholder="0.00"
-                          onChange={(e) => setAutoExpenses({ ...autoExpenses, maintenanceCost: e.target.value })}
-                          className="w-full px-3 py-2 bg-gray-50 border border-pink-200 rounded-xl text-xs font-bold text-gray-800 outline-none focus:ring-2 focus:ring-pink-400"
-                        />
-                      </div>
-
-                      <div>
-                        <label className="block text-xs font-bold text-gray-700 mb-1">Toll / Other Incidental Expenses (₹)</label>
-                        <input
-                          type="number"
-                          min="0"
-                          value={autoExpenses.otherCost || ''}
-                          placeholder="0.00"
-                          onChange={(e) => setAutoExpenses({ ...autoExpenses, otherCost: e.target.value })}
-                          className="w-full px-3 py-2 bg-gray-50 border border-pink-200 rounded-xl text-xs font-bold text-gray-800 outline-none focus:ring-2 focus:ring-pink-400"
-                        />
-                      </div>
-
-                      <div className="pt-2 border-t border-gray-100 flex justify-between items-center text-xs font-bold">
-                        <span className="text-gray-500">Total Deductible Expenses:</span>
-                        <span className="text-rose-600 font-black text-sm">
-                          ₹{autoTotalExpenses.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Financial Settlement & Net Collection Box */}
-                  <div className="bg-gradient-to-br from-pink-50/80 to-white p-5 rounded-2xl border-2 border-pink-300 shadow-sm space-y-4">
-                    <div className="flex items-center justify-between border-b border-pink-200 pb-2">
-                      <div className="text-xs font-black text-gray-800 uppercase tracking-wider">
-                        Financial Settlement & Receipt
-                      </div>
-                      <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-emerald-100 text-emerald-800">
-                        Net Amount to Collect
-                      </span>
-                    </div>
-
-                    <div className="space-y-2 text-xs">
-                      <div className="flex justify-between text-gray-600">
-                        <span>Gross Sold Value:</span>
-                        <span className="font-bold text-gray-900">
-                          ₹{autoGrossSalesTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
-                        </span>
-                      </div>
-
-                      <div className="flex justify-between text-rose-600">
-                        <span>Less: Extra Expenses (Diesel + Repairs):</span>
-                        <span className="font-bold">
-                          - ₹{autoTotalExpenses.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
-                        </span>
-                      </div>
-
-                      <div className="pt-2 border-t border-pink-200 flex justify-between items-center">
-                        <span className="font-black text-gray-900 text-sm">Net Final Cash/UPI Handover:</span>
-                        <span className="text-xl font-black text-emerald-600">
-                          ₹{autoNetCollectionTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
-                        </span>
-                      </div>
-                    </div>
-
-                    {/* Payment Mode Breakdown Inputs */}
-                    <div className="pt-3 border-t border-pink-200 space-y-2">
-                      <div className="text-[11px] font-bold text-gray-700">Payment Breakdown Received:</div>
-                      <div className="grid grid-cols-3 gap-2">
-                        <div>
-                          <label className="block text-[10px] font-bold text-gray-500 mb-0.5">Cash (₹)</label>
-                          <input
-                            type="number"
-                            min="0"
-                            value={autoCollection.cashAmount || ''}
-                            placeholder="0.00"
-                            onChange={(e) => setAutoCollection({ ...autoCollection, cashAmount: e.target.value })}
-                            className="w-full px-2 py-1.5 bg-white border border-pink-200 rounded-lg text-xs font-bold text-gray-800"
-                          />
-                        </div>
-
-                        <div>
-                          <label className="block text-[10px] font-bold text-gray-500 mb-0.5">Paytm (₹)</label>
-                          <input
-                            type="number"
-                            min="0"
-                            value={autoCollection.paytmAmount || ''}
-                            placeholder="0.00"
-                            onChange={(e) => setAutoCollection({ ...autoCollection, paytmAmount: e.target.value })}
-                            className="w-full px-2 py-1.5 bg-white border border-pink-200 rounded-lg text-xs font-bold text-gray-800"
-                          />
-                        </div>
-
-                        <div>
-                          <label className="block text-[10px] font-bold text-gray-500 mb-0.5">GPay / UPI (₹)</label>
-                          <input
-                            type="number"
-                            min="0"
-                            value={autoCollection.gpayAmount || ''}
-                            placeholder="0.00"
-                            onChange={(e) => setAutoCollection({ ...autoCollection, gpayAmount: e.target.value })}
-                            className="w-full px-2 py-1.5 bg-white border border-pink-200 rounded-lg text-xs font-bold text-gray-800"
-                          />
-                        </div>
-                      </div>
-
-                      {autoPendingDifference !== 0 && autoTotalCollected > 0 && (
-                        <div className="text-[11px] font-bold text-amber-600 bg-amber-50 p-2 rounded-lg border border-amber-200">
-                          Difference from Net Value: ₹{autoPendingDifference.toFixed(2)}
-                        </div>
+                      {filteredAutoSalesInvoices.length === 0 && (
+                        <tr>
+                          <td colSpan="7" className="px-6 py-12 text-center text-gray-400 font-medium">
+                            No Auto Sales orders found. You can also click "+ Direct Van Stock Settlement" to reconcile without an SO.
+                          </td>
+                        </tr>
                       )}
-                    </div>
-
-                    <button
-                      type="submit"
-                      disabled={submitting}
-                      className="w-full mt-3 py-3 bg-gradient-to-r from-[var(--color-primary)] to-pink-600 hover:opacity-90 text-white rounded-xl text-xs font-black uppercase tracking-wider shadow-lg shadow-pink-500/20 flex items-center justify-center gap-2 transition-all disabled:opacity-50"
-                    >
-                      {submitting ? (
-                        <>
-                          <Loader2 size={16} className="animate-spin" /> Finalizing Settlement...
-                        </>
-                      ) : (
-                        <>
-                          <CheckCircle2 size={16} /> Finalize Settlement & Generate Receipt
-                        </>
-                      )}
-                    </button>
-                  </div>
+                    </tbody>
+                  </table>
                 </div>
-              </form>
+              </div>
             </div>
           )}
 
@@ -952,7 +873,263 @@ const ReceiptEntry = () => {
       )}
 
       {/* ========================================================================= */}
-      {/* MODAL: RECEIVE PAYMENT AGAINST INVOICE                                    */}
+      {/* MODAL: AUTO SALES DAILY STOCK SETTLEMENT & EXPENSE VOUCHER                */}
+      {/* ========================================================================= */}
+      {autoSettlementModalOpen && (
+        <Modal
+          isOpen={autoSettlementModalOpen}
+          onClose={() => setAutoSettlementModalOpen(false)}
+          title={activeAutoSO ? `Auto Sales Settlement — ${activeAutoSO.invoiceNumber || activeAutoSO.id}` : 'Auto Van Daily Stock & Expense Settlement'}
+        >
+          <form onSubmit={handleSubmitAutoSettlement} className="space-y-5 max-h-[80vh] overflow-y-auto pr-1">
+            {/* Header info */}
+            <div className="bg-pink-50/70 p-4 rounded-xl border border-pink-200 grid grid-cols-1 md:grid-cols-4 gap-3">
+              <div>
+                <label className="block text-[11px] font-bold text-gray-700 mb-1">Settlement Date *</label>
+                <input
+                  type="date"
+                  value={autoDate}
+                  onChange={(e) => {
+                    setAutoDate(e.target.value);
+                    if (selectedAutoCustomerId) handleAutoVehicleChangeInModal(selectedAutoCustomerId, e.target.value);
+                  }}
+                  className="w-full px-2.5 py-1.5 bg-white border border-pink-200 rounded-lg text-xs font-bold"
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-bold text-gray-700 mb-1">Auto Sales Van *</label>
+                <select
+                  value={selectedAutoCustomerId}
+                  onChange={(e) => handleAutoVehicleChangeInModal(e.target.value, autoDate)}
+                  className="w-full px-2.5 py-1.5 bg-white border border-pink-200 rounded-lg text-xs font-bold"
+                  required
+                >
+                  <option value="">-- Choose Auto Van --</option>
+                  {autoCustomers.map(c => (
+                    <option key={c._id} value={c._id}>{c.name} ({c.customerCode || 'Van'})</option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-bold text-gray-700 mb-1">Vehicle Reg No</label>
+                <input
+                  type="text"
+                  value={vehicleNo}
+                  readOnly
+                  placeholder="Auto Reg No"
+                  className="w-full px-2.5 py-1.5 bg-gray-100 border border-gray-200 rounded-lg text-xs font-bold text-gray-600"
+                />
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-bold text-gray-700 mb-1">Driver / Incharge</label>
+                <select
+                  value={inchargeId}
+                  onChange={(e) => setInchargeId(e.target.value)}
+                  className="w-full px-2.5 py-1.5 bg-white border border-pink-200 rounded-lg text-xs font-semibold"
+                >
+                  <option value="">-- Select Driver --</option>
+                  {users.map(u => (
+                    <option key={u._id || u.id} value={u._id || u.id}>{u.name} ({u.employeeId || 'Staff'})</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            {/* Stock Reconciliation Grid */}
+            <div className="bg-white rounded-xl border border-pink-200 overflow-hidden shadow-xs">
+              <div className="p-3 bg-gradient-to-r from-pink-50 to-white border-b border-pink-200 flex items-center justify-between">
+                <span className="text-xs font-bold text-gray-800 uppercase tracking-wider">
+                  Fill Unsold Returns to Calculate Sales Value ({displayedAutoItems.length} Products)
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setShowAllProducts(!showAllProducts)}
+                  className="px-2.5 py-0.5 rounded bg-pink-100 hover:bg-pink-200 text-pink-800 text-[10px] font-bold transition-all"
+                >
+                  {showAllProducts ? 'Show Only Active Products' : '+ Show All Products'}
+                </button>
+              </div>
+
+              <div className="overflow-x-auto max-h-60 overflow-y-auto">
+                <table className="w-full text-left text-xs text-gray-800">
+                  <thead className="bg-gray-100 text-gray-700 uppercase text-[10px] font-extrabold sticky top-0">
+                    <tr>
+                      <th className="px-3 py-2 text-center w-10">#</th>
+                      <th className="px-3 py-2">Product</th>
+                      <th className="px-2 py-2 text-center bg-amber-100 text-amber-900">Opening</th>
+                      <th className="px-2 py-2 text-center bg-blue-100 text-blue-900">Taken (SO)</th>
+                      <th className="px-2 py-2 text-center bg-indigo-100 text-indigo-900">Total</th>
+                      <th className="px-2 py-2 text-center bg-rose-100 text-rose-900">Return Unsold</th>
+                      <th className="px-2 py-2 text-center bg-emerald-100 text-emerald-900">Sold</th>
+                      <th className="px-2 py-2 text-right">Rate</th>
+                      <th className="px-3 py-2 text-right">Value (₹)</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100">
+                    {displayedAutoItems.map((item, idx) => {
+                      const originalIdx = autoItems.findIndex(i => i.product === item.product);
+                      return (
+                        <tr key={item.product || idx} className="hover:bg-pink-50/20">
+                          <td className="px-3 py-2 text-center text-gray-400 font-bold">{idx + 1}</td>
+                          <td className="px-3 py-2 font-bold text-gray-900">{item.productName}</td>
+                          <td className="px-2 py-2 text-center font-black text-amber-700 bg-amber-50/40">{item.openingQty || 0}</td>
+                          <td className="px-2 py-2 text-center font-black text-blue-700 bg-blue-50/40">{item.takenQty || 0}</td>
+                          <td className="px-2 py-2 text-center font-black text-indigo-900 bg-indigo-50/40">{item.totalQty || 0}</td>
+                          <td className="px-2 py-2 text-center bg-rose-50/40">
+                            <input
+                              type="number"
+                              min="0"
+                              max={item.totalQty || 9999}
+                              value={item.returnQty === 0 ? '' : item.returnQty}
+                              placeholder="0"
+                              onChange={(e) => handleAutoItemReturnChange(originalIdx, e.target.value)}
+                              className="w-16 px-1.5 py-0.5 bg-white border border-rose-300 rounded text-center font-black text-rose-700 outline-none focus:ring-1 focus:ring-rose-400"
+                            />
+                          </td>
+                          <td className="px-2 py-2 text-center font-black text-emerald-800 bg-emerald-50/40">{item.salesQty || 0}</td>
+                          <td className="px-2 py-2 text-right font-semibold text-gray-700">₹{item.unitPrice}</td>
+                          <td className="px-3 py-2 text-right font-black text-gray-900">
+                            ₹{(item.totalSalesValue || 0).toFixed(2)}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            {/* Expenses & Collection Grid */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {/* Daily Expenses */}
+              <div className="bg-gray-50 p-3.5 rounded-xl border border-gray-200 space-y-2 text-xs">
+                <div className="font-bold text-gray-800 flex items-center gap-1">
+                  <Fuel size={14} className="text-amber-600" /> Daily Expenses (Deducted from Collection)
+                </div>
+                <div className="grid grid-cols-3 gap-2">
+                  <div>
+                    <label className="block text-[10px] font-bold text-gray-600 mb-0.5">Diesel (₹)</label>
+                    <input
+                      type="number"
+                      min="0"
+                      value={autoExpenses.dieselCost || ''}
+                      placeholder="0.00"
+                      onChange={(e) => setAutoExpenses({ ...autoExpenses, dieselCost: e.target.value })}
+                      className="w-full px-2 py-1 bg-white border border-gray-300 rounded text-xs font-bold"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-bold text-gray-600 mb-0.5">Repairs (₹)</label>
+                    <input
+                      type="number"
+                      min="0"
+                      value={autoExpenses.maintenanceCost || ''}
+                      placeholder="0.00"
+                      onChange={(e) => setAutoExpenses({ ...autoExpenses, maintenanceCost: e.target.value })}
+                      className="w-full px-2 py-1 bg-white border border-gray-300 rounded text-xs font-bold"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-bold text-gray-600 mb-0.5">Other (₹)</label>
+                    <input
+                      type="number"
+                      min="0"
+                      value={autoExpenses.otherCost || ''}
+                      placeholder="0.00"
+                      onChange={(e) => setAutoExpenses({ ...autoExpenses, otherCost: e.target.value })}
+                      className="w-full px-2 py-1 bg-white border border-gray-300 rounded text-xs font-bold"
+                    />
+                  </div>
+                </div>
+                <div className="text-right font-black text-rose-600 text-[11px] pt-1">
+                  Total Deductions: - ₹{autoTotalExpenses.toFixed(2)}
+                </div>
+              </div>
+
+              {/* Settlement Summary */}
+              <div className="bg-pink-50/70 p-3.5 rounded-xl border border-pink-200 space-y-2 text-xs">
+                <div className="flex justify-between font-semibold text-gray-700">
+                  <span>Gross Sold Value:</span>
+                  <span className="font-bold text-gray-900">₹{autoGrossSalesTotal.toFixed(2)}</span>
+                </div>
+                <div className="flex justify-between font-semibold text-rose-600">
+                  <span>Less Expenses:</span>
+                  <span>- ₹{autoTotalExpenses.toFixed(2)}</span>
+                </div>
+                <div className="flex justify-between items-center pt-1 border-t border-pink-200">
+                  <span className="font-black text-gray-900 text-sm">Net Handover Amount:</span>
+                  <span className="text-base font-black text-emerald-600">₹{autoNetCollectionTotal.toFixed(2)}</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Collection Breakdown */}
+            <div className="space-y-1.5 pt-1">
+              <div className="text-[11px] font-bold text-gray-700">Received Collection Breakdown:</div>
+              <div className="grid grid-cols-3 gap-2">
+                <div>
+                  <label className="block text-[10px] font-bold text-gray-500 mb-0.5">Cash (₹)</label>
+                  <input
+                    type="number"
+                    min="0"
+                    value={autoCollection.cashAmount || ''}
+                    placeholder="0.00"
+                    onChange={(e) => setAutoCollection({ ...autoCollection, cashAmount: e.target.value })}
+                    className="w-full px-2 py-1.5 bg-white border border-pink-200 rounded-lg text-xs font-bold text-gray-800"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-bold text-gray-500 mb-0.5">Paytm (₹)</label>
+                  <input
+                    type="number"
+                    min="0"
+                    value={autoCollection.paytmAmount || ''}
+                    placeholder="0.00"
+                    onChange={(e) => setAutoCollection({ ...autoCollection, paytmAmount: e.target.value })}
+                    className="w-full px-2 py-1.5 bg-white border border-pink-200 rounded-lg text-xs font-bold text-gray-800"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-bold text-gray-500 mb-0.5">GPay / UPI (₹)</label>
+                  <input
+                    type="number"
+                    min="0"
+                    value={autoCollection.gpayAmount || ''}
+                    placeholder="0.00"
+                    onChange={(e) => setAutoCollection({ ...autoCollection, gpayAmount: e.target.value })}
+                    className="w-full px-2 py-1.5 bg-white border border-pink-200 rounded-lg text-xs font-bold text-gray-800"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Actions */}
+            <div className="flex gap-2 pt-2">
+              <button
+                type="button"
+                onClick={() => setAutoSettlementModalOpen(false)}
+                className="flex-1 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl text-xs font-bold"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={submitting}
+                className="flex-1 py-2.5 bg-gradient-to-r from-[var(--color-primary)] to-pink-600 hover:opacity-95 text-white rounded-xl text-xs font-black uppercase tracking-wider shadow-md shadow-pink-500/20 disabled:opacity-50"
+              >
+                {submitting ? 'Finalizing...' : 'Finalize Settlement & Generate Receipt'}
+              </button>
+            </div>
+          </form>
+        </Modal>
+      )}
+
+      {/* ========================================================================= */}
+      {/* MODAL: RECEIVE PAYMENT AGAINST STANDARD INVOICE                           */}
       {/* ========================================================================= */}
       {paymentModalOpen && selectedInvoiceForPayment && (
         <Modal
